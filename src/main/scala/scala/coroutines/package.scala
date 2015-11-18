@@ -9,12 +9,14 @@ import scala.reflect.macros.whitebox.Context
 
 package object coroutines {
 
-  def coroutine(f: Any): Any = macro coroutineImpl
-
-  def coroutineImpl(c: Context)(f: c.Tree): c.Tree = {
-    import c.universe._
-    println(f)
-    q"()"
+  def yieldval[T](x: T): Unit = {
+    sys.error("Yield allowed only inside coroutines.")
   }
+
+  def yieldto[T](f: Coroutine.Frame[T]): Unit = {
+    sys.error("Yield allowed only inside coroutines.")
+  }
+
+  def coroutine[T](f: Any): Coroutine[T] = macro Coroutine.transformation
 
 }
