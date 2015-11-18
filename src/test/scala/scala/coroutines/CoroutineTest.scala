@@ -19,12 +19,21 @@ class CoroutineTest extends FunSuite with Matchers {
     }
   }
 
-  test("should have the return type that is the least upper bound") {
+  test("should lub yieldvals and returns") {
     val c = coroutine { (x: Int) =>
       yieldval(List(x))
       List(x.toString)
     }
     val d: Coroutine[List[Any]] = c
+  }
+
+  test("should lub yieldtos and returns") {
+    val f: Coroutine.Frame[List[String]] = null
+    val c = coroutine { (x: Int) =>
+      yieldto(f)
+      Vector(x)
+    }
+    val d: Coroutine[Seq[Any]] = null 
   }
 
 }

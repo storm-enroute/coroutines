@@ -29,10 +29,7 @@ object Coroutine {
     }
     val constraintTpes = body.collect {
       case q"$qual.yieldval[$tpt]($v)" if isCoroutines(qual) => tpt.tpe
-      case q"$qual.yieldto[$tpt]($f)" if isCoroutines(qual) => tq"$tpt" match {
-        case tq"Frame[$tpt]" => tpt.tpe
-        case _ => c.abort(f.pos, "The yieldto argument must be a Coroutine.Frame.")
-      }
+      case q"$qual.yieldto[$tpt]($f)" if isCoroutines(qual) => tpt.tpe
     }
     tq"${lub(rettpe :: constraintTpes)}"
   }
@@ -60,7 +57,6 @@ object Coroutine {
     val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpes, $rettpe] {
       def apply(..$args) = ???
     }"""
-    println("tree: " + co)
     co
   }
 
