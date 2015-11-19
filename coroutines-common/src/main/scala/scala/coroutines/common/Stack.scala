@@ -14,7 +14,8 @@ object Stack {
     import c.universe._
 
     val q"$path.${name: TermName}" = stack
-    val stackptr = TermName(s"${name}ptr")
+    val stackptrname = TermName(s"${name}ptr")
+    val stackptr = q"$path.$stackptrname"
     val tpe = implicitly[WeakTypeTag[T]]
     q"""
     if ($stackptr >= $stack.length) {
@@ -33,7 +34,8 @@ object Stack {
     import c.universe._
 
     val q"$path.${name: TermName}" = stack
-    val stackptr = TermName(s"${name}ptr")
+    val stackptrname = TermName(s"${name}ptr")
+    val stackptr = q"$path.$stackptrname"
     val tpe = implicitly[WeakTypeTag[T]]
     val valnme = TermName(c.freshName())
     q"""
@@ -50,7 +52,8 @@ object Stack {
     import c.universe._
 
     val q"$path.${name: TermName}" = stack
-    val stackptr = TermName(s"${name}ptr")
+    val stackptrname = TermName(s"${name}ptr")
+    val stackptr = q"$path.$stackptrname"
     q"""
     $stack($stackptr - 1)
     """
@@ -62,7 +65,8 @@ object Stack {
     import c.universe._
 
     val q"$path.${name: TermName}" = stack
-    val stackptr = TermName(s"${name}ptr")
+    val stackptrname = TermName(s"${name}ptr")
+    val stackptr = q"$path.$stackptrname"
     val valnme = TermName(c.freshName())
 
     q"""

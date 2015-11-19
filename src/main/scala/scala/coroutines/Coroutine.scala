@@ -58,11 +58,11 @@ object Coroutine {
   private[coroutines] class Synthesizer[C <: Context](val c: C) {
     import c.universe._
 
-    def inferReturnType(body: Tree): Tree = {
+    private def inferReturnType(body: Tree): Tree = {
       // return type must correspond to the return type of the function literal
       val rettpe = body.tpe
 
-      // return type must be the lbu of the function return type and yield argument types
+      // return type is the lub of the function return type and yield argument types
       def isCoroutines(q: Tree) = q match {
         case q"coroutines.this.`package`" => true
         case t => false
@@ -74,8 +74,48 @@ object Coroutine {
       tq"${lub(rettpe :: constraintTpes)}"
     }
 
-    def generateVariableMap(args: List[Tree], body: Tree): Map[Symbol, Int] = {
+    private def generateVariableMap(args: List[Tree], body: Tree): Map[Symbol, Int] = {
       Map()
+    }
+
+    private def generateEntryPoints(args: List[Tree], body: Tree,
+      varmap: Map[Symbol, Int]): Map[Int, Tree] = {
+      Map(
+        0 -> q"def ep0() = {}",
+        1 -> q"def ep1() = {}"
+      )
+    }
+
+    private def generateEnterMethod(entrypoints: Map[Int, Tree], tpe: Tree): Tree = {
+      if (entrypoints.size == 1) {
+        val q"def $ep() = $_" = entrypoints(0)
+        q"""
+        def enter(c: Coroutine[$tpe]): Unit = $ep()
+        """
+      } else if (entrypoints.size == 2) {
+        val q"def $ep0() = $_" = entrypoints(0)
+        val q"def $ep1() = $_" = entrypoints(1)
+        q"""
+        def enter(c: Coroutine[$tpe]): Unit = {
+          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+          if (pc == 0) $ep0() else $ep1()
+        }
+        """
+      } else {
+        val cases = for ((index, defdef) <- entrypoints) yield {
+          val q"def $ep() = $rhs" = defdef
+          cq"$index => $ep()"
+        }
+
+        q"""
+        def enter(c: Coroutine[$tpe]): Unit = {
+          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+          (pc: @scala.annotation.switch) match {
+            case ..$cases
+          }
+        }
+        """
+      }
     }
 
     def transform(f: Tree): Tree = {
@@ -98,11 +138,14 @@ object Coroutine {
       val varmap = generateVariableMap(args, body)
 
       // generate entry points from yields and coroutine applies
+      val entrypoints = generateEntryPoints(args, body, varmap)
 
       // generate entry method
+      val entermethod = generateEnterMethod(entrypoints, rettpe)
 
       // emit coroutine instantiation
       val coroutineTpe = TypeName(s"Arity${args.size}")
+      val entrypointmethods = entrypoints.map(_._2)
       val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpes, $rettpe] {
         def apply(..$args) = {
           new Coroutine[$rettpe]
@@ -113,10 +156,10 @@ object Coroutine {
         def pop(c: Coroutine[$rettpe]): Unit = {
           ???
         }
-        def enter(c: Coroutine[$rettpe]): Unit = {
-          ???
-        }
+        $entermethod
+        ..$entrypointmethods
       }"""
+      println(co)
       co
     }
   }
