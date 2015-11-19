@@ -13,10 +13,12 @@ package object coroutines {
     sys.error("Yield allowed only inside coroutines.")
   }
 
-  def yieldto[T](f: Coroutine.Frame[T]): Unit = {
+  def yieldto[T](f: Coroutine[T]): Unit = {
     sys.error("Yield allowed only inside coroutines.")
   }
 
-  def coroutine[T](f: Any): Coroutine[T] = macro Coroutine.transformation
+  def resume[T](co: Coroutine[T]): Unit = macro Coroutine.resume[T]
+
+  def coroutine[T](f: Any): Coroutine.Definition[T] = macro Coroutine.transform
 
 }

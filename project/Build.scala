@@ -92,11 +92,72 @@ object CoroutinesBuild extends MechaRepoBuild {
     case Some((2, major)) if major >= 11 => Seq(
       "org.scalatest" % "scalatest_2.11" % "2.1.7" % "test",
       "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.2",
-      "org.scala-lang" % "scala-reflect" % "2.11.4",
-      "org.json4s" %% "json4s-native" % "3.2.10",
-      "commons-io" % "commons-io" % "2.4",
-      "org.apache.commons" % "commons-compress" % "1.8",
-      "net.databinder.dispatch" %% "dispatch-core" % "0.11.0"
+      "org.scala-lang" % "scala-reflect" % "2.11.4"
+    )
+    case _ => Nil
+  }
+
+  val coroutinesCommonSettings = Defaults.defaultSettings ++
+    MechaRepoPlugin.defaultSettings ++ Seq(
+    name := "coroutines-common",
+    organization := "com.storm-enroute",
+    version <<= frameworkVersion,
+    scalaVersion <<= coroutinesScalaVersion,
+    crossScalaVersions <<= coroutinesCrossScalaVersions,
+    libraryDependencies <++= (scalaVersion)(sv => commonDependencies(sv)),
+    scalacOptions ++= Seq(
+      "-deprecation",
+      "-unchecked",
+      "-optimise",
+      "-Yinline-warnings"
+    ),
+    resolvers ++= Seq(
+      "Sonatype OSS Snapshots" at
+        "https://oss.sonatype.org/content/repositories/snapshots",
+      "Sonatype OSS Releases" at
+        "https://oss.sonatype.org/content/repositories/releases"
+    ),
+    publishMavenStyle := true,
+    publishTo <<= version { (v: String) =>
+      val nexus = "https://oss.sonatype.org/"
+      if (v.trim.endsWith("SNAPSHOT"))
+        Some("snapshots" at nexus + "content/repositories/snapshots")
+      else
+        Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+    },
+    publishArtifact in Test := false,
+    pomIncludeRepository := { _ => false },
+    pomExtra :=
+      <url>http://storm-enroute.com/</url>
+      <licenses>
+        <license>
+          <name>BSD-style</name>
+          <url>http://opensource.org/licenses/BSD-3-Clause</url>
+          <distribution>repo</distribution>
+        </license>
+      </licenses>
+      <scm>
+        <url>git@github.com:storm-enroute/coroutines.git</url>
+        <connection>scm:git:git@github.com:storm-enroute/coroutines.git</connection>
+      </scm>
+      <developers>
+        <developer>
+          <id>axel22</id>
+          <name>Aleksandar Prokopec</name>
+          <url>http://axel22.github.com/</url>
+        </developer>
+      </developers>,
+    mechaDocsRepoKey := "git@github.com:storm-enroute/apidocs.git",
+    mechaDocsBranchKey := "gh-pages",
+    mechaDocsPathKey := "coroutines-common"
+  )
+
+  def commonDependencies(scalaVersion: String) =
+    CrossVersion.partialVersion(scalaVersion) match {
+    case Some((2, major)) if major >= 11 => Seq(
+      "org.scalatest" % "scalatest_2.11" % "2.1.7" % "test",
+      "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.2",
+      "org.scala-lang" % "scala-reflect" % "2.11.4"
     )
     case _ => Nil
   }
@@ -105,6 +166,14 @@ object CoroutinesBuild extends MechaRepoBuild {
     "coroutines",
     file("."),
     settings = coroutinesSettings
-  )
+  ) dependsOn(
+    coroutinesCommon % "compile->compile;test->test"
+  ) dependsOnSuperRepo
+
+  lazy val coroutinesCommon: Project = Project(
+    "coroutines-common",
+    file("coroutines-common"),
+    settings = coroutinesCommonSettings
+  ) dependsOnSuperRepo
 
 }

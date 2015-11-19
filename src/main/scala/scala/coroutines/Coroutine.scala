@@ -2,18 +2,34 @@ package scala.coroutines
 
 
 
+import scala.coroutines.common.Stack
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
 
 
 
-abstract class Coroutine[T] {
+class Coroutine[T] {
+  var costackptr = 0
+  var costack = new Array[Coroutine.Definition[T]](Coroutine.INITIAL_STACK_SIZE)
+
+  final def push(cd: Coroutine.Definition[T]) {
+    Stack.push(costack, cd)
+    cd.push(this)
+  }
+
+  final def pop() {
+    val cd = Stack.pop(costack)
+    cd.pop(this)
+  }
 }
 
 
 object Coroutine {
-  abstract class Frame[T](val coroutine: Coroutine[T]) {
-    def apply(): T
+  private[coroutines] val INITIAL_STACK_SIZE = 8
+
+  abstract class Definition[T] {
+    def push(c: Coroutine[T]): Unit
+    def pop(c: Coroutine[T]): Unit
   }
 
   private def inferReturnType(c: Context)(body: c.Tree): c.Tree = {
@@ -34,7 +50,7 @@ object Coroutine {
     tq"${lub(rettpe :: constraintTpes)}"
   }
 
-  def transformation(c: Context)(f: c.Tree): c.Tree = {
+  def transform(c: Context)(f: c.Tree): c.Tree = {
     import c.universe._
 
     // ensure that argument is a function literal
@@ -55,24 +71,38 @@ object Coroutine {
     // emit coroutine construction
     val coroutineTpe = TypeName(s"Arity${args.size}")
     val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpes, $rettpe] {
-      def apply(..$args) = ???
+      def apply(..$args) = {
+        new Coroutine[$rettpe]
+      }
+      def push(c: Coroutine[$rettpe]) = {
+        ???
+      }
+      def pop(c: Coroutine[$rettpe]) = {
+        ???
+      }
     }"""
     co
   }
 
-  abstract class Arity0[T] extends Coroutine[T] {
-    def apply(): T
+  def resume[T: c.WeakTypeTag](c: Context)(co: c.Tree): c.Tree = {
+    import c.universe._
+
+    q"()"
   }
 
-  abstract class Arity1[A0, T] extends Coroutine[T] {
-    def apply(a0: A0): T
+  abstract class Arity0[T] extends Coroutine.Definition[T] {
+    def apply(): Coroutine[T]
   }
 
-  abstract class Arity2[A0, A1, T] extends Coroutine[T] {
-    def apply(a0: A0, a1: A1): T
+  abstract class Arity1[A0, T] extends Coroutine.Definition[T] {
+    def apply(a0: A0): Coroutine[T]
   }
 
-  abstract class Arity3[A0, A1, A2, T] extends Coroutine[T] {
-    def apply(a0: A0, a1: A1, a2: A2): T
+  abstract class Arity2[A0, A1, T] extends Coroutine.Definition[T] {
+    def apply(a0: A0, a1: A1): Coroutine[T]
+  }
+
+  abstract class Arity3[A0, A1, A2, T] extends Coroutine.Definition[T] {
+    def apply(a0: A0, a1: A1, a2: A2): Coroutine[T]
   }
 }

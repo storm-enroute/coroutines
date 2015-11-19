@@ -24,16 +24,16 @@ class CoroutineTest extends FunSuite with Matchers {
       yieldval(List(x))
       List(x.toString)
     }
-    val d: Coroutine[List[Any]] = c
+    val d: Coroutine.Definition[List[Any]] = c
   }
 
   test("should lub yieldtos and returns") {
-    val f: Coroutine.Frame[List[String]] = null
+    val f: Coroutine[List[String]] = null
     val c = coroutine { (x: Int) =>
       yieldto(f)
       Vector(x)
     }
-    val d: Coroutine[Seq[Any]] = null 
+    val d: Coroutine.Definition[Seq[Any]] = null 
   }
 
 }
