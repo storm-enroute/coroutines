@@ -9,7 +9,7 @@ import scala.reflect.macros.whitebox.Context
 
 
 
-class Coroutine[T] {
+class Coroutine[@specialized T] {
   import Coroutine._
   private[coroutines] var costackptr = 0
   private[coroutines] var costack = new Array[Definition[T]](INITIAL_CO_STACK_SIZE)
@@ -164,19 +164,19 @@ object Coroutine {
     }
   }
 
-  abstract class Arity0[T] extends Coroutine.Definition[T] {
+  abstract class Arity0[@specialized T] extends Coroutine.Definition[T] {
     def apply(): Coroutine[T]
   }
 
-  abstract class Arity1[A0, T] extends Coroutine.Definition[T] {
+  abstract class Arity1[A0, @specialized T] extends Coroutine.Definition[T] {
     def apply(a0: A0): Coroutine[T]
   }
 
-  abstract class Arity2[A0, A1, T] extends Coroutine.Definition[T] {
+  abstract class Arity2[A0, A1, @specialized T] extends Coroutine.Definition[T] {
     def apply(a0: A0, a1: A1): Coroutine[T]
   }
 
-  abstract class Arity3[A0, A1, A2, T] extends Coroutine.Definition[T] {
+  abstract class Arity3[A0, A1, A2, @specialized T] extends Coroutine.Definition[T] {
     def apply(a0: A0, a1: A1, a2: A2): Coroutine[T]
   }
 }
