@@ -17,7 +17,7 @@ package object coroutines {
     sys.error("Yield allowed only inside coroutines.")
   }
 
-  def resume[T](co: Coroutine[T]): Unit = macro Coroutine.resume[T]
+  def resume[T](co: Coroutine[T]): T = macro Coroutine.resume[T]
 
   def coroutine[T](f: Any): Coroutine.Definition[T] = macro Coroutine.transform
 

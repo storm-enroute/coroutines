@@ -24,11 +24,9 @@ class Coroutine[T] {
     cd.pop(this)
   }
 
-  final def enter() {
+  final def enter(): T = {
     val cd = Stack.top(costack)
-    val pc = Stack.top(pcstack)
-    val npc = cd.enter(this, pc)
-    Stack.update(pcstack, npc)
+    cd.enter(this)
   }
 }
 
@@ -39,7 +37,7 @@ object Coroutine {
   abstract class Definition[T] {
     def push(c: Coroutine[T]): Unit
     def pop(c: Coroutine[T]): Unit
-    def enter(c: Coroutine[T], pc: Short): Short
+    def enter(c: Coroutine[T]): T
   }
 
   private def inferReturnType(c: Context)(body: c.Tree): c.Tree = {
@@ -78,7 +76,13 @@ object Coroutine {
     // infer return type
     val rettpe = inferReturnType(c)(body)
 
-    // emit coroutine construction
+    // generate variable map
+
+    // generate entry points
+
+    // generate entry method
+
+    // emit coroutine instantiation
     val coroutineTpe = TypeName(s"Arity${args.size}")
     val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpes, $rettpe] {
       def apply(..$args) = {
@@ -90,7 +94,7 @@ object Coroutine {
       def pop(c: Coroutine[$rettpe]): Unit = {
         ???
       }
-      def enter(c: Coroutine[$rettpe], pc: Short): Short = {
+      def enter(c: Coroutine[$rettpe]): $rettpe = {
         ???
       }
     }"""
