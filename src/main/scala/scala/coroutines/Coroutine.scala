@@ -10,7 +10,9 @@ import scala.reflect.macros.whitebox.Context
 
 class Coroutine[T] {
   var costackptr = 0
-  var costack = new Array[Coroutine.Definition[T]](Coroutine.INITIAL_STACK_SIZE)
+  var costack = new Array[Coroutine.Definition[T]](Coroutine.INITIAL_CO_STACK_SIZE)
+  var pcstackptr = 0
+  var pcstack = new Array[Short](Coroutine.INITIAL_CO_STACK_SIZE)
 
   final def push(cd: Coroutine.Definition[T]) {
     Stack.push(costack, cd)
@@ -21,15 +23,23 @@ class Coroutine[T] {
     val cd = Stack.pop(costack)
     cd.pop(this)
   }
+
+  final def enter() {
+    val cd = Stack.top(costack)
+    val pc = Stack.top(pcstack)
+    val npc = cd.enter(this, pc)
+    Stack.update(pcstack, npc)
+  }
 }
 
 
 object Coroutine {
-  private[coroutines] val INITIAL_STACK_SIZE = 8
+  private[coroutines] val INITIAL_CO_STACK_SIZE = 4
 
   abstract class Definition[T] {
     def push(c: Coroutine[T]): Unit
     def pop(c: Coroutine[T]): Unit
+    def enter(c: Coroutine[T], pc: Short): Short
   }
 
   private def inferReturnType(c: Context)(body: c.Tree): c.Tree = {
@@ -74,10 +84,13 @@ object Coroutine {
       def apply(..$args) = {
         new Coroutine[$rettpe]
       }
-      def push(c: Coroutine[$rettpe]) = {
+      def push(c: Coroutine[$rettpe]): Unit = {
         ???
       }
-      def pop(c: Coroutine[$rettpe]) = {
+      def pop(c: Coroutine[$rettpe]): Unit = {
+        ???
+      }
+      def enter(c: Coroutine[$rettpe], pc: Short): Short = {
         ???
       }
     }"""

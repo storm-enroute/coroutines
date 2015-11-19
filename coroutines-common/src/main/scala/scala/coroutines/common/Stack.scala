@@ -8,12 +8,12 @@ import scala.reflect.macros.whitebox.Context
 
 
 object Stack {
-  def push[T](stack: Array[T], cd: Any): Unit = macro pushMacro[T]
+  def push[T](stack: Array[T], x: T): Unit = macro pushMacro[T]
 
-  def pushMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree, cd: c.Tree): c.Tree = {
+  def pushMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree, x: c.Tree): c.Tree = {
     import c.universe._
 
-    val q"""$path.${name: TermName}""" = stack
+    val q"$path.${name: TermName}" = stack
     val stackptr = TermName(s"${name}ptr")
     val tpe = implicitly[WeakTypeTag[T]]
     q"""
@@ -22,7 +22,7 @@ object Stack {
       java.lang.System.arraycopy($stack, 0, nstack, 0, $stack.length)
       $stack = nstack
     }
-    $stack($stackptr) = $cd
+    $stack($stackptr) = $x
     $stackptr += 1
     """
   }
@@ -32,7 +32,7 @@ object Stack {
   def popMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree): c.Tree = {
     import c.universe._
 
-    val q"""$path.${name: TermName}""" = stack
+    val q"$path.${name: TermName}" = stack
     val stackptr = TermName(s"${name}ptr")
     val tpe = implicitly[WeakTypeTag[T]]
     val valnme = TermName(c.freshName())
@@ -43,4 +43,33 @@ object Stack {
     $valnme
     """
   }
+
+  def top[T](stack: Array[T]): T = macro topMacro[T]
+
+  def topMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree): c.Tree = {
+    import c.universe._
+
+    val q"$path.${name: TermName}" = stack
+    val stackptr = TermName(s"${name}ptr")
+    q"""
+    $stack($stackptr - 1)
+    """
+  }
+
+  def update[T](stack: Array[T], x: T): T = macro updateMacro[T]
+
+  def updateMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree, x: c.Tree): c.Tree = {
+    import c.universe._
+
+    val q"$path.${name: TermName}" = stack
+    val stackptr = TermName(s"${name}ptr")
+    val valnme = TermName(c.freshName())
+
+    q"""
+    val $valnme = $stack($stackptr)
+    $stack($stackptr - 1) = $x
+    $valnme
+    """
+  }
+
 }
