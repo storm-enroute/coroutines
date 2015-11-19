@@ -51,65 +51,74 @@ object Coroutine {
     def enter(c: Coroutine[T]): Unit
   }
 
-  private def inferReturnType(c: Context)(body: c.Tree): c.Tree = {
-    import c.universe._
-
-    // return type must correspond to the return type of the function literal
-    val rettpe = body.tpe
-
-    // return type must be the lbu of the function return type and yield argument types
-    def isCoroutines(q: Tree) = q match {
-      case q"coroutines.this.`package`" => true
-      case t => false
-    }
-    val constraintTpes = body.collect {
-      case q"$qual.yieldval[$tpt]($v)" if isCoroutines(qual) => tpt.tpe
-      case q"$qual.yieldto[$tpt]($f)" if isCoroutines(qual) => tpt.tpe
-    }
-    tq"${lub(rettpe :: constraintTpes)}"
+  def transform(c: Context)(f: c.Tree): c.Tree = {
+    new Synthesizer[c.type](c).transform(f)
   }
 
-  def transform(c: Context)(f: c.Tree): c.Tree = {
+  private[coroutines] class Synthesizer[C <: Context](val c: C) {
     import c.universe._
 
-    // ensure that argument is a function literal
-    val (args, body) = f match {
-      case q"(..$args) => $body" => (args, body)
-      case _ => c.abort(f.pos, "The coroutine takes a single function literal.")
+    def inferReturnType(body: Tree): Tree = {
+      // return type must correspond to the return type of the function literal
+      val rettpe = body.tpe
+
+      // return type must be the lbu of the function return type and yield argument types
+      def isCoroutines(q: Tree) = q match {
+        case q"coroutines.this.`package`" => true
+        case t => false
+      }
+      val constraintTpes = body.collect {
+        case q"$qual.yieldval[$tpt]($v)" if isCoroutines(qual) => tpt.tpe
+        case q"$qual.yieldto[$tpt]($f)" if isCoroutines(qual) => tpt.tpe
+      }
+      tq"${lub(rettpe :: constraintTpes)}"
     }
 
-    // extract argument names and types
-    val (argnames, argtpes) = (for (arg <- args) yield {
-      val q"$_ val $name: $tpe = $_" = arg
-      (name, tpe)
-    }).unzip
+    def generateVariableMap(args: List[Tree], body: Tree): Map[Symbol, Int] = {
+      Map()
+    }
 
-    // infer return type
-    val rettpe = inferReturnType(c)(body)
-
-    // generate variable map
-
-    // generate entry points from yields and coroutine applies
-
-    // generate entry method
-
-    // emit coroutine instantiation
-    val coroutineTpe = TypeName(s"Arity${args.size}")
-    val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpes, $rettpe] {
-      def apply(..$args) = {
-        new Coroutine[$rettpe]
+    def transform(f: Tree): Tree = {
+      // ensure that argument is a function literal
+      val (args, body) = f match {
+        case q"(..$args) => $body" => (args, body)
+        case _ => c.abort(f.pos, "The coroutine takes a single function literal.")
       }
-      def push(c: Coroutine[$rettpe]): Unit = {
-        ???
-      }
-      def pop(c: Coroutine[$rettpe]): Unit = {
-        ???
-      }
-      def enter(c: Coroutine[$rettpe]): Unit = {
-        ???
-      }
-    }"""
-    co
+
+      // extract argument names and types
+      val (argnames, argtpes) = (for (arg <- args) yield {
+        val q"$_ val $name: $tpe = $_" = arg
+        (name, tpe)
+      }).unzip
+
+      // infer return type
+      val rettpe = inferReturnType(body)
+
+      // generate variable map
+      val varmap = generateVariableMap(args, body)
+
+      // generate entry points from yields and coroutine applies
+
+      // generate entry method
+
+      // emit coroutine instantiation
+      val coroutineTpe = TypeName(s"Arity${args.size}")
+      val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpes, $rettpe] {
+        def apply(..$args) = {
+          new Coroutine[$rettpe]
+        }
+        def push(c: Coroutine[$rettpe]): Unit = {
+          ???
+        }
+        def pop(c: Coroutine[$rettpe]): Unit = {
+          ???
+        }
+        def enter(c: Coroutine[$rettpe]): Unit = {
+          ???
+        }
+      }"""
+      co
+    }
   }
 
   abstract class Arity0[T] extends Coroutine.Definition[T] {
