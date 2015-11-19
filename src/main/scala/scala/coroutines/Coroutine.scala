@@ -2,6 +2,7 @@ package scala.coroutines
 
 
 
+import scala.annotation.tailrec
 import scala.coroutines.common.Stack
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
@@ -9,10 +10,13 @@ import scala.reflect.macros.whitebox.Context
 
 
 class Coroutine[T] {
-  var costackptr = 0
-  var costack = new Array[Coroutine.Definition[T]](Coroutine.INITIAL_CO_STACK_SIZE)
-  var pcstackptr = 0
-  var pcstack = new Array[Short](Coroutine.INITIAL_CO_STACK_SIZE)
+  import Coroutine._
+  private[coroutines] var costackptr = 0
+  private[coroutines] var costack = new Array[Definition[T]](INITIAL_CO_STACK_SIZE)
+  private[coroutines] var pcstackptr = 0
+  private[coroutines] var pcstack = new Array[Short](INITIAL_CO_STACK_SIZE)
+  private[coroutines] var target: Coroutine[T] = null
+  private[coroutines] var result: T = null.asInstanceOf[T]
 
   final def push(cd: Coroutine.Definition[T]) {
     Stack.push(costack, cd)
@@ -24,20 +28,27 @@ class Coroutine[T] {
     cd.pop(this)
   }
 
+  @tailrec
   final def enter(): T = {
     val cd = Stack.top(costack)
     cd.enter(this)
+    if (target ne null) {
+      val nc = target
+      target = null
+      nc.enter()
+    } else result
   }
 }
 
 
 object Coroutine {
   private[coroutines] val INITIAL_CO_STACK_SIZE = 4
+  private[coroutines] val INITIAL_VAR_STACK_SIZE = 8
 
   abstract class Definition[T] {
     def push(c: Coroutine[T]): Unit
     def pop(c: Coroutine[T]): Unit
-    def enter(c: Coroutine[T]): T
+    def enter(c: Coroutine[T]): Unit
   }
 
   private def inferReturnType(c: Context)(body: c.Tree): c.Tree = {
@@ -78,7 +89,7 @@ object Coroutine {
 
     // generate variable map
 
-    // generate entry points
+    // generate entry points from yields and coroutine applies
 
     // generate entry method
 
@@ -94,17 +105,11 @@ object Coroutine {
       def pop(c: Coroutine[$rettpe]): Unit = {
         ???
       }
-      def enter(c: Coroutine[$rettpe]): $rettpe = {
+      def enter(c: Coroutine[$rettpe]): Unit = {
         ???
       }
     }"""
     co
-  }
-
-  def resume[T: c.WeakTypeTag](c: Context)(co: c.Tree): c.Tree = {
-    import c.universe._
-
-    q"()"
   }
 
   abstract class Arity0[T] extends Coroutine.Definition[T] {
