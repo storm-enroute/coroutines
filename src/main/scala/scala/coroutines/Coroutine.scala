@@ -3,6 +3,7 @@ package scala.coroutines
 
 
 import scala.annotation.tailrec
+import scala.collection._
 import scala.coroutines.common.Stack
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
@@ -20,16 +21,18 @@ class Coroutine[@specialized T] {
 
   final def push(cd: Coroutine.Definition[T]) {
     Stack.push(costack, cd)
+    Stack.push(pcstack, 0.toShort)
     cd.push(this)
   }
 
   final def pop() {
+    Stack.pop(pcstack)
     val cd = Stack.pop(costack)
     cd.pop(this)
   }
 
   @tailrec
-  final def enter(): T = {
+  private[coroutines] final def enter(): T = {
     val cd = Stack.top(costack)
     cd.enter(this)
     if (target ne null) {
@@ -38,6 +41,8 @@ class Coroutine[@specialized T] {
       nc.enter()
     } else result
   }
+
+  def apply(): T = enter()
 }
 
 
@@ -58,6 +63,10 @@ object Coroutine {
   private[coroutines] class Synthesizer[C <: Context](val c: C) {
     import c.universe._
 
+    case class VarInfo(position: Int)
+
+    type VarMap = Map[Symbol, VarInfo]
+
     private def inferReturnType(body: Tree): Tree = {
       // return type must correspond to the return type of the function literal
       val rettpe = body.tpe
@@ -74,12 +83,26 @@ object Coroutine {
       tq"${lub(rettpe :: constraintTpes)}"
     }
 
-    private def generateVariableMap(args: List[Tree], body: Tree): Map[Symbol, Int] = {
-      Map()
+    private def generateVariableMap(args: List[Tree], body: Tree): VarMap = {
+      val varmap = mutable.Map[Symbol, VarInfo]()
+      var index = 0
+      val traverser = new Traverser {
+        override def traverse(t: Tree): Unit = t match {
+          case q"$_ val $_: $_ = $rhs" =>
+            varmap(t.symbol) = VarInfo(index)
+            index += 1
+            traverse(rhs)
+          case _ =>
+            super.traverse(t)
+        }
+      }
+      traverser.traverse(body)
+      varmap
     }
 
-    private def generateEntryPoints(args: List[Tree], body: Tree,
-      varmap: Map[Symbol, Int]): Map[Int, Tree] = {
+    private def generateEntryPoints(
+      args: List[Tree], body: Tree, varmap: VarMap
+    ): Map[Int, Tree] = {
       Map(
         0 -> q"def ep0() = {}",
         1 -> q"def ep1() = {}"
@@ -89,12 +112,14 @@ object Coroutine {
     private def generateEnterMethod(entrypoints: Map[Int, Tree], tpe: Tree): Tree = {
       if (entrypoints.size == 1) {
         val q"def $ep() = $_" = entrypoints(0)
+
         q"""
         def enter(c: Coroutine[$tpe]): Unit = $ep()
         """
       } else if (entrypoints.size == 2) {
         val q"def $ep0() = $_" = entrypoints(0)
         val q"def $ep1() = $_" = entrypoints(1)
+
         q"""
         def enter(c: Coroutine[$tpe]): Unit = {
           val pc = scala.coroutines.common.Stack.top(c.pcstack)
@@ -146,9 +171,12 @@ object Coroutine {
       // emit coroutine instantiation
       val coroutineTpe = TypeName(s"Arity${args.size}")
       val entrypointmethods = entrypoints.map(_._2)
+      val valnme = TermName(c.freshName("c"))
       val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpes, $rettpe] {
         def apply(..$args) = {
-          new Coroutine[$rettpe]
+          val $valnme = new Coroutine[$rettpe]
+          $valnme.push(this)
+          $valnme
         }
         def push(c: Coroutine[$rettpe]): Unit = {
           ???
