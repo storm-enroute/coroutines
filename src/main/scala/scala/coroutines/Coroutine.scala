@@ -86,11 +86,15 @@ object Coroutine {
     private def generateVariableMap(args: List[Tree], body: Tree): VarMap = {
       val varmap = mutable.Map[Symbol, VarInfo]()
       var index = 0
+      def addVar(s: Symbol) {
+        varmap(s) = VarInfo(index)
+        index += 1
+      }
+      for (t <- args) addVar(t.symbol)
       val traverser = new Traverser {
         override def traverse(t: Tree): Unit = t match {
           case q"$_ val $_: $_ = $rhs" =>
-            varmap(t.symbol) = VarInfo(index)
-            index += 1
+            addVar(t.symbol)
             traverse(rhs)
           case _ =>
             super.traverse(t)
