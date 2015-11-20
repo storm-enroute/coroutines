@@ -111,12 +111,16 @@ object Coroutine {
         var count = 0
         val seen = mutable.Map[CtrlNode, Int]()
         def print(n: CtrlNode, prefix: String) {
+          def shorten(s: String) = {
+            if (s.contains('\n')) s.takeWhile(_ != '\n') + "..." else s
+          }
           seen(n) = count
-          text.append(s"$prefix|-> $count: Node(${n.tree})\n")
+          val treerepr = shorten(n.tree.toString)
+          text.append(s"$prefix|-> $count: Node($treerepr)\n")
           count += 1
           def printChild(c: CtrlNode, newPrefix: String) {
             if (seen.contains(c)) {
-              text.append(s"$newPrefix|-> ${seen(c)}")
+              text.append(s"$newPrefix|-> label ${seen(c)}")
             } else {
               print(c, newPrefix)
             }
@@ -136,15 +140,24 @@ object Coroutine {
     private def generateControlFlowGraph(body: Tree): CtrlNode = {
       def traverse(t: Tree): (CtrlNode, CtrlNode) = {
         t match {
-          case q"{ ..$stats }" if stats.nonEmpty =>
-            val first = new CtrlNode(stats.head)
-            var current = first
-            println(current.tree)
+          case q"if ($cond) $ifbranch else $elsebranch" =>
+            val ifnode = new CtrlNode(t)
+            val mergenode = new CtrlNode(q"{}")
+            def addBranch(branch: Tree) {
+              val (childhead, childlast) = traverse(branch)
+              ifnode.successors ::= childhead
+              childlast.successors ::= mergenode
+            }
+            addBranch(ifbranch)
+            addBranch(elsebranch)
+            (ifnode, mergenode)
+          case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
+            val (first, childlast) = traverse(stats.head)
+            var current = childlast
             for (stat <- stats.tail) {
-              println(stat)
-              val (subh, subl) = traverse(stat)
-              current.successors ::= subh
-              current = subl
+              val (childhead, childlast) = traverse(stat)
+              current.successors ::= childhead
+              current = childlast
             }
             (first, current)
           case _ =>
@@ -162,7 +175,6 @@ object Coroutine {
       args: List[Tree], body: Tree, varmap: VarMap
     ): Map[Int, Tree] = {
       val cfg = generateControlFlowGraph(body)
-      println(cfg)
 
       Map(
         0 -> q"def ep0() = {}",
