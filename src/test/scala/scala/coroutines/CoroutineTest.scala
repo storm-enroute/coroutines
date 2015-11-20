@@ -30,7 +30,7 @@ class CoroutineTest extends FunSuite with Matchers {
   test("should lub yieldtos and returns") {
     val f: Coroutine[List[String]] = null
     val c = coroutine { (x: Int) =>
-      yieldto(f)
+      yieldto(f)          
       Vector(x)
     }
     val d: Coroutine.Definition[Seq[Any]] = null 

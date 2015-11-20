@@ -48,7 +48,6 @@ class Coroutine[@specialized T] {
 
 object Coroutine {
   private[coroutines] val INITIAL_CO_STACK_SIZE = 4
-  private[coroutines] val INITIAL_VAR_STACK_SIZE = 8
 
   abstract class Definition[T] {
     def push(c: Coroutine[T]): Unit
@@ -104,9 +103,67 @@ object Coroutine {
       varmap
     }
 
+    class CtrlNode(val tree: Tree) {
+      var successors: List[CtrlNode] = Nil
+
+      def prettyPrint = {
+        val text = new StringBuilder
+        var count = 0
+        val seen = mutable.Map[CtrlNode, Int]()
+        def print(n: CtrlNode, prefix: String) {
+          seen(n) = count
+          text.append(s"$prefix|-> $count: Node(${n.tree})\n")
+          count += 1
+          def printChild(c: CtrlNode, newPrefix: String) {
+            if (seen.contains(c)) {
+              text.append(s"$newPrefix|-> ${seen(c)}")
+            } else {
+              print(c, newPrefix)
+            }
+          }
+          if (n.successors.nonEmpty) {
+            for (s <- n.successors.tail) {
+              printChild(s, prefix + "|   ")
+            }
+            printChild(n.successors.head, prefix)
+          }
+        }
+        print(this, "")
+        text.toString
+      }
+    }
+
+    private def generateControlFlowGraph(body: Tree): CtrlNode = {
+      def traverse(t: Tree): (CtrlNode, CtrlNode) = {
+        t match {
+          case q"{ ..$stats }" if stats.nonEmpty =>
+            val first = new CtrlNode(stats.head)
+            var current = first
+            println(current.tree)
+            for (stat <- stats.tail) {
+              println(stat)
+              val (subh, subl) = traverse(stat)
+              current.successors ::= subh
+              current = subl
+            }
+            (first, current)
+          case _ =>
+            val n = new CtrlNode(t)
+            (n, n)
+        }
+      }
+
+      val (head, last) = traverse(body)
+      println(head.prettyPrint)
+      head
+    }
+
     private def generateEntryPoints(
       args: List[Tree], body: Tree, varmap: VarMap
     ): Map[Int, Tree] = {
+      val cfg = generateControlFlowGraph(body)
+      println(cfg)
+
       Map(
         0 -> q"def ep0() = {}",
         1 -> q"def ep1() = {}"
