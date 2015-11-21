@@ -22,36 +22,32 @@ class Coroutine[@specialized T] {
   final def push(cd: Coroutine.Definition[T]) {
     Stack.push(costack, cd)
     Stack.push(pcstack, 0.toShort)
-    cd.push(this)
   }
 
   final def pop() {
     Stack.pop(pcstack)
-    val cd = Stack.pop(costack)
-    cd.pop(this)
+    Stack.pop(costack)
   }
 
-  @tailrec
-  private[coroutines] final def enter(): T = {
-    val cd = Stack.top(costack)
-    cd.enter(this)
-    if (target ne null) {
-      val nc = target
-      target = null
-      nc.enter()
-    } else result
-  }
-
-  def apply(): T = enter()
+  def apply(): T = Coroutine.enter[T](this)
 }
 
 
 object Coroutine {
   private[coroutines] val INITIAL_CO_STACK_SIZE = 4
 
+  @tailrec
+  private[coroutines] final def enter[T](c: Coroutine[T]): T = {
+    val cd = Stack.top(c.costack)
+    cd.enter(c)
+    if (c.target ne null) {
+      val nc = c.target
+      c.target = null
+      enter(nc)
+    } else c.result
+  }
+
   abstract class Definition[T] {
-    def push(c: Coroutine[T]): Unit
-    def pop(c: Coroutine[T]): Unit
     def enter(c: Coroutine[T]): Unit
   }
 
@@ -71,13 +67,14 @@ object Coroutine {
       val rettpe = body.tpe
 
       // return type is the lub of the function return type and yield argument types
-      def isCoroutines(q: Tree) = q match {
+      def isCoroutinesPackage(q: Tree) = q match {
         case q"coroutines.this.`package`" => true
         case t => false
       }
+      // TODO: ensure that this does not capture constraints from nested class scopes
       val constraintTpes = body.collect {
-        case q"$qual.yieldval[$tpt]($v)" if isCoroutines(qual) => tpt.tpe
-        case q"$qual.yieldto[$tpt]($f)" if isCoroutines(qual) => tpt.tpe
+        case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
+        case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
       }
       tq"${lub(rettpe :: constraintTpes)}"
     }
@@ -175,7 +172,7 @@ object Coroutine {
       head
     }
 
-    private def extractSubgraphs(cfg: CtrlNode): Set[CtrlNode] = {
+    private def extractSubgraphs(cfg: CtrlNode, rettpt: Tree): Set[CtrlNode] = {
       val subgraph = mutable.LinkedHashSet[CtrlNode]()
       val entrypoints = mutable.Set[CtrlNode]()
       val front = mutable.Queue[CtrlNode]()
@@ -187,13 +184,37 @@ object Coroutine {
         seen(n) = current
 
         // check for termination condition
+        def addToNodeFront() {
+          // add successors to node front
+          for (s <- n.successors) if (!entrypoints(s)) {
+            entrypoints += s
+            front.enqueue(s)
+          }
+        }
+        def isCoroutineDefType(tpe: Type) = {
+          val codefsym = typeOf[Coroutine.Definition[_]].typeConstructor.typeSymbol
+          tpe.baseType(codefsym) != NoType
+        }
+        def addCoroutineInvocationToNodeFront(co: Tree) {
+          val codeftpe = typeOf[Coroutine.Definition[_]].typeConstructor
+          val coroutinetpe = appliedType(codeftpe, List(rettpt.tpe))
+          if (!(co.tpe <:< coroutinetpe)) {
+            c.abort(co.pos,
+              s"Coroutine invocation site has invalid return type.\n" +
+              s"required: $coroutinetpe\n" +
+              s"found:    ${co.tpe} (with underlying type ${co.tpe.widen})")
+          }
+          addToNodeFront()
+        }
         n.tree match {
           case q"coroutines.this.`package`.yieldval[$_]($_)" =>
-            // add successors to node front
-            for (s <- n.successors) if (!entrypoints(s)) {
-              entrypoints += s
-              front.enqueue(s)
-            }
+            addToNodeFront()
+          case q"coroutines.this.`package`.yieldto[$_]($_)" =>
+            addToNodeFront()
+          case q"return $_" =>
+            addToNodeFront()
+          case q"$_ val $_ = $co.apply(..$args)" if isCoroutineDefType(co.tpe) =>
+            addCoroutineInvocationToNodeFront(co)
           case _ =>
             // traverse successors
             for (s <- n.successors) {
@@ -214,10 +235,10 @@ object Coroutine {
     }
 
     private def generateEntryPoints(
-      args: List[Tree], body: Tree, varmap: VarMap
+      args: List[Tree], body: Tree, varmap: VarMap, rettpt: Tree
     ): Map[Int, Tree] = {
       val cfg = generateControlFlowGraph(body)
-      val segments = extractSubgraphs(cfg)
+      val segments = extractSubgraphs(cfg, rettpt)
 
       Map(
         0 -> q"def ep0() = {}",
@@ -267,38 +288,37 @@ object Coroutine {
       }
 
       // extract argument names and types
-      val (argnames, argtpes) = (for (arg <- args) yield {
-        val q"$_ val $name: $tpe = $_" = arg
-        (name, tpe)
+      val (argnames, argtpts) = (for (arg <- args) yield {
+        val q"$_ val $name: $tpt = $_" = arg
+        (name, tpt)
       }).unzip
 
       // infer return type
-      val rettpe = inferReturnType(body)
+      val rettpt = inferReturnType(body)
 
       // generate variable map
       val varmap = generateVariableMap(args, body)
 
       // generate entry points from yields and coroutine applies
-      val entrypoints = generateEntryPoints(args, body, varmap)
+      val entrypoints = generateEntryPoints(args, body, varmap, rettpt)
 
       // generate entry method
-      val entermethod = generateEnterMethod(entrypoints, rettpe)
+      val entermethod = generateEnterMethod(entrypoints, rettpt)
 
       // emit coroutine instantiation
       val coroutineTpe = TypeName(s"Arity${args.size}")
       val entrypointmethods = entrypoints.map(_._2)
       val valnme = TermName(c.freshName("c"))
-      val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpes, $rettpe] {
-        def apply(..$args) = {
-          val $valnme = new Coroutine[$rettpe]
+      val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
+        def call(..$args) = {
+          val $valnme = new Coroutine[$rettpt]
           $valnme.push(this)
           $valnme
         }
-        def push(c: Coroutine[$rettpe]): Unit = {
-          ???
-        }
-        def pop(c: Coroutine[$rettpe]): Unit = {
-          ???
+        def apply(..$args): $rettpt = {
+          sys.error(
+            "Coroutines can only be invoked directly from within other coroutines. " +
+            "Use `call` instead if you want to start a new coroutine.")
         }
         $entermethod
         ..$entrypointmethods
@@ -309,18 +329,22 @@ object Coroutine {
   }
 
   abstract class Arity0[@specialized T] extends Coroutine.Definition[T] {
-    def apply(): Coroutine[T]
+    def call(): Coroutine[T]
+    def apply(): T
   }
 
   abstract class Arity1[A0, @specialized T] extends Coroutine.Definition[T] {
-    def apply(a0: A0): Coroutine[T]
+    def call(a0: A0): Coroutine[T]
+    def apply(a0: A0): T
   }
 
   abstract class Arity2[A0, A1, @specialized T] extends Coroutine.Definition[T] {
-    def apply(a0: A0, a1: A1): Coroutine[T]
+    def call(a0: A0, a1: A1): Coroutine[T]
+    def apply(a0: A0, a1: A1): T
   }
 
   abstract class Arity3[A0, A1, A2, @specialized T] extends Coroutine.Definition[T] {
-    def apply(a0: A0, a1: A1, a2: A2): Coroutine[T]
+    def call(a0: A0, a1: A1, a2: A2): Coroutine[T]
+    def apply(a0: A0, a1: A1, a2: A2): T
   }
 }

@@ -17,6 +17,8 @@ package object coroutines {
     sys.error("Yield allowed only inside coroutines.")
   }
 
+  def call[T](f: Coroutine[T]): Coroutine[T] = ???
+
   def coroutine[T](f: Any): Coroutine.Definition[T] = macro Coroutine.transform
 
 }
