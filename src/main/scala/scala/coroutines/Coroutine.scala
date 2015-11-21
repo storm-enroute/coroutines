@@ -137,6 +137,10 @@ object Coroutine {
       }
     }
 
+    object CtrlNode {
+      def withoutSuccessors(n: CtrlNode) = new CtrlNode(n.tree)
+    }
+
     private def generateControlFlowGraph(body: Tree): CtrlNode = {
       def traverse(t: Tree): (CtrlNode, CtrlNode) = {
         t match {
@@ -171,10 +175,49 @@ object Coroutine {
       head
     }
 
+    private def extractSubgraphs(cfg: CtrlNode): Set[CtrlNode] = {
+      val subgraph = mutable.LinkedHashSet[CtrlNode]()
+      val entrypoints = mutable.Set[CtrlNode]()
+      val front = mutable.Queue[CtrlNode]()
+      entrypoints += cfg
+      front.enqueue(cfg)
+      def extract(n: CtrlNode, seen: mutable.Map[CtrlNode, CtrlNode]): CtrlNode = {
+        // duplicate and mark current node as seen
+        val current = CtrlNode.withoutSuccessors(n)
+        seen(n) = current
+
+        // check for termination condition
+        n.tree match {
+          case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+            // add successors to node front
+            for (s <- n.successors) if (!entrypoints(s)) {
+              entrypoints += s
+              front.enqueue(s)
+            }
+          case _ =>
+            // traverse successors
+            for (s <- n.successors) {
+              if (!seen.contains(s)) {
+                extract(s, seen)
+              }
+              current.successors ::= seen(s)
+            }
+        }
+        current
+      }
+
+      // as long as there are more nodes on the expansion front, extract them
+      while (front.nonEmpty) subgraph += extract(front.dequeue(), mutable.Map())
+      println(subgraph.map(_.prettyPrint).zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
+        .mkString("\n"))
+      subgraph
+    }
+
     private def generateEntryPoints(
       args: List[Tree], body: Tree, varmap: VarMap
     ): Map[Int, Tree] = {
       val cfg = generateControlFlowGraph(body)
+      val segments = extractSubgraphs(cfg)
 
       Map(
         0 -> q"def ep0() = {}",
