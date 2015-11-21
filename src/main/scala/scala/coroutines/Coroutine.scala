@@ -16,15 +16,22 @@ class Coroutine[@specialized T] {
   private[coroutines] var costack = new Array[Definition[T]](INITIAL_CO_STACK_SIZE)
   private[coroutines] var pcstackptr = 0
   private[coroutines] var pcstack = new Array[Short](INITIAL_CO_STACK_SIZE)
+  private[coroutines] var refstackptr = 0
+  private[coroutines] var refstack: Array[AnyRef] = _
+  private[coroutines] var valstackptr = 0
+  private[coroutines] var valstack: Array[Long] = _
   private[coroutines] var target: Coroutine[T] = null
   private[coroutines] var result: T = null.asInstanceOf[T]
 
-  final def push(cd: Coroutine.Definition[T]) {
+  final def startFrame(cd: Coroutine.Definition[T]) {
     Stack.push(costack, cd)
     Stack.push(pcstack, 0.toShort)
+    cd.push(this)
   }
 
-  final def pop() {
+  final def endFrame() {
+    val cd = Stack.top(costack)
+    cd.pop(this)
     Stack.pop(pcstack)
     Stack.pop(costack)
   }
@@ -49,6 +56,8 @@ object Coroutine {
 
   abstract class Definition[T] {
     def enter(c: Coroutine[T]): Unit
+    def push(c: Coroutine[T]): Unit
+    def pop(c: Coroutine[T]): Unit
   }
 
   def transform(c: Context)(f: c.Tree): c.Tree = {
@@ -58,47 +67,18 @@ object Coroutine {
   private[coroutines] class Synthesizer[C <: Context](val c: C) {
     import c.universe._
 
-    case class VarInfo(position: Int)
-
-    type VarMap = Map[Symbol, VarInfo]
-
-    private def inferReturnType(body: Tree): Tree = {
-      // return type must correspond to the return type of the function literal
-      val rettpe = body.tpe
-
-      // return type is the lub of the function return type and yield argument types
-      def isCoroutinesPackage(q: Tree) = q match {
-        case q"coroutines.this.`package`" => true
-        case t => false
-      }
-      // TODO: ensure that this does not capture constraints from nested class scopes
-      val constraintTpes = body.collect {
-        case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
-        case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
-      }
-      tq"${lub(rettpe :: constraintTpes)}"
+    class VarInfo(val uid: Int, val tpe: Type) {
+      var stackpos = uid
     }
 
-    private def generateVariableMap(args: List[Tree], body: Tree): VarMap = {
-      val varmap = mutable.Map[Symbol, VarInfo]()
-      var index = 0
-      def addVar(s: Symbol) {
-        varmap(s) = VarInfo(index)
-        index += 1
-      }
-      for (t <- args) addVar(t.symbol)
-      val traverser = new Traverser {
-        override def traverse(t: Tree): Unit = t match {
-          case q"$_ val $_: $_ = $rhs" =>
-            addVar(t.symbol)
-            traverse(rhs)
-          case _ =>
-            super.traverse(t)
-        }
-      }
-      traverser.traverse(body)
-      varmap
+    type VarMap = mutable.Map[Symbol, VarInfo]
+
+    implicit class VarMapOps(val self: VarMap) {
+      def refvars = self.filter(_._2.tpe <:< typeOf[AnyRef])
+      def valvars = self.filter(_._2.tpe <:< typeOf[AnyVal])
     }
+
+    def newVarMap: VarMap = mutable.Map[Symbol, VarInfo]()
 
     class CtrlNode(val tree: Tree) {
       var successors: List[CtrlNode] = Nil
@@ -138,6 +118,50 @@ object Coroutine {
       def withoutSuccessors(n: CtrlNode) = new CtrlNode(n.tree)
     }
 
+    class Subgraph {
+      val stackvars = newVarMap
+      var start: CtrlNode = _
+    }
+
+    private def inferReturnType(body: Tree): Tree = {
+      // return type must correspond to the return type of the function literal
+      val rettpe = body.tpe
+
+      // return type is the lub of the function return type and yield argument types
+      def isCoroutinesPackage(q: Tree) = q match {
+        case q"coroutines.this.`package`" => true
+        case t => false
+      }
+      // TODO: ensure that this does not capture constraints from nested class scopes
+      val constraintTpes = body.collect {
+        case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
+        case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
+      }
+      tq"${lub(rettpe :: constraintTpes)}"
+    }
+
+    private def generateVariableMap(args: List[Tree], body: Tree): VarMap = {
+      val varmap = newVarMap
+      var index = 0
+      def addVar(s: Symbol) {
+        varmap(s) = new VarInfo(index, s.info)
+        index += 1
+      }
+      for (t <- args) addVar(t.symbol)
+      // TODO: ensure that this does not capture variables from nested class scopes
+      val traverser = new Traverser {
+        override def traverse(t: Tree): Unit = t match {
+          case q"$_ val $_: $_ = $rhs" =>
+            addVar(t.symbol)
+            traverse(rhs)
+          case _ =>
+            super.traverse(t)
+        }
+      }
+      traverser.traverse(body)
+      varmap
+    }
+
     private def generateControlFlowGraph(body: Tree): CtrlNode = {
       def traverse(t: Tree): (CtrlNode, CtrlNode) = {
         t match {
@@ -172,23 +196,33 @@ object Coroutine {
       head
     }
 
-    private def extractSubgraphs(cfg: CtrlNode, rettpt: Tree): Set[CtrlNode] = {
-      val subgraph = mutable.LinkedHashSet[CtrlNode]()
-      val entrypoints = mutable.Set[CtrlNode]()
-      val front = mutable.Queue[CtrlNode]()
-      entrypoints += cfg
-      front.enqueue(cfg)
-      def extract(n: CtrlNode, seen: mutable.Map[CtrlNode, CtrlNode]): CtrlNode = {
+    private def extractSubgraphs(
+      varmap: VarMap, cfg: CtrlNode, rettpt: Tree
+    ): Set[Subgraph] = {
+      val subgraphs = mutable.LinkedHashSet[Subgraph]()
+      val seenEntries = mutable.Set[CtrlNode]()
+      val nodefront = mutable.Queue[CtrlNode]()
+      seenEntries += cfg
+      nodefront.enqueue(cfg)
+
+      def extract(
+        n: CtrlNode, seen: mutable.Map[CtrlNode, CtrlNode], subgraph: Subgraph
+      ): CtrlNode = {
         // duplicate and mark current node as seen
         val current = CtrlNode.withoutSuccessors(n)
         seen(n) = current
 
+        // detect referenced stack variables
+        for (t <- n.tree) if (varmap.contains(t.symbol)) {
+          subgraph.stackvars(t.symbol) = varmap(t.symbol)
+        }
+
         // check for termination condition
         def addToNodeFront() {
           // add successors to node front
-          for (s <- n.successors) if (!entrypoints(s)) {
-            entrypoints += s
-            front.enqueue(s)
+          for (s <- n.successors) if (!seenEntries(s)) {
+            seenEntries += s
+            nodefront.enqueue(s)
           }
         }
         def isCoroutineDefType(tpe: Type) = {
@@ -219,7 +253,7 @@ object Coroutine {
             // traverse successors
             for (s <- n.successors) {
               if (!seen.contains(s)) {
-                extract(s, seen)
+                extract(s, seen, subgraph)
               }
               current.successors ::= seen(s)
             }
@@ -228,49 +262,61 @@ object Coroutine {
       }
 
       // as long as there are more nodes on the expansion front, extract them
-      while (front.nonEmpty) subgraph += extract(front.dequeue(), mutable.Map())
-      println(subgraph.map(_.prettyPrint).zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
+      while (nodefront.nonEmpty) {
+        val subgraph = new Subgraph
+        subgraph.start = extract(nodefront.dequeue(), mutable.Map(), subgraph)
+        subgraphs += subgraph
+      }
+      println(subgraphs
+        .map(t => "[" + t.stackvars.mkString(", ") + "]\n" + t.start.prettyPrint)
+        .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
         .mkString("\n"))
-      subgraph
+      subgraphs
     }
 
     private def generateEntryPoints(
       args: List[Tree], body: Tree, varmap: VarMap, rettpt: Tree
     ): Map[Int, Tree] = {
       val cfg = generateControlFlowGraph(body)
-      val segments = extractSubgraphs(cfg, rettpt)
+      val subgraphs = extractSubgraphs(varmap, cfg, rettpt)
 
-      Map(
-        0 -> q"def ep0() = {}",
-        1 -> q"def ep1() = {}"
-      )
+      val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
+        val defname = TermName(s"ep$i")
+        val defdef = q"""
+          def $defname(): Unit = {
+            ???
+          }
+        """
+        (i, defdef)
+      }
+      entrypoints.toMap
     }
 
-    private def generateEnterMethod(entrypoints: Map[Int, Tree], tpe: Tree): Tree = {
+    private def generateEnterMethod(entrypoints: Map[Int, Tree], tpt: Tree): Tree = {
       if (entrypoints.size == 1) {
-        val q"def $ep() = $_" = entrypoints(0)
+        val q"def $ep(): Unit = $_" = entrypoints(0)
 
         q"""
-        def enter(c: Coroutine[$tpe]): Unit = $ep()
+        def enter(c: Coroutine[$tpt]): Unit = $ep()
         """
       } else if (entrypoints.size == 2) {
-        val q"def $ep0() = $_" = entrypoints(0)
-        val q"def $ep1() = $_" = entrypoints(1)
+        val q"def $ep0(): Unit = $_" = entrypoints(0)
+        val q"def $ep1(): Unit = $_" = entrypoints(1)
 
         q"""
-        def enter(c: Coroutine[$tpe]): Unit = {
+        def enter(c: Coroutine[$tpt]): Unit = {
           val pc = scala.coroutines.common.Stack.top(c.pcstack)
           if (pc == 0) $ep0() else $ep1()
         }
         """
       } else {
         val cases = for ((index, defdef) <- entrypoints) yield {
-          val q"def $ep() = $rhs" = defdef
+          val q"def $ep(): Unit = $rhs" = defdef
           cq"$index => $ep()"
         }
 
         q"""
-        def enter(c: Coroutine[$tpe]): Unit = {
+        def enter(c: Coroutine[$tpt]): Unit = {
           val pc = scala.coroutines.common.Stack.top(c.pcstack)
           (pc: @scala.annotation.switch) match {
             case ..$cases
@@ -309,20 +355,28 @@ object Coroutine {
       val coroutineTpe = TypeName(s"Arity${args.size}")
       val entrypointmethods = entrypoints.map(_._2)
       val valnme = TermName(c.freshName("c"))
-      val co = q"""new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
-        def call(..$args) = {
-          val $valnme = new Coroutine[$rettpt]
-          $valnme.push(this)
-          $valnme
+      val co = q"""
+        new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
+          def call(..$args) = {
+            val $valnme = new Coroutine[$rettpt]
+            $valnme.startFrame(this)
+            $valnme
+          }
+          def apply(..$args): $rettpt = {
+            sys.error(
+              "Coroutines can only be invoked directly from within other coroutines. " +
+              "Use `call` instead if you want to start a new coroutine.")
+          }
+          def push(c: Coroutine[$rettpt]): Unit = {
+
+          }
+          def pop(c: Coroutine[$rettpt]): Unit = {
+            
+          }
+          $entermethod
+          ..$entrypointmethods
         }
-        def apply(..$args): $rettpt = {
-          sys.error(
-            "Coroutines can only be invoked directly from within other coroutines. " +
-            "Use `call` instead if you want to start a new coroutine.")
-        }
-        $entermethod
-        ..$entrypointmethods
-      }"""
+      """
       println(co)
       co
     }
