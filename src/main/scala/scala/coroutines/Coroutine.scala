@@ -107,16 +107,29 @@ object Coroutine {
       """
     }
 
-    type VarMap = mutable.LinkedHashMap[Symbol, VarInfo]
-
-    implicit class VarMapOps(val self: VarMap) {
-      def refvars = self.filter(_._2.isRefType)
-      def valvars = self.filter(_._2.isValType)
+    class VarMap(val lambda: Tree) {
+      var varcount = 0
+      val all = mutable.LinkedHashMap[Symbol, VarInfo]()
+      val topLevelScope = new Chain(this, lambda, null)
+      def foreach[U](f: ((Symbol, VarInfo)) => U): Unit = all.foreach(f)
+      def contains(s: Symbol) = all.contains(s)
+      def apply(s: Symbol) = all(s)
+      def refvars = all.filter(_._2.isRefType)
+      def valvars = all.filter(_._2.isValType)
     }
 
-    def newVarMap: VarMap = mutable.LinkedHashMap[Symbol, VarInfo]()
+    class Chain(val varmap: VarMap, val tree: Tree, val parent: Chain) {
+      val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
+      def newChain(subtree: Tree) = new Chain(varmap, subtree, this)
+      def addVar(s: Symbol, name: TermName, isArg: Boolean) {
+        val info = new VarInfo(varmap.varcount, s.info, s, name, isArg)
+        vars(s) = info
+        varmap.all(s) = info
+        varmap.varcount += 1
+      }
+    }
 
-    class CtrlNode(val tree: Tree) {
+    class CtrlNode(val tree: Tree, val scope: Chain) {
       var successors: List[CtrlNode] = Nil
 
       def prettyPrint = {
@@ -151,11 +164,11 @@ object Coroutine {
     }
 
     object CtrlNode {
-      def withoutSuccessors(n: CtrlNode) = new CtrlNode(n.tree)
+      def copyNoSuccessors(n: CtrlNode) = new CtrlNode(n.tree, n.scope)
     }
 
     class Subgraph {
-      val stackvars = newVarMap
+      val stackvars = mutable.LinkedHashMap[Symbol, VarInfo]()
       var start: CtrlNode = _
     }
 
@@ -177,39 +190,21 @@ object Coroutine {
       tq"${lub(rettpe :: constraintTpes)}"
     }
 
-    private def generateVariableMap(args: List[Tree], body: Tree): VarMap = {
-      val varmap = newVarMap
-      var index = 0
-      def addVar(s: Symbol, name: TermName, isArg: Boolean) {
-        varmap(s) = new VarInfo(index, s.info, s, name, isArg)
-        index += 1
-      }
-      for (t <- args) {
-        val q"$_ val $name: $_ = $_" = t
-        addVar(t.symbol, name, true)
-      }
-      // TODO: ensure that this does not capture variables from nested class scopes
-      val traverser = new Traverser {
-        override def traverse(t: Tree): Unit = t match {
-          case q"$_ val $name: $_ = $rhs" =>
-            addVar(t.symbol, name, false)
-            traverse(rhs)
-          case _ =>
-            super.traverse(t)
-        }
-      }
-      traverser.traverse(body)
-      varmap
-    }
-
-    private def generateControlFlowGraph(body: Tree): CtrlNode = {
-      def traverse(t: Tree): (CtrlNode, CtrlNode) = {
+    private def generateControlFlowGraph(
+      args: List[Tree], body: Tree, varmap: VarMap
+    ): CtrlNode = {
+      def traverse(t: Tree, s: Chain): (CtrlNode, CtrlNode) = {
         t match {
+          case q"$_ val $name: $_ = $_" =>
+            s.addVar(t.symbol, name, false)
+            val n = new CtrlNode(t, s)
+            (n, n)
           case q"if ($cond) $ifbranch else $elsebranch" =>
-            val ifnode = new CtrlNode(t)
-            val mergenode = new CtrlNode(q"{}")
+            val nestedscope = s.newChain(t)
+            val ifnode = new CtrlNode(t, nestedscope)
+            val mergenode = new CtrlNode(q"{}", nestedscope)
             def addBranch(branch: Tree) {
-              val (childhead, childlast) = traverse(branch)
+              val (childhead, childlast) = traverse(branch, nestedscope)
               ifnode.successors ::= childhead
               childlast.successors ::= mergenode
             }
@@ -217,21 +212,27 @@ object Coroutine {
             addBranch(elsebranch)
             (ifnode, mergenode)
           case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
-            val (first, childlast) = traverse(stats.head)
+            val (first, childlast) = traverse(stats.head, s)
             var current = childlast
             for (stat <- stats.tail) {
-              val (childhead, childlast) = traverse(stat)
+              val (childhead, childlast) = traverse(stat, s)
               current.successors ::= childhead
               current = childlast
             }
             (first, current)
           case _ =>
-            val n = new CtrlNode(t)
+            val n = new CtrlNode(t, s)
             (n, n)
         }
       }
 
-      val (head, last) = traverse(body)
+      for (t <- args) {
+        val q"$_ val $name: $_ = $_" = t
+        varmap.topLevelScope.addVar(t.symbol, name, true)
+      }
+
+      // traverse tree to construct CFG and extract local variables
+      val (head, last) = traverse(body, varmap.topLevelScope.newChain(body))
       println(head.prettyPrint)
       head
     }
@@ -249,7 +250,7 @@ object Coroutine {
         n: CtrlNode, seen: mutable.Map[CtrlNode, CtrlNode], subgraph: Subgraph
       ): CtrlNode = {
         // duplicate and mark current node as seen
-        val current = CtrlNode.withoutSuccessors(n)
+        val current = CtrlNode.copyNoSuccessors(n)
         seen(n) = current
 
         // detect referenced stack variables
@@ -315,7 +316,7 @@ object Coroutine {
     private def generateEntryPoints(
       args: List[Tree], body: Tree, varmap: VarMap, rettpt: Tree
     ): Map[Int, Tree] = {
-      val cfg = generateControlFlowGraph(body)
+      val cfg = generateControlFlowGraph(args, body, varmap)
       val subgraphs = extractSubgraphs(varmap, cfg, rettpt)
 
       val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
@@ -365,6 +366,8 @@ object Coroutine {
     }
 
     def transform(f: Tree): Tree = {
+      val varmap = new VarMap(f)
+
       // ensure that argument is a function literal
       val (args, body) = f match {
         case q"(..$args) => $body" => (args, body)
@@ -384,9 +387,6 @@ object Coroutine {
       // infer coroutine return type
       val rettpt = inferReturnType(body)
 
-      // generate variable map
-      val varmap = generateVariableMap(args, body)
-
       // generate entry points from yields and coroutine applies
       val entrypoints = generateEntryPoints(args, body, varmap, rettpt)
 
@@ -394,7 +394,7 @@ object Coroutine {
       val entermethod = generateEnterMethod(entrypoints, rettpt)
 
       // generate variable pushes and pops for stack variables
-      val (varpushes, varpops) = (for ((sym, info) <- varmap.toList) yield {
+      val (varpushes, varpops) = (for ((sym, info) <- varmap.all.toList) yield {
         (info.pushTree, info.popTree)
       }).unzip
 
