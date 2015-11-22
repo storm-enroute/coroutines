@@ -56,6 +56,7 @@ object Coroutine {
 
     class VarInfo(
       val uid: Int,
+      val origtree: Tree,
       val tpe: Type,
       val sym: Symbol,
       val name: TermName,
@@ -118,18 +119,19 @@ object Coroutine {
       def valvars = all.filter(_._2.isValType)
     }
 
-    class Chain(val varmap: VarMap, val tree: Tree, val parent: Chain) {
+    class Chain(val varmap: VarMap, val origtree: Tree, val parent: Chain) {
       val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
       def newChain(subtree: Tree) = new Chain(varmap, subtree, this)
-      def addVar(s: Symbol, name: TermName, isArg: Boolean) {
-        val info = new VarInfo(varmap.varcount, s.info, s, name, isArg)
-        vars(s) = info
-        varmap.all(s) = info
+      def addVar(valdef: Tree, name: TermName, isArg: Boolean) {
+        val sym = valdef.symbol
+        val info = new VarInfo(varmap.varcount, valdef, sym.info, sym, name, isArg)
+        vars(sym) = info
+        varmap.all(sym) = info
         varmap.varcount += 1
       }
     }
 
-    class CtrlNode(val tree: Tree, val scope: Chain) {
+    class CtrlNode(val tree: Tree, val chain: Chain) {
       var successors: List[CtrlNode] = Nil
 
       def prettyPrint = {
@@ -164,12 +166,30 @@ object Coroutine {
     }
 
     object CtrlNode {
-      def copyNoSuccessors(n: CtrlNode) = new CtrlNode(n.tree, n.scope)
+      def copyNoSuccessors(n: CtrlNode) = new CtrlNode(n.tree, n.chain)
     }
 
     class Subgraph {
       val stackvars = mutable.LinkedHashMap[Symbol, VarInfo]()
       var start: CtrlNode = _
+    }
+
+    case class Zipper(above: Zipper, left: List[Tree], ctor: List[Tree] => Tree) {
+      def append(x: Tree) = Zipper(above, x :: left, ctor)
+      def isRoot = above == null
+      def root = {
+        var z = this
+        while (z.above != null) z = z.above
+        z
+      }
+      def result: Tree = {
+        assert(above == null)
+        ctor(left)
+      }
+      def ascend: Zipper = if (above == null) null else {
+        Zipper(above.above, ctor(left) :: above.left, above.ctor)
+      }
+      def descend(ctor: List[Tree] => Tree) = Zipper(this, Nil, ctor)
     }
 
     private def inferReturnType(body: Tree): Tree = {
@@ -196,7 +216,7 @@ object Coroutine {
       def traverse(t: Tree, c: Chain): (CtrlNode, CtrlNode) = {
         t match {
           case q"$_ val $name: $_ = $_" =>
-            c.addVar(t.symbol, name, false)
+            c.addVar(t, name, false)
             val n = new CtrlNode(t, c)
             (n, n)
           case q"if ($cond) $ifbranch else $elsebranch" =>
@@ -229,7 +249,7 @@ object Coroutine {
 
       for (t <- args) {
         val q"$_ val $name: $_ = $_" = t
-        varmap.topChain.addVar(t.symbol, name, true)
+        varmap.topChain.addVar(t, name, true)
       }
 
       // traverse tree to construct CFG and extract local variables
@@ -314,12 +334,27 @@ object Coroutine {
       subgraphs
     }
 
-    private def generateEntryPoint(i: Int, subgraph: Subgraph): Tree = {
-      def construct(n: CtrlNode): Tree = {
-        q"()"
+    private def generateEntryPoint(varmap: VarMap, i: Int, subgraph: Subgraph): Tree = {
+      def construct(n: CtrlNode, seen: mutable.Set[CtrlNode], z: Zipper): Zipper = {
+        z
       }
 
-      val body = construct(subgraph.start)
+      def findStart(chain: Chain): Zipper = {
+        var z = {
+          if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
+          else findStart(chain.parent).descend(trees => q"..$trees")
+        }
+        for ((sym, info) <- chain.vars) {
+          if (subgraph.stackvars.contains(sym)) {
+            val valdef = info.origtree
+            z = z.append(valdef)
+          }
+        }
+        z
+      }
+
+      val startPoint = findStart(subgraph.start.chain)
+      val body = construct(subgraph.start, mutable.Set(), startPoint).root.result
       val defname = TermName(s"ep$i")
       val defdef = q"""
         def $defname(): Unit = {
@@ -336,7 +371,7 @@ object Coroutine {
       val subgraphs = extractSubgraphs(varmap, cfg, rettpt)
 
       val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
-        (i, generateEntryPoint(i, subgraph))
+        (i, generateEntryPoint(varmap, i, subgraph))
       }
       entrypoints.toMap
     }
