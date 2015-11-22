@@ -8,9 +8,22 @@ import scala.reflect.macros.whitebox.Context
 
 
 object Stack {
-  def push[T](stack: Array[T], x: T): Unit = macro pushMacro[T]
+  def init[T](stack: Array[T], size: Int): Unit = macro initMacro[T]
 
-  def pushMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree, x: c.Tree): c.Tree = {
+  def initMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree, size: c.Tree): c.Tree = {
+    import c.universe._
+
+    val tpe = implicitly[c.WeakTypeTag[T]]
+    q"""
+      if ($stack == null) $stack = new Array[$tpe]($size)
+    """
+  }
+
+  def push[T](stack: Array[T], x: T, size: Int): Unit = macro pushMacro[T]
+
+  def pushMacro[T: c.WeakTypeTag](c: Context)(
+    stack: c.Tree, x: c.Tree, size: c.Tree
+  ): c.Tree = {
     import c.universe._
 
     val q"$path.${name: TermName}" = stack
@@ -18,13 +31,14 @@ object Stack {
     val stackptr = q"$path.$stackptrname"
     val tpe = implicitly[WeakTypeTag[T]]
     q"""
-    if ($stackptr >= $stack.length) {
-      val nstack = new Array[$tpe]($stack.length * 2)
-      java.lang.System.arraycopy($stack, 0, nstack, 0, $stack.length)
-      $stack = nstack
-    }
-    $stack($stackptr) = $x
-    $stackptr += 1
+      scala.coroutines.common.Stack.init[$tpe]($stack, $size)
+      if ($stackptr >= $stack.length) {
+        val nstack = new Array[$tpe]($stack.length * 2)
+        java.lang.System.arraycopy($stack, 0, nstack, 0, $stack.length)
+        $stack = nstack
+      }
+      $stack($stackptr) = $x
+      $stackptr += 1
     """
   }
 
@@ -39,10 +53,10 @@ object Stack {
     val tpe = implicitly[WeakTypeTag[T]]
     val valnme = TermName(c.freshName())
     q"""
-    $stackptr -= 1
-    val $valnme = $stack($stackptr)
-    $stack($stackptr) = null.asInstanceOf[$tpe]
-    $valnme
+      $stackptr -= 1
+      val $valnme = $stack($stackptr)
+      $stack($stackptr) = null.asInstanceOf[$tpe]
+      $valnme
     """
   }
 
@@ -55,7 +69,7 @@ object Stack {
     val stackptrname = TermName(s"${name}ptr")
     val stackptr = q"$path.$stackptrname"
     q"""
-    $stack($stackptr - 1)
+      $stack($stackptr - 1)
     """
   }
 
@@ -68,11 +82,10 @@ object Stack {
     val stackptrname = TermName(s"${name}ptr")
     val stackptr = q"$path.$stackptrname"
     val valnme = TermName(c.freshName())
-
     q"""
-    val $valnme = $stack($stackptr)
-    $stack($stackptr - 1) = $x
-    $valnme
+      val $valnme = $stack($stackptr)
+      $stack($stackptr - 1) = $x
+      $valnme
     """
   }
 

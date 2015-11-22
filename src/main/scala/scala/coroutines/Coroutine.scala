@@ -23,19 +23,6 @@ class Coroutine[@specialized T] {
   private[coroutines] var target: Coroutine[T] = null
   private[coroutines] var result: T = null.asInstanceOf[T]
 
-  final def startFrame(cd: Coroutine.Definition[T]) {
-    Stack.push(costack, cd)
-    Stack.push(pcstack, 0.toShort)
-    cd.push(this)
-  }
-
-  final def endFrame() {
-    val cd = Stack.top(costack)
-    cd.pop(this)
-    Stack.pop(pcstack)
-    Stack.pop(costack)
-  }
-
   def apply(): T = Coroutine.enter[T](this)
 }
 
@@ -56,8 +43,6 @@ object Coroutine {
 
   abstract class Definition[T] {
     def enter(c: Coroutine[T]): Unit
-    def push(c: Coroutine[T]): Unit
-    def pop(c: Coroutine[T]): Unit
   }
 
   def transform(c: Context)(f: c.Tree): c.Tree = {
@@ -67,18 +52,63 @@ object Coroutine {
   private[coroutines] class Synthesizer[C <: Context](val c: C) {
     import c.universe._
 
-    class VarInfo(val uid: Int, val tpe: Type) {
+    class VarInfo(
+      val uid: Int,
+      val tpe: Type,
+      val sym: Symbol,
+      val name: TermName,
+      val isArg: Boolean
+    ) {
       var stackpos = uid
+      def isRefType = tpe <:< typeOf[AnyRef]
+      def isValType = tpe <:< typeOf[AnyVal]
+      val defaultValue: Tree = {
+        if (isRefType) q"null"
+        else if (tpe =:= typeOf[Boolean]) q"false"
+        else if (tpe =:= typeOf[Byte]) q"0.toByte"
+        else if (tpe =:= typeOf[Short]) q"0.toShort"
+        else if (tpe =:= typeOf[Char]) q"0.toChar"
+        else if (tpe =:= typeOf[Int]) q"0"
+        else if (tpe =:= typeOf[Float]) q"0.0f"
+        else if (tpe =:= typeOf[Long]) q"0L"
+        else if (tpe =:= typeOf[Double]) q"0.0"
+        else sys.error(s"Unknown type: $tpe")
+      }
+      private def encodeAsLong(t: Tree): Tree = {
+        if (tpe =:= typeOf[Int]) q"$t.toLong"
+        else sys.error(s"Cannot encode type $tpe as Long.")
+      }
+      val initialValue: Tree = {
+        val t = if (isArg) q"$name" else defaultValue
+        if (isRefType) t
+        else encodeAsLong(t)
+      }
+      val stackname = {
+        if (isRefType) TermName("refstack")
+        else TermName("valstack")
+      }
+      val stacktpe = {
+        if (isRefType) typeOf[AnyRef]
+        else typeOf[Long]
+      }
+      def initialSize: Tree = q"4"
+      def pushTree: Tree = q"""
+        scala.coroutines.common.Stack.push[$stacktpe](
+          c.$stackname, $initialValue, $initialSize)
+      """
+      def popTree = q"""
+        scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
+      """
     }
 
-    type VarMap = mutable.Map[Symbol, VarInfo]
+    type VarMap = mutable.LinkedHashMap[Symbol, VarInfo]
 
     implicit class VarMapOps(val self: VarMap) {
-      def refvars = self.filter(_._2.tpe <:< typeOf[AnyRef])
-      def valvars = self.filter(_._2.tpe <:< typeOf[AnyVal])
+      def refvars = self.filter(_._2.isRefType)
+      def valvars = self.filter(_._2.isValType)
     }
 
-    def newVarMap: VarMap = mutable.Map[Symbol, VarInfo]()
+    def newVarMap: VarMap = mutable.LinkedHashMap[Symbol, VarInfo]()
 
     class CtrlNode(val tree: Tree) {
       var successors: List[CtrlNode] = Nil
@@ -133,6 +163,7 @@ object Coroutine {
         case t => false
       }
       // TODO: ensure that this does not capture constraints from nested class scopes
+      // TODO: ensure that this collect nested coroutine invocations
       val constraintTpes = body.collect {
         case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
         case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
@@ -143,16 +174,19 @@ object Coroutine {
     private def generateVariableMap(args: List[Tree], body: Tree): VarMap = {
       val varmap = newVarMap
       var index = 0
-      def addVar(s: Symbol) {
-        varmap(s) = new VarInfo(index, s.info)
+      def addVar(s: Symbol, name: TermName, isArg: Boolean) {
+        varmap(s) = new VarInfo(index, s.info, s, name, isArg)
         index += 1
       }
-      for (t <- args) addVar(t.symbol)
+      for (t <- args) {
+        val q"$_ val $name: $_ = $_" = t
+        addVar(t.symbol, name, true)
+      }
       // TODO: ensure that this does not capture variables from nested class scopes
       val traverser = new Traverser {
         override def traverse(t: Tree): Unit = t match {
-          case q"$_ val $_: $_ = $rhs" =>
-            addVar(t.symbol)
+          case q"$_ val $name: $_ = $rhs" =>
+            addVar(t.symbol, name, false)
             traverse(rhs)
           case _ =>
             super.traverse(t)
@@ -332,6 +366,10 @@ object Coroutine {
         case q"(..$args) => $body" => (args, body)
         case _ => c.abort(f.pos, "The coroutine takes a single function literal.")
       }
+      val argidents = for (arg <- args) yield {
+        val q"$_ val $argname: $_ = $_" = arg
+        q"$argname"
+      }
 
       // extract argument names and types
       val (argnames, argtpts) = (for (arg <- args) yield {
@@ -339,7 +377,7 @@ object Coroutine {
         (name, tpt)
       }).unzip
 
-      // infer return type
+      // infer coroutine return type
       val rettpt = inferReturnType(body)
 
       // generate variable map
@@ -351,6 +389,11 @@ object Coroutine {
       // generate entry method
       val entermethod = generateEnterMethod(entrypoints, rettpt)
 
+      // generate variable pushes and pops for stack variables
+      val (varpushes, varpops) = (for ((sym, info) <- varmap.toList) yield {
+        (info.pushTree, info.popTree)
+      }).unzip
+
       // emit coroutine instantiation
       val coroutineTpe = TypeName(s"Arity${args.size}")
       val entrypointmethods = entrypoints.map(_._2)
@@ -359,7 +402,7 @@ object Coroutine {
         new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
           def call(..$args) = {
             val $valnme = new Coroutine[$rettpt]
-            $valnme.startFrame(this)
+            push($valnme, ..$argidents)
             $valnme
           }
           def apply(..$args): $rettpt = {
@@ -367,11 +410,15 @@ object Coroutine {
               "Coroutines can only be invoked directly from within other coroutines. " +
               "Use `call` instead if you want to start a new coroutine.")
           }
-          def push(c: Coroutine[$rettpt]): Unit = {
-
+          def push(c: Coroutine[$rettpt], ..$args): Unit = {
+            scala.coroutines.common.Stack.push(c.costack, this, -1)
+            scala.coroutines.common.Stack.push(c.pcstack, 0.toShort, -1)
+            ..$varpushes
           }
           def pop(c: Coroutine[$rettpt]): Unit = {
-            
+            scala.coroutines.common.Stack.pop(c.pcstack)
+            scala.coroutines.common.Stack.pop(c.costack)
+            ..$varpops
           }
           $entermethod
           ..$entrypointmethods
