@@ -37,11 +37,11 @@ class CoroutineTest extends FunSuite with Matchers {
   }
 
   test("should declare body with if statement") {
-    val c = coroutine { (x: Int) =>
+    val c = coroutine { (x: Int, y: Int) =>
       if (x > 0) {
         yieldval(x)
       } else {
-        yieldval(-x)
+        yieldval(y)
       }
       x
     }
@@ -52,6 +52,19 @@ class CoroutineTest extends FunSuite with Matchers {
     val c2 = coroutine { (x: Int) =>
       val y = c1(x)
       y
+    }
+  }
+
+  test("should declare a variable in a nested scope") {
+    val c = coroutine { (x: Int, y: Int) =>
+      if (x > 0) {
+        val z = -x
+        yieldval(z)
+        yieldval(-z)
+      } else {
+        yieldval(y)
+      }
+      x
     }
   }
 

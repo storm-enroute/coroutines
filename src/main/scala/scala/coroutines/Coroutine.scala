@@ -129,6 +129,10 @@ object Coroutine {
         varmap.all(sym) = info
         varmap.varcount += 1
       }
+      override def toString = {
+        val s = s"[${vars.map(_._2.sym).mkString(", ")}] ->"
+        if (parent != null) s + parent.toString else s
+      }
     }
 
     class CtrlNode(val tree: Tree, val chain: Chain) {
@@ -179,7 +183,7 @@ object Coroutine {
       def isRoot = above == null
       def root = {
         var z = this
-        while (z.above != null) z = z.above
+        while (z.above != null) z = z.ascend
         z
       }
       def result: Tree = {
@@ -328,7 +332,7 @@ object Coroutine {
         subgraphs += subgraph
       }
       println(subgraphs
-        .map(t => "[" + t.stackvars.mkString(", ") + "]\n" + t.start.prettyPrint)
+        .map(t => "[" + t.stackvars.keys.mkString(", ") + "]\n" + t.start.prettyPrint)
         .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
         .mkString("\n"))
       subgraphs
@@ -346,7 +350,8 @@ object Coroutine {
         }
         for ((sym, info) <- chain.vars) {
           if (subgraph.stackvars.contains(sym)) {
-            val valdef = info.origtree
+            val q"$mods val $name: $tpt = $_" = info.origtree
+            val valdef = q"$mods val $name: $tpt = ${info.defaultValue}"
             z = z.append(valdef)
           }
         }
