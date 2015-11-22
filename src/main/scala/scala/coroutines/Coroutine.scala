@@ -110,7 +110,7 @@ object Coroutine {
     class VarMap(val lambda: Tree) {
       var varcount = 0
       val all = mutable.LinkedHashMap[Symbol, VarInfo]()
-      val topLevelScope = new Chain(this, lambda, null)
+      val topChain = new Chain(this, lambda, null)
       def foreach[U](f: ((Symbol, VarInfo)) => U): Unit = all.foreach(f)
       def contains(s: Symbol) = all.contains(s)
       def apply(s: Symbol) = all(s)
@@ -193,18 +193,18 @@ object Coroutine {
     private def generateControlFlowGraph(
       args: List[Tree], body: Tree, varmap: VarMap
     ): CtrlNode = {
-      def traverse(t: Tree, s: Chain): (CtrlNode, CtrlNode) = {
+      def traverse(t: Tree, c: Chain): (CtrlNode, CtrlNode) = {
         t match {
           case q"$_ val $name: $_ = $_" =>
-            s.addVar(t.symbol, name, false)
-            val n = new CtrlNode(t, s)
+            c.addVar(t.symbol, name, false)
+            val n = new CtrlNode(t, c)
             (n, n)
           case q"if ($cond) $ifbranch else $elsebranch" =>
-            val nestedscope = s.newChain(t)
-            val ifnode = new CtrlNode(t, nestedscope)
-            val mergenode = new CtrlNode(q"{}", nestedscope)
+            val nestedchain = c.newChain(t)
+            val ifnode = new CtrlNode(t, nestedchain)
+            val mergenode = new CtrlNode(q"{}", nestedchain)
             def addBranch(branch: Tree) {
-              val (childhead, childlast) = traverse(branch, nestedscope)
+              val (childhead, childlast) = traverse(branch, nestedchain)
               ifnode.successors ::= childhead
               childlast.successors ::= mergenode
             }
@@ -212,27 +212,28 @@ object Coroutine {
             addBranch(elsebranch)
             (ifnode, mergenode)
           case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
-            val (first, childlast) = traverse(stats.head, s)
+            val nestedchain = c.newChain(t)
+            val (first, childlast) = traverse(stats.head, nestedchain)
             var current = childlast
             for (stat <- stats.tail) {
-              val (childhead, childlast) = traverse(stat, s)
+              val (childhead, childlast) = traverse(stat, nestedchain)
               current.successors ::= childhead
               current = childlast
             }
             (first, current)
           case _ =>
-            val n = new CtrlNode(t, s)
+            val n = new CtrlNode(t, c)
             (n, n)
         }
       }
 
       for (t <- args) {
         val q"$_ val $name: $_ = $_" = t
-        varmap.topLevelScope.addVar(t.symbol, name, true)
+        varmap.topChain.addVar(t.symbol, name, true)
       }
 
       // traverse tree to construct CFG and extract local variables
-      val (head, last) = traverse(body, varmap.topLevelScope.newChain(body))
+      val (head, last) = traverse(body, varmap.topChain)
       println(head.prettyPrint)
       head
     }
@@ -313,6 +314,21 @@ object Coroutine {
       subgraphs
     }
 
+    private def generateEntryPoint(i: Int, subgraph: Subgraph): Tree = {
+      def construct(n: CtrlNode): Tree = {
+        q"()"
+      }
+
+      val body = construct(subgraph.start)
+      val defname = TermName(s"ep$i")
+      val defdef = q"""
+        def $defname(): Unit = {
+          $body
+        }
+      """
+      defdef
+    }
+
     private def generateEntryPoints(
       args: List[Tree], body: Tree, varmap: VarMap, rettpt: Tree
     ): Map[Int, Tree] = {
@@ -320,13 +336,7 @@ object Coroutine {
       val subgraphs = extractSubgraphs(varmap, cfg, rettpt)
 
       val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
-        val defname = TermName(s"ep$i")
-        val defdef = q"""
-          def $defname(): Unit = {
-            ???
-          }
-        """
-        (i, defdef)
+        (i, generateEntryPoint(i, subgraph))
       }
       entrypoints.toMap
     }
@@ -336,17 +346,17 @@ object Coroutine {
         val q"def $ep(): Unit = $_" = entrypoints(0)
 
         q"""
-        def enter(c: Coroutine[$tpt]): Unit = $ep()
+          def enter(c: Coroutine[$tpt]): Unit = $ep()
         """
       } else if (entrypoints.size == 2) {
         val q"def $ep0(): Unit = $_" = entrypoints(0)
         val q"def $ep1(): Unit = $_" = entrypoints(1)
 
         q"""
-        def enter(c: Coroutine[$tpt]): Unit = {
-          val pc = scala.coroutines.common.Stack.top(c.pcstack)
-          if (pc == 0) $ep0() else $ep1()
-        }
+          def enter(c: Coroutine[$tpt]): Unit = {
+            val pc = scala.coroutines.common.Stack.top(c.pcstack)
+            if (pc == 0) $ep0() else $ep1()
+          }
         """
       } else {
         val cases = for ((index, defdef) <- entrypoints) yield {
@@ -355,12 +365,12 @@ object Coroutine {
         }
 
         q"""
-        def enter(c: Coroutine[$tpt]): Unit = {
-          val pc = scala.coroutines.common.Stack.top(c.pcstack)
-          (pc: @scala.annotation.switch) match {
-            case ..$cases
+          def enter(c: Coroutine[$tpt]): Unit = {
+            val pc = scala.coroutines.common.Stack.top(c.pcstack)
+            (pc: @scala.annotation.switch) match {
+              case ..$cases
+            }
           }
-        }
         """
       }
     }
