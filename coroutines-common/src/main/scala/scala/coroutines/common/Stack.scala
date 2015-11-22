@@ -89,4 +89,17 @@ object Stack {
     """
   }
 
+  def isEmpty[T](stack: Array[T]): Boolean = macro isEmptyMacro[T]
+
+  def isEmptyMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree): c.Tree = {
+    import c.universe._
+
+    val q"$path.${name: TermName}" = stack
+    val stackptrname = TermName(s"${name}ptr")
+    val stackptr = q"$path.$stackptrname"
+    q"""
+      $stackptr > 0
+    """
+  }
+
 }

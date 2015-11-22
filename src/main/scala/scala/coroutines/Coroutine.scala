@@ -16,6 +16,8 @@ class Coroutine[@specialized T] {
   private[coroutines] var costack = new Array[Definition[T]](INITIAL_CO_STACK_SIZE)
   private[coroutines] var pcstackptr = 0
   private[coroutines] var pcstack = new Array[Short](INITIAL_CO_STACK_SIZE)
+  private[coroutines] var rvstackptr = 0
+  private[coroutines] var rvstack: Array[Byte] = _
   private[coroutines] var refstackptr = 0
   private[coroutines] var refstack: Array[AnyRef] = _
   private[coroutines] var valstackptr = 0
@@ -74,14 +76,18 @@ object Coroutine {
         else if (tpe =:= typeOf[Double]) q"0.0"
         else sys.error(s"Unknown type: $tpe")
       }
-      private def encodeAsLong(t: Tree): Tree = {
+      private def encodeLong(t: Tree): Tree = {
         if (tpe =:= typeOf[Int]) q"$t.toLong"
         else sys.error(s"Cannot encode type $tpe as Long.")
+      }
+      private def decodeLong(t: Tree): Tree = {
+        if (tpe =:= typeOf[Int]) q"($t & 0xffffffff).toInt"
+        else sys.error(s"Cannot decode type $tpe from Long.")
       }
       val initialValue: Tree = {
         val t = if (isArg) q"$name" else defaultValue
         if (isRefType) t
-        else encodeAsLong(t)
+        else encodeLong(t)
       }
       val stackname = {
         if (isRefType) TermName("refstack")
@@ -117,7 +123,7 @@ object Coroutine {
         val text = new StringBuilder
         var count = 0
         val seen = mutable.Map[CtrlNode, Int]()
-        def print(n: CtrlNode, prefix: String) {
+        def emit(n: CtrlNode, prefix: String) {
           def shorten(s: String) = {
             if (s.contains('\n')) s.takeWhile(_ != '\n') + "..." else s
           }
@@ -125,21 +131,21 @@ object Coroutine {
           val treerepr = shorten(n.tree.toString)
           text.append(s"$prefix|-> $count: Node($treerepr)\n")
           count += 1
-          def printChild(c: CtrlNode, newPrefix: String) {
+          def emitChild(c: CtrlNode, newPrefix: String) {
             if (seen.contains(c)) {
               text.append(s"$newPrefix|-> label ${seen(c)}")
             } else {
-              print(c, newPrefix)
+              emit(c, newPrefix)
             }
           }
           if (n.successors.nonEmpty) {
             for (s <- n.successors.tail) {
-              printChild(s, prefix + "|   ")
+              emitChild(s, prefix + "|   ")
             }
-            printChild(n.successors.head, prefix)
+            emitChild(n.successors.head, prefix)
           }
         }
-        print(this, "")
+        emit(this, "")
         text.toString
       }
     }
@@ -278,8 +284,6 @@ object Coroutine {
           case q"coroutines.this.`package`.yieldval[$_]($_)" =>
             addToNodeFront()
           case q"coroutines.this.`package`.yieldto[$_]($_)" =>
-            addToNodeFront()
-          case q"return $_" =>
             addToNodeFront()
           case q"$_ val $_ = $co.apply(..$args)" if isCoroutineDefType(co.tpe) =>
             addCoroutineInvocationToNodeFront(co)
