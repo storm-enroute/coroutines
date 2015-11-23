@@ -43,7 +43,12 @@ trait Analyzer[C <: Context] {
     val isArg: Boolean,
     val table: Table
   ) {
-    var stackpos = uid
+    def stackpos = {
+      val sametpvars =
+        if (isRefType) table.vars.filter(_._2.isRefType)
+        else table.vars.filter(_._2.isValType)
+      sametpvars.size - 1 - sametpvars.toList.indexWhere(_._2.uid == uid)
+    }
     def isRefType = tpe <:< typeOf[AnyRef]
     def isValType = tpe <:< typeOf[AnyVal]
     val defaultValue: Tree = {
@@ -58,11 +63,11 @@ trait Analyzer[C <: Context] {
       else if (tpe =:= typeOf[Double]) q"0.0"
       else sys.error(s"Unknown type: $tpe")
     }
-    private def encodeLong(t: Tree): Tree = {
+    def encodeLong(t: Tree): Tree = {
       if (tpe =:= typeOf[Int]) q"$t.toLong"
       else sys.error(s"Cannot encode type $tpe as Long.")
     }
-    private def decodeLong(t: Tree): Tree = {
+    def decodeLong(t: Tree): Tree = {
       if (tpe =:= typeOf[Int]) q"($t & 0xffffffff).toInt"
       else sys.error(s"Cannot decode type $tpe from Long.")
     }
@@ -91,17 +96,17 @@ trait Analyzer[C <: Context] {
 
   class Table(val lambda: Tree) {
     var varcount = 0
-    val all = mutable.LinkedHashMap[Symbol, VarInfo]()
+    val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val topChain = new Chain(this, lambda, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
     object names {
       val coroutineParam = TermName(c.freshName())
     }
-    def foreach[U](f: ((Symbol, VarInfo)) => U): Unit = all.foreach(f)
-    def contains(s: Symbol) = all.contains(s)
-    def apply(s: Symbol) = all(s)
-    def refvars = all.filter(_._2.isRefType)
-    def valvars = all.filter(_._2.isValType)
+    def foreach[U](f: ((Symbol, VarInfo)) => U): Unit = vars.foreach(f)
+    def contains(s: Symbol) = vars.contains(s)
+    def apply(s: Symbol) = vars(s)
+    def refvars = vars.filter(_._2.isRefType)
+    def valvars = vars.filter(_._2.isValType)
   }
 
   class Chain(val table: Table, val origtree: Tree, val parent: Chain) {
@@ -111,7 +116,7 @@ trait Analyzer[C <: Context] {
       val sym = valdef.symbol
       val info = new VarInfo(table.varcount, valdef, sym.info, sym, name, isArg, table)
       vars(sym) = info
-      table.all(sym) = info
+      table.vars(sym) = info
       table.varcount += 1
     }
     override def toString = {

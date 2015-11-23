@@ -73,6 +73,20 @@ object Stack {
     """
   }
 
+  def peek[T](stack: Array[T], n: Int): T = macro peekMacro[T]
+
+  def peekMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree, n: c.Tree): c.Tree = {
+    import c.universe._
+
+    val q"$path.${name: TermName}" = stack
+    val stackptrname = TermName(s"${name}ptr")
+    val stackptr = q"$path.$stackptrname"
+    val valnme = TermName(c.freshName())
+    q"""
+      $stack($stackptr - 1 - $n)
+    """
+  }
+
   def update[T](stack: Array[T], x: T): T = macro updateMacro[T]
 
   def updateMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree, x: c.Tree): c.Tree = {

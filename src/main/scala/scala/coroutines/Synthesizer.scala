@@ -137,7 +137,12 @@ extends Analyzer[C] with ControlFlowGraph[C] {
         val declared = subgraph.declaredvars.contains(sym)
         if (referenced && !declared) {
           val q"$mods val $name: $tpt = $_" = info.origtree
-          val valdef = q"$mods val $name: $tpt = ${info.defaultValue}"
+          val cparam = table.names.coroutineParam
+          val stack = info.stackname
+          val pos = info.stackpos
+          val stackpeek = q"scala.coroutines.common.Stack.peek($cparam.$stack, $pos)"
+          val decodedpeek = info.decodeLong(stackpeek)
+          val valdef = q"$mods val $name: $tpt = $decodedpeek"
           z = z.append(valdef)
         }
       }
@@ -234,7 +239,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val entermethod = synthesizeEnterMethod(entrypoints, rettpt)
 
     // generate variable pushes and pops for stack variables
-    val (varpushes, varpops) = (for ((sym, info) <- table.all.toList) yield {
+    val (varpushes, varpops) = (for ((sym, info) <- table.vars.toList) yield {
       (info.pushTree, info.popTree)
     }).unzip
 
