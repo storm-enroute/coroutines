@@ -125,7 +125,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   }
 
   private def synthesizeEntryPoint(
-    i: Int, subgraph: Subgraph
+    i: Int, subgraph: Subgraph, rettpt: Tree
   )(implicit table: Table): Tree = {
     def findStart(chain: Chain): Zipper = {
       var z = {
@@ -149,7 +149,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val body = bodyZipper.root.result
     val defname = TermName(s"ep$i")
     val defdef = q"""
-      def $defname(): Unit = {
+      def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {
         $body
       }
     """
@@ -163,37 +163,40 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val subgraphs = extractSubgraphs(cfg, rettpt)
 
     val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
-      (i, synthesizeEntryPoint(i, subgraph))
+      (i, synthesizeEntryPoint(i, subgraph, rettpt))
     }
     entrypoints.toMap
   }
 
-  private def synthesizeEnterMethod(entrypoints: Map[Int, Tree], tpt: Tree): Tree = {
+  private def synthesizeEnterMethod(
+    entrypoints: Map[Int, Tree], tpt: Tree
+  )(implicit table: Table): Tree = {
+    val cparamname = table.names.coroutineParam
     if (entrypoints.size == 1) {
-      val q"def $ep(): Unit = $_" = entrypoints(0)
+      val q"def $ep($_): Unit = $_" = entrypoints(0)
 
       q"""
-        def enter(c: Coroutine[$tpt]): Unit = $ep()
+        def enter($cparamname: Coroutine[$tpt]): Unit = $ep($cparamname)
       """
     } else if (entrypoints.size == 2) {
-      val q"def $ep0(): Unit = $_" = entrypoints(0)
-      val q"def $ep1(): Unit = $_" = entrypoints(1)
+      val q"def $ep0($_): Unit = $_" = entrypoints(0)
+      val q"def $ep1($_): Unit = $_" = entrypoints(1)
 
       q"""
-        def enter(c: Coroutine[$tpt]): Unit = {
-          val pc = scala.coroutines.common.Stack.top(c.pcstack)
-          if (pc == 0) $ep0() else $ep1()
+        def enter($cparamname: Coroutine[$tpt]): Unit = {
+          val pc = scala.coroutines.common.Stack.top($cparamname.pcstack)
+          if (pc == 0) $ep0($cparamname) else $ep1($cparamname)
         }
       """
     } else {
       val cases = for ((index, defdef) <- entrypoints) yield {
-        val q"def $ep(): Unit = $rhs" = defdef
-        cq"$index => $ep()"
+        val q"def $ep($_): Unit = $rhs" = defdef
+        cq"$index => $ep($cparamname)"
       }
 
       q"""
-        def enter(c: Coroutine[$tpt]): Unit = {
-          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+        def enter($cparamname: Coroutine[$tpt]): Unit = {
+          val pc = scala.coroutines.common.Stack.top($cparamname.pcstack)
           (pc: @scala.annotation.switch) match {
             case ..$cases
           }

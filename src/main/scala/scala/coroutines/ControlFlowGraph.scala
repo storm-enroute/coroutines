@@ -100,6 +100,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       def copyWithoutSuccessors = new If(tree, chain)
     }
+
     class IfMerge(val tree: Tree, val chain: Chain) extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node]
@@ -113,6 +114,21 @@ trait ControlFlowGraph[C <: Context] {
       }
       def copyWithoutSuccessors = new IfMerge(tree, chain)
     }
+
+    class YieldVal(val tree: Tree, val chain: Chain) extends Node {
+      def emit(
+        z: Zipper, seen: mutable.Set[Node]
+      )(implicit ce: CanEmit, table: Table): Zipper = {
+        val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
+        val termtree = q"""
+          ${table.names.coroutineParam}.result = ${table.untyper.untypecheck(x)}
+          return
+        """
+        z.append(termtree)
+      }
+      def copyWithoutSuccessors = new YieldVal(tree, chain)
+    }
+
     class Statement(val tree: Tree, val chain: Chain) extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node]

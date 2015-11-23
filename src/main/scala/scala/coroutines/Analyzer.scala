@@ -40,7 +40,8 @@ trait Analyzer[C <: Context] {
     val tpe: Type,
     val sym: Symbol,
     val name: TermName,
-    val isArg: Boolean
+    val isArg: Boolean,
+    val table: Table
   ) {
     var stackpos = uid
     def isRefType = tpe <:< typeOf[AnyRef]
@@ -93,6 +94,9 @@ trait Analyzer[C <: Context] {
     val all = mutable.LinkedHashMap[Symbol, VarInfo]()
     val topChain = new Chain(this, lambda, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
+    object names {
+      val coroutineParam = TermName(c.freshName())
+    }
     def foreach[U](f: ((Symbol, VarInfo)) => U): Unit = all.foreach(f)
     def contains(s: Symbol) = all.contains(s)
     def apply(s: Symbol) = all(s)
@@ -105,7 +109,7 @@ trait Analyzer[C <: Context] {
     def newChain(subtree: Tree) = new Chain(table, subtree, this)
     def addVar(valdef: Tree, name: TermName, isArg: Boolean) {
       val sym = valdef.symbol
-      val info = new VarInfo(table.varcount, valdef, sym.info, sym, name, isArg)
+      val info = new VarInfo(table.varcount, valdef, sym.info, sym, name, isArg, table)
       vars(sym) = info
       table.all(sym) = info
       table.varcount += 1
