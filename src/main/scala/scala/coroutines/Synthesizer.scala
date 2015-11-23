@@ -42,52 +42,6 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     tq"${lub(rettpe :: constraintTpes)}"
   }
 
-  private def synthesizeControlFlowGraph(args: List[Tree], body: Tree): Node = {
-    def traverse(t: Tree, c: Chain): (Node, Node) = {
-      t match {
-        case q"$_ val $name: $_ = $_" =>
-          c.addVar(t, name, false)
-          val n = new Node(t, None, c)
-          (n, n)
-        case q"if ($cond) $thenbranch else $elsebranch" =>
-          val ifnode = new Node(t, Some(t), c)
-          val mergenode = new Node(q"{}", Some(t), c)
-          def addBranch(branch: Tree) {
-            val nestedchain = c.newChain(t)
-            val (childhead, childlast) = traverse(branch, nestedchain)
-            ifnode.successors ::= childhead
-            childlast.successors ::= mergenode
-          }
-          addBranch(thenbranch)
-          addBranch(elsebranch)
-          (ifnode, mergenode)
-        case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
-          val nestedchain = c.newChain(t)
-          val (first, childlast) = traverse(stats.head, nestedchain)
-          var current = childlast
-          for (stat <- stats.tail) {
-            val (childhead, childlast) = traverse(stat, nestedchain)
-            current.successors ::= childhead
-            current = childlast
-          }
-          (first, current)
-        case _ =>
-          val n = new Node(t, None, c)
-          (n, n)
-      }
-    }
-
-    for (t <- args) {
-      val q"$_ val $name: $_ = $_" = t
-      table.topChain.addVar(t, name, true)
-    }
-
-    // traverse tree to construct CFG and extract local variables
-    val (head, last) = traverse(body, table.topChain)
-    println(head.prettyPrint)
-    head
-  }
-
   private def extractSubgraphs(cfg: Node, rettpt: Tree): Set[Subgraph] = {
     val subgraphs = mutable.LinkedHashSet[Subgraph]()
     val seenEntries = mutable.Set[Node]()
@@ -205,7 +159,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   private def synthesizeEntryPoints(
     args: List[Tree], body: Tree, rettpt: Tree
   ): Map[Int, Tree] = {
-    val cfg = synthesizeControlFlowGraph(args, body)
+    val cfg = generateControlFlowGraph(lambda)
     val subgraphs = extractSubgraphs(cfg, rettpt)
 
     val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {

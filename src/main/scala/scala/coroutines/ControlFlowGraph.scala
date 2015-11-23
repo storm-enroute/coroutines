@@ -14,7 +14,7 @@ import scala.reflect.macros.whitebox.Context
 trait ControlFlowGraph[C <: Context] {
   self: Synthesizer[C] with Analyzer[C] =>
 
-  val c: Context
+  val c: C
 
   import c.universe._
 
@@ -130,5 +130,56 @@ trait ControlFlowGraph[C <: Context] {
   object Node {
     def copyNoSuccessors(n: Node) =
       new Node(n.tree, n.ctrlflowtree, n.chain)
+  }
+
+  def generateControlFlowGraph(lambda: Tree): Node = {
+    def traverse(t: Tree, c: Chain): (Node, Node) = {
+      t match {
+        case q"$_ val $name: $_ = $_" =>
+          c.addVar(t, name, false)
+          val n = new Node(t, None, c)
+          (n, n)
+        case q"if ($cond) $thenbranch else $elsebranch" =>
+          val ifnode = new Node(t, Some(t), c)
+          val mergenode = new Node(q"{}", Some(t), c)
+          def addBranch(branch: Tree) {
+            val nestedchain = c.newChain(t)
+            val (childhead, childlast) = traverse(branch, nestedchain)
+            ifnode.successors ::= childhead
+            childlast.successors ::= mergenode
+          }
+          addBranch(thenbranch)
+          addBranch(elsebranch)
+          (ifnode, mergenode)
+        case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
+          val nestedchain = c.newChain(t)
+          val (first, childlast) = traverse(stats.head, nestedchain)
+          var current = childlast
+          for (stat <- stats.tail) {
+            val (childhead, childlast) = traverse(stat, nestedchain)
+            current.successors ::= childhead
+            current = childlast
+          }
+          (first, current)
+        case _ =>
+          val n = new Node(t, None, c)
+          (n, n)
+      }
+    }
+
+    val (args, body) = lambda match {
+      case q"(..$args) => $body" => (args, body)
+      case _ => c.abort(lambda.pos, "The coroutine takes a single function literal.")
+    }
+
+    for (t <- args) {
+      val q"$_ val $name: $_ = $_" = t
+      table.topChain.addVar(t, name, true)
+    }
+
+    // traverse tree to construct CFG and extract local variables
+    val (head, last) = traverse(body, table.topChain)
+    println(head.prettyPrint)
+    head
   }
 }

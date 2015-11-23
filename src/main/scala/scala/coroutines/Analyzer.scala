@@ -12,9 +12,7 @@ import scala.reflect.macros.whitebox.Context
 /** Analyzes coroutine trees and produces control flow graphs.
  */
 trait Analyzer[C <: Context] {
-  val c: Context
-
-  val table: Table
+  val c: C
 
   import c.universe._
 
