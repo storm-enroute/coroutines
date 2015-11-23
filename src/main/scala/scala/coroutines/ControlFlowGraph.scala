@@ -24,17 +24,14 @@ trait ControlFlowGraph[C <: Context] {
     implicit object canEmit extends CanEmit
   }
 
-  class Node(
-    val tree: Tree,
-    val ctrlflowtree: Option[Tree],
-    val chain: Chain
-  ) {
+  abstract class Node {
     var successors: List[Node] = Nil
 
-    def singleSuccessor: Option[Node] = {
-      if (successors.size == 1) Some(successors.head)
-      else None
-    }
+    val tree: Tree
+
+    def chain: Chain
+
+    def copyWithoutSuccessors: Node
 
     final def emitCode(z: Zipper): Zipper = {
       val seen = mutable.Set[Node]()
@@ -49,52 +46,7 @@ trait ControlFlowGraph[C <: Context] {
       } else z
     }
 
-    def emit(z: Zipper, seen: mutable.Set[Node])(implicit ce: CanEmit): Zipper = {
-      ctrlflowtree match {
-        case None =>
-          // inside the control-flow-construct, normal statement
-          val z1 = z.append(table.untyper.untypecheck(tree))
-          singleSuccessor match {
-            case Some(sn) => sn.markAndEmitTree(z1, seen)
-            case None => z1
-          }
-        case Some(cftree) if cftree eq tree =>
-          // node marks the start of a control-flow-construct
-          cftree match {
-            case q"if ($cond) $_ else $_" =>
-              val newZipper = Zipper(null, Nil, trees => q"..$trees")
-              val elsenode = this.successors(0)
-              val thennode = this.successors(1)
-              val elsebranch = elsenode.markAndEmitTree(newZipper, seen).root.result
-              val thenbranch = thennode.markAndEmitTree(newZipper, seen).root.result
-              val untypedcond = table.untyper.untypecheck(cond)
-              val iftree = q"if ($untypedcond) $thenbranch else $elsebranch"
-              val z1 = z.append(iftree)
-              z1
-            case _ =>
-              sys.error("Unknown control flow construct: $cftree")
-          }
-        case Some(cftree) if cftree ne tree =>
-          // node marks the end of a control-flow-construct
-          val z1 = this.backwardSuccessor.markAndEmitTree(z, seen)
-          val z2 = this.forwardSuccessor.markAndEmitTree(z1, seen)
-          z2
-      }
-    }
-
-    def forwardSuccessor: Node = ctrlflowtree match {
-      case Some(q"if ($_) $_ else $_") =>
-        successors.head
-      case None =>
-        sys.error(s"Cannot compute forward node for <$tree>.")
-    }
-
-    def backwardSuccessor: Node = ctrlflowtree match {
-      case Some(q"if ($_) $_ else $_") =>
-        new Node(q"()", None, chain)
-      case None =>
-        sys.error(s"Cannot compute backward node for <$tree>.")
-    }
+    def emit(z: Zipper, seen: mutable.Set[Node])(implicit ce: CanEmit): Zipper
 
     def prettyPrint = {
       val text = new StringBuilder
@@ -128,8 +80,44 @@ trait ControlFlowGraph[C <: Context] {
   }
 
   object Node {
-    def copyNoSuccessors(n: Node) =
-      new Node(n.tree, n.ctrlflowtree, n.chain)
+    class If(val tree: Tree, val chain: Chain) extends Node {
+      def emit(z: Zipper, seen: mutable.Set[Node])(implicit ce: CanEmit): Zipper = {
+        val q"if ($cond) $_ else $_" = tree
+        val newZipper = Zipper(null, Nil, trees => q"..$trees")
+        val elsenode = this.successors(0)
+        val thennode = this.successors(1)
+        val elsebranch = elsenode.markAndEmitTree(newZipper, seen).root.result
+        val thenbranch = thennode.markAndEmitTree(newZipper, seen).root.result
+        val untypedcond = table.untyper.untypecheck(cond)
+        val iftree = q"if ($untypedcond) $thenbranch else $elsebranch"
+        z.append(iftree)
+      }
+      def copyWithoutSuccessors = new If(tree, chain)
+    }
+    class IfMerge(val tree: Tree, val chain: Chain) extends Node {
+      def emit(z: Zipper, seen: mutable.Set[Node])(implicit ce: CanEmit): Zipper = {
+        if (successors.length == 1) {
+          successors.head.markAndEmitTree(z, seen)
+        } else if (successors.length == 0) {
+          // do nothing
+          z
+        } else sys.error(s"Multiple successors for <$tree>.")
+      }
+      def copyWithoutSuccessors = new IfMerge(tree, chain)
+    }
+    class Statement(val tree: Tree, val chain: Chain) extends Node {
+      def emit(z: Zipper, seen: mutable.Set[Node])(implicit ce: CanEmit): Zipper = {
+        // inside the control-flow-construct, normal statement
+        val z1 = z.append(table.untyper.untypecheck(tree))
+        if (successors.length == 1) {
+          successors.head.markAndEmitTree(z1, seen)
+        } else if (successors.length == 0) {
+          // do nothing
+          z1
+        } else sys.error(s"Multiple successors for <$tree>.")
+      }
+      def copyWithoutSuccessors = new Statement(tree, chain)
+    }
   }
 
   def generateControlFlowGraph(lambda: Tree): Node = {
@@ -137,11 +125,11 @@ trait ControlFlowGraph[C <: Context] {
       t match {
         case q"$_ val $name: $_ = $_" =>
           c.addVar(t, name, false)
-          val n = new Node(t, None, c)
+          val n = new Node.Statement(t, c)
           (n, n)
         case q"if ($cond) $thenbranch else $elsebranch" =>
-          val ifnode = new Node(t, Some(t), c)
-          val mergenode = new Node(q"{}", Some(t), c)
+          val ifnode = new Node.If(t, c)
+          val mergenode = new Node.IfMerge(q"{}", c)
           def addBranch(branch: Tree) {
             val nestedchain = c.newChain(t)
             val (childhead, childlast) = traverse(branch, nestedchain)
@@ -162,7 +150,7 @@ trait ControlFlowGraph[C <: Context] {
           }
           (first, current)
         case _ =>
-          val n = new Node(t, None, c)
+          val n = new Node.Statement(t, c)
           (n, n)
       }
     }

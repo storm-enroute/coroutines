@@ -53,7 +53,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
       n: Node, seen: mutable.Map[Node, Node], subgraph: Subgraph
     ): Node = {
       // duplicate and mark current node as seen
-      val current = Node.copyNoSuccessors(n)
+      val current = n.copyWithoutSuccessors
       seen(n) = current
 
       // detect referenced and declared stack variables
