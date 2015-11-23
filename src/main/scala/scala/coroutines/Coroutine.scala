@@ -54,6 +54,34 @@ object Coroutine {
   private[coroutines] class Synthesizer[C <: Context](val c: C) {
     import c.universe._
 
+    val parserTrees = mutable.Map[Tree, Tree]()
+
+    def getParserTree(t: Tree) = if (parserTrees.contains(t)) parserTrees(t) else t
+
+    // TODO: refactor this into a utility class
+    def traverseMirrored(t0: Tree, t1: Tree)(f: (Tree, Tree) => Unit) = {
+      def traverse(t0: Tree, t1: Tree): Unit = {
+        f(t0, t1)
+        (t0, t1) match {
+          case (q"(..$args0) => $body0", q"(..$args1) => $body1") =>
+            for ((a0, a1) <- args0 zip args1) traverse(a0, a1)
+            traverse(body0, body1)
+          case (q"$_ val $_: $tp0 = $rhs0", q"$_ val $_: $tp1 = $rhs1") =>
+            traverse(tp0, tp1)
+            traverse(rhs0, rhs1)
+          case (q"if ($c0) $t0 else $e0", q"if ($c1) $t1 else $e1") =>
+           traverse(c0, c1)
+           traverse(t0, t1)
+           traverse(e0, e1)
+          case (q"{ ..$ss0 }", q"{ ..$ss1 }") if ss0.length > 1 && ss1.length > 1 =>
+            for ((a, b) <- ss0 zip ss1) traverse(a, b)
+          case _ =>
+            // TODO: implement remaining cases
+        }
+      }
+      traverse(t0, t1)
+    }
+
     class VarInfo(
       val uid: Int,
       val origtree: Tree,
@@ -130,13 +158,36 @@ object Coroutine {
         varmap.varcount += 1
       }
       override def toString = {
-        val s = s"[${vars.map(_._2.sym).mkString(", ")}] ->"
+        val s = s"[${vars.map(_._2.sym).mkString(", ")}] -> "
         if (parent != null) s + parent.toString else s
       }
     }
 
-    class CtrlNode(val tree: Tree, val chain: Chain) {
+    class CtrlNode(
+      val tree: Tree,
+      val ctrlflowtree: Option[Tree],
+      val chain: Chain
+    ) {
       var successors: List[CtrlNode] = Nil
+
+      def singleSuccessor: Option[CtrlNode] = {
+        if (successors.size == 1) Some(successors.head)
+        else None
+      }
+
+      def forwardSuccessor: CtrlNode = ctrlflowtree match {
+        case Some(q"if ($_) $_ else $_") =>
+          successors.head
+        case None =>
+          sys.error(s"Cannot compute forward node for <$tree>.")
+      }
+
+      def backwardSuccessor: CtrlNode = ctrlflowtree match {
+        case Some(q"if ($_) $_ else $_") =>
+          new CtrlNode(q"()", None, chain)
+        case None =>
+          sys.error(s"Cannot compute backward node for <$tree>.")
+      }
 
       def prettyPrint = {
         val text = new StringBuilder
@@ -170,11 +221,13 @@ object Coroutine {
     }
 
     object CtrlNode {
-      def copyNoSuccessors(n: CtrlNode) = new CtrlNode(n.tree, n.chain)
+      def copyNoSuccessors(n: CtrlNode) =
+        new CtrlNode(n.tree, n.ctrlflowtree, n.chain)
     }
 
     class Subgraph {
-      val stackvars = mutable.LinkedHashMap[Symbol, VarInfo]()
+      val referencedvars = mutable.LinkedHashMap[Symbol, VarInfo]()
+      val declaredvars = mutable.LinkedHashMap[Symbol, VarInfo]()
       var start: CtrlNode = _
     }
 
@@ -188,10 +241,10 @@ object Coroutine {
       }
       def result: Tree = {
         assert(above == null)
-        ctor(left)
+        ctor(left.reverse)
       }
       def ascend: Zipper = if (above == null) null else {
-        Zipper(above.above, ctor(left) :: above.left, above.ctor)
+        Zipper(above.above, ctor(left.reverse) :: above.left, above.ctor)
       }
       def descend(ctor: List[Tree] => Tree) = Zipper(this, Nil, ctor)
     }
@@ -206,7 +259,7 @@ object Coroutine {
         case t => false
       }
       // TODO: ensure that this does not capture constraints from nested class scopes
-      // TODO: ensure that this collect nested coroutine invocations
+      // TODO: ensure that this does not collect nested coroutine invocations
       val constraintTpes = body.collect {
         case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
         case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
@@ -221,13 +274,13 @@ object Coroutine {
         t match {
           case q"$_ val $name: $_ = $_" =>
             c.addVar(t, name, false)
-            val n = new CtrlNode(t, c)
+            val n = new CtrlNode(t, None, c)
             (n, n)
           case q"if ($cond) $ifbranch else $elsebranch" =>
-            val nestedchain = c.newChain(t)
-            val ifnode = new CtrlNode(t, nestedchain)
-            val mergenode = new CtrlNode(q"{}", nestedchain)
+            val ifnode = new CtrlNode(t, Some(t), c)
+            val mergenode = new CtrlNode(q"{}", Some(t), c)
             def addBranch(branch: Tree) {
+              val nestedchain = c.newChain(t)
               val (childhead, childlast) = traverse(branch, nestedchain)
               ifnode.successors ::= childhead
               childlast.successors ::= mergenode
@@ -246,7 +299,7 @@ object Coroutine {
             }
             (first, current)
           case _ =>
-            val n = new CtrlNode(t, c)
+            val n = new CtrlNode(t, None, c)
             (n, n)
         }
       }
@@ -278,9 +331,17 @@ object Coroutine {
         val current = CtrlNode.copyNoSuccessors(n)
         seen(n) = current
 
-        // detect referenced stack variables
-        for (t <- n.tree) if (varmap.contains(t.symbol)) {
-          subgraph.stackvars(t.symbol) = varmap(t.symbol)
+        // detect referenced and declared stack variables
+        for (t <- n.tree) {
+          if (varmap.contains(t.symbol)) {
+            subgraph.referencedvars(t.symbol) = varmap(t.symbol)
+          }
+          t match {
+            case q"$_ val $_: $_ = $_" =>
+              subgraph.declaredvars(t.symbol) = varmap(t.symbol)
+            case _ =>
+              // do nothing
+          }
         }
 
         // check for termination condition
@@ -332,24 +393,24 @@ object Coroutine {
         subgraphs += subgraph
       }
       println(subgraphs
-        .map(t => "[" + t.stackvars.keys.mkString(", ") + "]\n" + t.start.prettyPrint)
+        .map(t => {
+          "[" + t.referencedvars.keys.mkString(", ") + "]\n" + t.start.prettyPrint
+        })
         .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
         .mkString("\n"))
       subgraphs
     }
 
     private def generateEntryPoint(varmap: VarMap, i: Int, subgraph: Subgraph): Tree = {
-      def construct(n: CtrlNode, seen: mutable.Set[CtrlNode], z: Zipper): Zipper = {
-        z
-      }
-
       def findStart(chain: Chain): Zipper = {
         var z = {
           if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
           else findStart(chain.parent).descend(trees => q"..$trees")
         }
         for ((sym, info) <- chain.vars) {
-          if (subgraph.stackvars.contains(sym)) {
+          val referenced = subgraph.referencedvars.contains(sym)
+          val declared = subgraph.declaredvars.contains(sym)
+          if (referenced && !declared) {
             val q"$mods val $name: $tpt = $_" = info.origtree
             val valdef = q"$mods val $name: $tpt = ${info.defaultValue}"
             z = z.append(valdef)
@@ -358,8 +419,37 @@ object Coroutine {
         z
       }
 
+      def construct(
+        n: CtrlNode, seen: mutable.Set[CtrlNode], z: Zipper
+      ): Zipper = {
+        if (!seen(n)) {
+          seen += n
+          n.ctrlflowtree match {
+            case None =>
+              // inside the control-flow-construct, normal statement
+              val z1 = z.append(getParserTree(n.tree))
+              n.singleSuccessor match {
+                case Some(sn) => construct(sn, seen, z1)
+                case None => z1
+              }
+            case Some(cftree) if cftree eq n.tree =>
+              // node marks the start of a control-flow-construct
+              cftree match {
+                case q"if ($_) $_ else $_" => z
+                case _ => sys.error("Unknown control flow construct: $cftree")
+              }
+            case Some(cftree) if cftree ne n.tree =>
+              // node marks the end of a control-flow-construct
+              val z1 = construct(n.backwardSuccessor, seen, z)
+              val z2 = construct(n.forwardSuccessor, seen, z1)
+              z2
+          }
+        } else z
+      }
+
       val startPoint = findStart(subgraph.start.chain)
-      val body = construct(subgraph.start, mutable.Set(), startPoint).root.result
+      val bodyZipper = construct(subgraph.start, mutable.Set(), startPoint)
+      val body = bodyZipper.root.result
       val defname = TermName(s"ep$i")
       val defdef = q"""
         def $defname(): Unit = {
@@ -417,6 +507,8 @@ object Coroutine {
 
     def transform(f: Tree): Tree = {
       val varmap = new VarMap(f)
+      val parserf = c.untypecheck(f)
+      traverseMirrored(f, parserf)((t, pt) => parserTrees(t) = pt)
 
       // ensure that argument is a function literal
       val (args, body) = f match {
