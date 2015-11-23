@@ -54,16 +54,6 @@ object Coroutine {
   private[coroutines] class Synthesizer[C <: Context](val c: C) {
     import c.universe._
 
-    // TODO: refactor this into a utility class
-    val parserTrees = mutable.Map[Tree, Tree]()
-
-    def getParserTree(t: Tree) = {
-      if (parserTrees.contains(t)) parserTrees(t)
-      else t
-    }
-
-    val traverser = new TraverserUtil[c.type](c)
-
     class VarInfo(
       val uid: Int,
       val origtree: Tree,
@@ -118,10 +108,11 @@ object Coroutine {
       """
     }
 
-    class VarMap(val lambda: Tree) {
+    class Table(val lambda: Tree) {
       var varcount = 0
       val all = mutable.LinkedHashMap[Symbol, VarInfo]()
       val topChain = new Chain(this, lambda, null)
+      val untyper = new ByTreeUntyper[c.type](c)(lambda)
       def foreach[U](f: ((Symbol, VarInfo)) => U): Unit = all.foreach(f)
       def contains(s: Symbol) = all.contains(s)
       def apply(s: Symbol) = all(s)
@@ -129,15 +120,15 @@ object Coroutine {
       def valvars = all.filter(_._2.isValType)
     }
 
-    class Chain(val varmap: VarMap, val origtree: Tree, val parent: Chain) {
+    class Chain(val table: Table, val origtree: Tree, val parent: Chain) {
       val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
-      def newChain(subtree: Tree) = new Chain(varmap, subtree, this)
+      def newChain(subtree: Tree) = new Chain(table, subtree, this)
       def addVar(valdef: Tree, name: TermName, isArg: Boolean) {
         val sym = valdef.symbol
-        val info = new VarInfo(varmap.varcount, valdef, sym.info, sym, name, isArg)
+        val info = new VarInfo(table.varcount, valdef, sym.info, sym, name, isArg)
         vars(sym) = info
-        varmap.all(sym) = info
-        varmap.varcount += 1
+        table.all(sym) = info
+        table.varcount += 1
       }
       override def toString = {
         val s = s"[${vars.map(_._2.sym).mkString(", ")}] -> "
@@ -250,7 +241,7 @@ object Coroutine {
     }
 
     private def generateControlFlowGraph(
-      args: List[Tree], body: Tree, varmap: VarMap
+      args: List[Tree], body: Tree, table: Table
     ): CtrlNode = {
       def traverse(t: Tree, c: Chain): (CtrlNode, CtrlNode) = {
         t match {
@@ -288,17 +279,17 @@ object Coroutine {
 
       for (t <- args) {
         val q"$_ val $name: $_ = $_" = t
-        varmap.topChain.addVar(t, name, true)
+        table.topChain.addVar(t, name, true)
       }
 
       // traverse tree to construct CFG and extract local variables
-      val (head, last) = traverse(body, varmap.topChain)
+      val (head, last) = traverse(body, table.topChain)
       println(head.prettyPrint)
       head
     }
 
     private def extractSubgraphs(
-      varmap: VarMap, cfg: CtrlNode, rettpt: Tree
+      table: Table, cfg: CtrlNode, rettpt: Tree
     ): Set[Subgraph] = {
       val subgraphs = mutable.LinkedHashSet[Subgraph]()
       val seenEntries = mutable.Set[CtrlNode]()
@@ -315,12 +306,12 @@ object Coroutine {
 
         // detect referenced and declared stack variables
         for (t <- n.tree) {
-          if (varmap.contains(t.symbol)) {
-            subgraph.referencedvars(t.symbol) = varmap(t.symbol)
+          if (table.contains(t.symbol)) {
+            subgraph.referencedvars(t.symbol) = table(t.symbol)
           }
           t match {
             case q"$_ val $_: $_ = $_" =>
-              subgraph.declaredvars(t.symbol) = varmap(t.symbol)
+              subgraph.declaredvars(t.symbol) = table(t.symbol)
             case _ =>
               // do nothing
           }
@@ -383,7 +374,7 @@ object Coroutine {
       subgraphs
     }
 
-    private def generateEntryPoint(varmap: VarMap, i: Int, subgraph: Subgraph): Tree = {
+    private def generateEntryPoint(table: Table, i: Int, subgraph: Subgraph): Tree = {
       def findStart(chain: Chain): Zipper = {
         var z = {
           if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
@@ -409,7 +400,7 @@ object Coroutine {
           n.ctrlflowtree match {
             case None =>
               // inside the control-flow-construct, normal statement
-              val z1 = z.append(getParserTree(n.tree))
+              val z1 = z.append(table.untyper.untypecheck(n.tree))
               n.singleSuccessor match {
                 case Some(sn) => construct(sn, seen, z1)
                 case None => z1
@@ -423,7 +414,7 @@ object Coroutine {
                   val thennode = n.successors(1)
                   val elsebranch = construct(elsenode, seen, newZipper).root.result
                   val thenbranch = construct(thennode, seen, newZipper).root.result
-                  val parsercond = getParserTree(cond)
+                  val parsercond = table.untyper.untypecheck(cond)
                   val iftree = q"if ($parsercond) $thenbranch else $elsebranch"
                   val z1 = z.append(iftree)
                   z1
@@ -452,13 +443,13 @@ object Coroutine {
     }
 
     private def generateEntryPoints(
-      args: List[Tree], body: Tree, varmap: VarMap, rettpt: Tree
+      args: List[Tree], body: Tree, table: Table, rettpt: Tree
     ): Map[Int, Tree] = {
-      val cfg = generateControlFlowGraph(args, body, varmap)
-      val subgraphs = extractSubgraphs(varmap, cfg, rettpt)
+      val cfg = generateControlFlowGraph(args, body, table)
+      val subgraphs = extractSubgraphs(table, cfg, rettpt)
 
       val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
-        (i, generateEntryPoint(varmap, i, subgraph))
+        (i, generateEntryPoint(table, i, subgraph))
       }
       entrypoints.toMap
     }
@@ -498,9 +489,7 @@ object Coroutine {
     }
 
     def transform(f: Tree): Tree = {
-      val varmap = new VarMap(f)
-      val parserf = c.untypecheck(f)
-      traverser.traverseByShape(f, parserf)((t, pt) => parserTrees(t) = pt)
+      val table = new Table(f)
 
       // ensure that argument is a function literal
       val (args, body) = f match {
@@ -522,13 +511,13 @@ object Coroutine {
       val rettpt = inferReturnType(body)
 
       // generate entry points from yields and coroutine applies
-      val entrypoints = generateEntryPoints(args, body, varmap, rettpt)
+      val entrypoints = generateEntryPoints(args, body, table, rettpt)
 
       // generate entry method
       val entermethod = generateEnterMethod(entrypoints, rettpt)
 
       // generate variable pushes and pops for stack variables
-      val (varpushes, varpops) = (for ((sym, info) <- varmap.all.toList) yield {
+      val (varpushes, varpops) = (for ((sym, info) <- table.all.toList) yield {
         (info.pushTree, info.popTree)
       }).unzip
 
