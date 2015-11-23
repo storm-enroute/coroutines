@@ -11,8 +11,10 @@ import scala.reflect.macros.whitebox.Context
 
 /** Analyzes coroutine trees and produces control flow graphs.
  */
-trait Analyser[C <: Context] {
+trait Analyzer[C <: Context] {
   val c: Context
+
+  val table: Table
 
   import c.universe._
 
@@ -114,67 +116,5 @@ trait Analyser[C <: Context] {
       val s = s"[${vars.map(_._2.sym).mkString(", ")}] -> "
       if (parent != null) s + parent.toString else s
     }
-  }
-
-  class CtrlNode(
-    val tree: Tree,
-    val ctrlflowtree: Option[Tree],
-    val chain: Chain
-  ) {
-    var successors: List[CtrlNode] = Nil
-
-    def singleSuccessor: Option[CtrlNode] = {
-      if (successors.size == 1) Some(successors.head)
-      else None
-    }
-
-    def forwardSuccessor: CtrlNode = ctrlflowtree match {
-      case Some(q"if ($_) $_ else $_") =>
-        successors.head
-      case None =>
-        sys.error(s"Cannot compute forward node for <$tree>.")
-    }
-
-    def backwardSuccessor: CtrlNode = ctrlflowtree match {
-      case Some(q"if ($_) $_ else $_") =>
-        new CtrlNode(q"()", None, chain)
-      case None =>
-        sys.error(s"Cannot compute backward node for <$tree>.")
-    }
-
-    def prettyPrint = {
-      val text = new StringBuilder
-      var count = 0
-      val seen = mutable.Map[CtrlNode, Int]()
-      def emit(n: CtrlNode, prefix: String) {
-        def shorten(s: String) = {
-          if (s.contains('\n')) s.takeWhile(_ != '\n') + "..." else s
-        }
-        seen(n) = count
-        val treerepr = shorten(n.tree.toString)
-        text.append(s"$prefix|-> $count: Node($treerepr)\n")
-        count += 1
-        def emitChild(c: CtrlNode, newPrefix: String) {
-          if (seen.contains(c)) {
-            text.append(s"$newPrefix|-> label ${seen(c)}")
-          } else {
-            emit(c, newPrefix)
-          }
-        }
-        if (n.successors.nonEmpty) {
-          for (s <- n.successors.tail) {
-            emitChild(s, prefix + "|   ")
-          }
-          emitChild(n.successors.head, prefix)
-        }
-      }
-      emit(this, "")
-      text.toString
-    }
-  }
-
-  object CtrlNode {
-    def copyNoSuccessors(n: CtrlNode) =
-      new CtrlNode(n.tree, n.ctrlflowtree, n.chain)
   }
 }

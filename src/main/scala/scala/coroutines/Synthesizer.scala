@@ -10,14 +10,18 @@ import scala.reflect.macros.whitebox.Context
 
 
 
-private[coroutines] class Synthesizer[C <: Context](val c: C)
-extends Analyser[C] {
+private[coroutines] class Synthesizer[C <: Context](val c: C)(val lambdaValue: Any)
+extends Analyzer[C] with ControlFlowGraph[C] {
   import c.universe._
+
+  val lambda = lambdaValue.asInstanceOf[Tree]
+
+  val table = new Table(lambda)
 
   class Subgraph {
     val referencedvars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val declaredvars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    var start: CtrlNode = _
+    var start: Node = _
   }
 
   private def inferReturnType(body: Tree): Tree = {
@@ -38,18 +42,16 @@ extends Analyser[C] {
     tq"${lub(rettpe :: constraintTpes)}"
   }
 
-  private def generateControlFlowGraph(
-    args: List[Tree], body: Tree, table: Table
-  ): CtrlNode = {
-    def traverse(t: Tree, c: Chain): (CtrlNode, CtrlNode) = {
+  private def synthesizeControlFlowGraph(args: List[Tree], body: Tree): Node = {
+    def traverse(t: Tree, c: Chain): (Node, Node) = {
       t match {
         case q"$_ val $name: $_ = $_" =>
           c.addVar(t, name, false)
-          val n = new CtrlNode(t, None, c)
+          val n = new Node(t, None, c)
           (n, n)
         case q"if ($cond) $thenbranch else $elsebranch" =>
-          val ifnode = new CtrlNode(t, Some(t), c)
-          val mergenode = new CtrlNode(q"{}", Some(t), c)
+          val ifnode = new Node(t, Some(t), c)
+          val mergenode = new Node(q"{}", Some(t), c)
           def addBranch(branch: Tree) {
             val nestedchain = c.newChain(t)
             val (childhead, childlast) = traverse(branch, nestedchain)
@@ -70,7 +72,7 @@ extends Analyser[C] {
           }
           (first, current)
         case _ =>
-          val n = new CtrlNode(t, None, c)
+          val n = new Node(t, None, c)
           (n, n)
       }
     }
@@ -86,20 +88,18 @@ extends Analyser[C] {
     head
   }
 
-  private def extractSubgraphs(
-    table: Table, cfg: CtrlNode, rettpt: Tree
-  ): Set[Subgraph] = {
+  private def extractSubgraphs(cfg: Node, rettpt: Tree): Set[Subgraph] = {
     val subgraphs = mutable.LinkedHashSet[Subgraph]()
-    val seenEntries = mutable.Set[CtrlNode]()
-    val nodefront = mutable.Queue[CtrlNode]()
+    val seenEntries = mutable.Set[Node]()
+    val nodefront = mutable.Queue[Node]()
     seenEntries += cfg
     nodefront.enqueue(cfg)
 
     def extract(
-      n: CtrlNode, seen: mutable.Map[CtrlNode, CtrlNode], subgraph: Subgraph
-    ): CtrlNode = {
+      n: Node, seen: mutable.Map[Node, Node], subgraph: Subgraph
+    ): Node = {
       // duplicate and mark current node as seen
-      val current = CtrlNode.copyNoSuccessors(n)
+      val current = Node.copyNoSuccessors(n)
       seen(n) = current
 
       // detect referenced and declared stack variables
@@ -172,7 +172,7 @@ extends Analyser[C] {
     subgraphs
   }
 
-  private def generateEntryPoint(table: Table, i: Int, subgraph: Subgraph): Tree = {
+  private def synthesizeEntryPoint(i: Int, subgraph: Subgraph): Tree = {
     def findStart(chain: Chain): Zipper = {
       var z = {
         if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
@@ -190,46 +190,8 @@ extends Analyser[C] {
       z
     }
 
-    def construct(
-      n: CtrlNode, seen: mutable.Set[CtrlNode], z: Zipper
-    ): Zipper = {
-      if (!seen(n)) {
-        seen += n
-        n.ctrlflowtree match {
-          case None =>
-            // inside the control-flow-construct, normal statement
-            val z1 = z.append(table.untyper.untypecheck(n.tree))
-            n.singleSuccessor match {
-              case Some(sn) => construct(sn, seen, z1)
-              case None => z1
-            }
-          case Some(cftree) if cftree eq n.tree =>
-            // node marks the start of a control-flow-construct
-            cftree match {
-              case q"if ($cond) $_ else $_" =>
-                val newZipper = Zipper(null, Nil, trees => q"..$trees")
-                val elsenode = n.successors(0)
-                val thennode = n.successors(1)
-                val elsebranch = construct(elsenode, seen, newZipper).root.result
-                val thenbranch = construct(thennode, seen, newZipper).root.result
-                val parsercond = table.untyper.untypecheck(cond)
-                val iftree = q"if ($parsercond) $thenbranch else $elsebranch"
-                val z1 = z.append(iftree)
-                z1
-              case _ =>
-                sys.error("Unknown control flow construct: $cftree")
-            }
-          case Some(cftree) if cftree ne n.tree =>
-            // node marks the end of a control-flow-construct
-            val z1 = construct(n.backwardSuccessor, seen, z)
-            val z2 = construct(n.forwardSuccessor, seen, z1)
-            z2
-        }
-      } else z
-    }
-
     val startPoint = findStart(subgraph.start.chain)
-    val bodyZipper = construct(subgraph.start, mutable.Set(), startPoint)
+    val bodyZipper = subgraph.start.emitCode(startPoint)
     val body = bodyZipper.root.result
     val defname = TermName(s"ep$i")
     val defdef = q"""
@@ -240,19 +202,19 @@ extends Analyser[C] {
     defdef
   }
 
-  private def generateEntryPoints(
-    args: List[Tree], body: Tree, table: Table, rettpt: Tree
+  private def synthesizeEntryPoints(
+    args: List[Tree], body: Tree, rettpt: Tree
   ): Map[Int, Tree] = {
-    val cfg = generateControlFlowGraph(args, body, table)
-    val subgraphs = extractSubgraphs(table, cfg, rettpt)
+    val cfg = synthesizeControlFlowGraph(args, body)
+    val subgraphs = extractSubgraphs(cfg, rettpt)
 
     val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
-      (i, generateEntryPoint(table, i, subgraph))
+      (i, synthesizeEntryPoint(i, subgraph))
     }
     entrypoints.toMap
   }
 
-  private def generateEnterMethod(entrypoints: Map[Int, Tree], tpt: Tree): Tree = {
+  private def synthesizeEnterMethod(entrypoints: Map[Int, Tree], tpt: Tree): Tree = {
     if (entrypoints.size == 1) {
       val q"def $ep(): Unit = $_" = entrypoints(0)
 
@@ -286,13 +248,11 @@ extends Analyser[C] {
     }
   }
 
-  def transform(f: Tree): Tree = {
-    val table = new Table(f)
-
+  def synthesize: Tree = {
     // ensure that argument is a function literal
-    val (args, body) = f match {
+    val (args, body) = lambda match {
       case q"(..$args) => $body" => (args, body)
-      case _ => c.abort(f.pos, "The coroutine takes a single function literal.")
+      case _ => c.abort(lambda.pos, "The coroutine takes a single function literal.")
     }
     val argidents = for (arg <- args) yield {
       val q"$_ val $argname: $_ = $_" = arg
@@ -309,10 +269,10 @@ extends Analyser[C] {
     val rettpt = inferReturnType(body)
 
     // generate entry points from yields and coroutine applies
-    val entrypoints = generateEntryPoints(args, body, table, rettpt)
+    val entrypoints = synthesizeEntryPoints(args, body, rettpt)
 
     // generate entry method
-    val entermethod = generateEnterMethod(entrypoints, rettpt)
+    val entermethod = synthesizeEnterMethod(entrypoints, rettpt)
 
     // generate variable pushes and pops for stack variables
     val (varpushes, varpops) = (for ((sym, info) <- table.all.toList) yield {
