@@ -54,9 +54,13 @@ object Coroutine {
   private[coroutines] class Synthesizer[C <: Context](val c: C) {
     import c.universe._
 
+    // TODO: refactor this into a utility class
     val parserTrees = mutable.Map[Tree, Tree]()
 
-    def getParserTree(t: Tree) = if (parserTrees.contains(t)) parserTrees(t) else t
+    def getParserTree(t: Tree) = {
+      if (parserTrees.contains(t)) parserTrees(t)
+      else t
+    }
 
     // TODO: refactor this into a utility class
     def traverseMirrored(t0: Tree, t1: Tree)(f: (Tree, Tree) => Unit) = {
@@ -70,9 +74,14 @@ object Coroutine {
             traverse(tp0, tp1)
             traverse(rhs0, rhs1)
           case (q"if ($c0) $t0 else $e0", q"if ($c1) $t1 else $e1") =>
-           traverse(c0, c1)
-           traverse(t0, t1)
-           traverse(e0, e1)
+            traverse(c0, c1)
+            traverse(t0, t1)
+            traverse(e0, e1)
+          case (q"$r0.$m0(..$args0)", q"$r1.$m1(..$args1)") =>
+            traverse(r0, r1)
+            for ((a0, a1) <- args0 zip args1) traverse(a0, a1)
+          case (q"$r0.$m0", q"$r1.$m1") =>
+            traverse(r0, r1)
           case (q"{ ..$ss0 }", q"{ ..$ss1 }") if ss0.length > 1 && ss1.length > 1 =>
             for ((a, b) <- ss0 zip ss1) traverse(a, b)
           case _ =>
@@ -276,7 +285,7 @@ object Coroutine {
             c.addVar(t, name, false)
             val n = new CtrlNode(t, None, c)
             (n, n)
-          case q"if ($cond) $ifbranch else $elsebranch" =>
+          case q"if ($cond) $thenbranch else $elsebranch" =>
             val ifnode = new CtrlNode(t, Some(t), c)
             val mergenode = new CtrlNode(q"{}", Some(t), c)
             def addBranch(branch: Tree) {
@@ -285,7 +294,7 @@ object Coroutine {
               ifnode.successors ::= childhead
               childlast.successors ::= mergenode
             }
-            addBranch(ifbranch)
+            addBranch(thenbranch)
             addBranch(elsebranch)
             (ifnode, mergenode)
           case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
@@ -435,8 +444,18 @@ object Coroutine {
             case Some(cftree) if cftree eq n.tree =>
               // node marks the start of a control-flow-construct
               cftree match {
-                case q"if ($_) $_ else $_" => z
-                case _ => sys.error("Unknown control flow construct: $cftree")
+                case q"if ($cond) $_ else $_" =>
+                  val newZipper = Zipper(null, Nil, trees => q"..$trees")
+                  val elsenode = n.successors(0)
+                  val thennode = n.successors(1)
+                  val elsebranch = construct(elsenode, seen, newZipper).root.result
+                  val thenbranch = construct(thennode, seen, newZipper).root.result
+                  val parsercond = getParserTree(cond)
+                  val iftree = q"if ($parsercond) $thenbranch else $elsebranch"
+                  val z1 = z.append(iftree)
+                  z1
+                case _ =>
+                  sys.error("Unknown control flow construct: $cftree")
               }
             case Some(cftree) if cftree ne n.tree =>
               // node marks the end of a control-flow-construct
