@@ -10,13 +10,9 @@ import scala.reflect.macros.whitebox.Context
 
 
 
-private[coroutines] class Synthesizer[C <: Context](val c: C)(val lambdaValue: Any)
+private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C] with ControlFlowGraph[C] {
   import c.universe._
-
-  val lambda = lambdaValue.asInstanceOf[Tree]
-
-  val table = new Table(lambda)
 
   class Subgraph {
     val referencedvars = mutable.LinkedHashMap[Symbol, VarInfo]()
@@ -42,7 +38,9 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     tq"${lub(rettpe :: constraintTpes)}"
   }
 
-  private def extractSubgraphs(cfg: Node, rettpt: Tree): Set[Subgraph] = {
+  private def extractSubgraphs(
+    cfg: Node, rettpt: Tree
+  )(implicit table: Table): Set[Subgraph] = {
     val subgraphs = mutable.LinkedHashSet[Subgraph]()
     val seenEntries = mutable.Set[Node]()
     val nodefront = mutable.Queue[Node]()
@@ -126,7 +124,9 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     subgraphs
   }
 
-  private def synthesizeEntryPoint(i: Int, subgraph: Subgraph): Tree = {
+  private def synthesizeEntryPoint(
+    i: Int, subgraph: Subgraph
+  )(implicit table: Table): Tree = {
     def findStart(chain: Chain): Zipper = {
       var z = {
         if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
@@ -158,8 +158,8 @@ extends Analyzer[C] with ControlFlowGraph[C] {
 
   private def synthesizeEntryPoints(
     args: List[Tree], body: Tree, rettpt: Tree
-  ): Map[Int, Tree] = {
-    val cfg = generateControlFlowGraph(lambda)
+  )(implicit table: Table): Map[Int, Tree] = {
+    val cfg = generateControlFlowGraph()
     val subgraphs = extractSubgraphs(cfg, rettpt)
 
     val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
@@ -202,7 +202,9 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     }
   }
 
-  def synthesize: Tree = {
+  def synthesize(lambda: Tree): Tree = {
+    implicit val table = new Table(lambda)
+
     // ensure that argument is a function literal
     val (args, body) = lambda match {
       case q"(..$args) => $body" => (args, body)

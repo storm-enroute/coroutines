@@ -12,7 +12,7 @@ import scala.reflect.macros.whitebox.Context
 /** Generates control flow graphs, and converts CFG nodes to ASTs.
  */
 trait ControlFlowGraph[C <: Context] {
-  self: Synthesizer[C] with Analyzer[C] =>
+  self: Analyzer[C] =>
 
   val c: C
 
@@ -33,12 +33,14 @@ trait ControlFlowGraph[C <: Context] {
 
     def copyWithoutSuccessors: Node
 
-    final def emitCode(z: Zipper): Zipper = {
+    final def emitCode(z: Zipper)(implicit t: Table): Zipper = {
       val seen = mutable.Set[Node]()
       this.markAndEmitTree(z, seen)
     }
 
-    final def markAndEmitTree(z: Zipper, seen: mutable.Set[Node]): Zipper = {
+    final def markAndEmitTree(
+      z: Zipper, seen: mutable.Set[Node]
+    )(implicit t: Table): Zipper = {
       import Permissions.canEmit
       if (!seen(this)) {
         seen += this
@@ -46,7 +48,9 @@ trait ControlFlowGraph[C <: Context] {
       } else z
     }
 
-    def emit(z: Zipper, seen: mutable.Set[Node])(implicit ce: CanEmit): Zipper
+    def emit(
+      z: Zipper, seen: mutable.Set[Node]
+    )(implicit ce: CanEmit, t: Table): Zipper
 
     def prettyPrint = {
       val text = new StringBuilder
@@ -81,7 +85,9 @@ trait ControlFlowGraph[C <: Context] {
 
   object Node {
     class If(val tree: Tree, val chain: Chain) extends Node {
-      def emit(z: Zipper, seen: mutable.Set[Node])(implicit ce: CanEmit): Zipper = {
+      def emit(
+        z: Zipper, seen: mutable.Set[Node]
+      )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"if ($cond) $_ else $_" = tree
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
         val elsenode = this.successors(0)
@@ -95,7 +101,9 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new If(tree, chain)
     }
     class IfMerge(val tree: Tree, val chain: Chain) extends Node {
-      def emit(z: Zipper, seen: mutable.Set[Node])(implicit ce: CanEmit): Zipper = {
+      def emit(
+        z: Zipper, seen: mutable.Set[Node]
+      )(implicit ce: CanEmit, table: Table): Zipper = {
         if (successors.length == 1) {
           successors.head.markAndEmitTree(z, seen)
         } else if (successors.length == 0) {
@@ -106,7 +114,9 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new IfMerge(tree, chain)
     }
     class Statement(val tree: Tree, val chain: Chain) extends Node {
-      def emit(z: Zipper, seen: mutable.Set[Node])(implicit ce: CanEmit): Zipper = {
+      def emit(
+        z: Zipper, seen: mutable.Set[Node]
+      )(implicit ce: CanEmit, table: Table): Zipper = {
         // inside the control-flow-construct, normal statement
         val z1 = z.append(table.untyper.untypecheck(tree))
         if (successors.length == 1) {
@@ -120,7 +130,7 @@ trait ControlFlowGraph[C <: Context] {
     }
   }
 
-  def generateControlFlowGraph(lambda: Tree): Node = {
+  def generateControlFlowGraph()(implicit table: Table): Node = {
     def traverse(t: Tree, c: Chain): (Node, Node) = {
       t match {
         case q"$_ val $name: $_ = $_" =>
@@ -155,6 +165,7 @@ trait ControlFlowGraph[C <: Context] {
       }
     }
 
+    val lambda = table.lambda
     val (args, body) = lambda match {
       case q"(..$args) => $body" => (args, body)
       case _ => c.abort(lambda.pos, "The coroutine takes a single function literal.")

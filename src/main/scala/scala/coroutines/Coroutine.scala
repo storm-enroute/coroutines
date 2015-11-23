@@ -48,7 +48,7 @@ object Coroutine {
   }
 
   def transform(c: Context)(f: c.Tree): c.Tree = {
-    new Synthesizer[c.type](c)(f).synthesize
+    new Synthesizer[c.type](c).synthesize(f)
   }
 
   abstract class Arity0[@specialized T] extends Coroutine.Definition[T] {
