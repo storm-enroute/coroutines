@@ -1,4 +1,4 @@
-package scala.coroutines
+package scala.coroutines.common
 
 
 

@@ -1,0 +1,355 @@
+package scala.coroutines
+
+
+
+import scala.annotation.tailrec
+import scala.collection._
+import scala.coroutines.common._
+import scala.language.experimental.macros
+import scala.reflect.macros.whitebox.Context
+
+
+
+private[coroutines] class Synthesizer[C <: Context](val c: C)
+extends Analyser[C] {
+  import c.universe._
+
+  class Subgraph {
+    val referencedvars = mutable.LinkedHashMap[Symbol, VarInfo]()
+    val declaredvars = mutable.LinkedHashMap[Symbol, VarInfo]()
+    var start: CtrlNode = _
+  }
+
+  private def inferReturnType(body: Tree): Tree = {
+    // return type must correspond to the return type of the function literal
+    val rettpe = body.tpe
+
+    // return type is the lub of the function return type and yield argument types
+    def isCoroutinesPackage(q: Tree) = q match {
+      case q"coroutines.this.`package`" => true
+      case t => false
+    }
+    // TODO: ensure that this does not capture constraints from nested class scopes
+    // TODO: ensure that this does not collect nested coroutine invocations
+    val constraintTpes = body.collect {
+      case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
+      case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
+    }
+    tq"${lub(rettpe :: constraintTpes)}"
+  }
+
+  private def generateControlFlowGraph(
+    args: List[Tree], body: Tree, table: Table
+  ): CtrlNode = {
+    def traverse(t: Tree, c: Chain): (CtrlNode, CtrlNode) = {
+      t match {
+        case q"$_ val $name: $_ = $_" =>
+          c.addVar(t, name, false)
+          val n = new CtrlNode(t, None, c)
+          (n, n)
+        case q"if ($cond) $thenbranch else $elsebranch" =>
+          val ifnode = new CtrlNode(t, Some(t), c)
+          val mergenode = new CtrlNode(q"{}", Some(t), c)
+          def addBranch(branch: Tree) {
+            val nestedchain = c.newChain(t)
+            val (childhead, childlast) = traverse(branch, nestedchain)
+            ifnode.successors ::= childhead
+            childlast.successors ::= mergenode
+          }
+          addBranch(thenbranch)
+          addBranch(elsebranch)
+          (ifnode, mergenode)
+        case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
+          val nestedchain = c.newChain(t)
+          val (first, childlast) = traverse(stats.head, nestedchain)
+          var current = childlast
+          for (stat <- stats.tail) {
+            val (childhead, childlast) = traverse(stat, nestedchain)
+            current.successors ::= childhead
+            current = childlast
+          }
+          (first, current)
+        case _ =>
+          val n = new CtrlNode(t, None, c)
+          (n, n)
+      }
+    }
+
+    for (t <- args) {
+      val q"$_ val $name: $_ = $_" = t
+      table.topChain.addVar(t, name, true)
+    }
+
+    // traverse tree to construct CFG and extract local variables
+    val (head, last) = traverse(body, table.topChain)
+    println(head.prettyPrint)
+    head
+  }
+
+  private def extractSubgraphs(
+    table: Table, cfg: CtrlNode, rettpt: Tree
+  ): Set[Subgraph] = {
+    val subgraphs = mutable.LinkedHashSet[Subgraph]()
+    val seenEntries = mutable.Set[CtrlNode]()
+    val nodefront = mutable.Queue[CtrlNode]()
+    seenEntries += cfg
+    nodefront.enqueue(cfg)
+
+    def extract(
+      n: CtrlNode, seen: mutable.Map[CtrlNode, CtrlNode], subgraph: Subgraph
+    ): CtrlNode = {
+      // duplicate and mark current node as seen
+      val current = CtrlNode.copyNoSuccessors(n)
+      seen(n) = current
+
+      // detect referenced and declared stack variables
+      for (t <- n.tree) {
+        if (table.contains(t.symbol)) {
+          subgraph.referencedvars(t.symbol) = table(t.symbol)
+        }
+        t match {
+          case q"$_ val $_: $_ = $_" =>
+            subgraph.declaredvars(t.symbol) = table(t.symbol)
+          case _ =>
+            // do nothing
+        }
+      }
+
+      // check for termination condition
+      def addToNodeFront() {
+        // add successors to node front
+        for (s <- n.successors) if (!seenEntries(s)) {
+          seenEntries += s
+          nodefront.enqueue(s)
+        }
+      }
+      def isCoroutineDefType(tpe: Type) = {
+        val codefsym = typeOf[Coroutine.Definition[_]].typeConstructor.typeSymbol
+        tpe.baseType(codefsym) != NoType
+      }
+      def addCoroutineInvocationToNodeFront(co: Tree) {
+        val codeftpe = typeOf[Coroutine.Definition[_]].typeConstructor
+        val coroutinetpe = appliedType(codeftpe, List(rettpt.tpe))
+        if (!(co.tpe <:< coroutinetpe)) {
+          c.abort(co.pos,
+            s"Coroutine invocation site has invalid return type.\n" +
+            s"required: $coroutinetpe\n" +
+            s"found:    ${co.tpe} (with underlying type ${co.tpe.widen})")
+        }
+        addToNodeFront()
+      }
+      n.tree match {
+        case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+          addToNodeFront()
+        case q"coroutines.this.`package`.yieldto[$_]($_)" =>
+          addToNodeFront()
+        case q"$_ val $_ = $co.apply(..$args)" if isCoroutineDefType(co.tpe) =>
+          addCoroutineInvocationToNodeFront(co)
+        case _ =>
+          // traverse successors
+          for (s <- n.successors) {
+            if (!seen.contains(s)) {
+              extract(s, seen, subgraph)
+            }
+            current.successors ::= seen(s)
+          }
+      }
+      current
+    }
+
+    // as long as there are more nodes on the expansion front, extract them
+    while (nodefront.nonEmpty) {
+      val subgraph = new Subgraph
+      subgraph.start = extract(nodefront.dequeue(), mutable.Map(), subgraph)
+      subgraphs += subgraph
+    }
+    println(subgraphs
+      .map(t => {
+        "[" + t.referencedvars.keys.mkString(", ") + "]\n" + t.start.prettyPrint
+      })
+      .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
+      .mkString("\n"))
+    subgraphs
+  }
+
+  private def generateEntryPoint(table: Table, i: Int, subgraph: Subgraph): Tree = {
+    def findStart(chain: Chain): Zipper = {
+      var z = {
+        if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
+        else findStart(chain.parent).descend(trees => q"..$trees")
+      }
+      for ((sym, info) <- chain.vars) {
+        val referenced = subgraph.referencedvars.contains(sym)
+        val declared = subgraph.declaredvars.contains(sym)
+        if (referenced && !declared) {
+          val q"$mods val $name: $tpt = $_" = info.origtree
+          val valdef = q"$mods val $name: $tpt = ${info.defaultValue}"
+          z = z.append(valdef)
+        }
+      }
+      z
+    }
+
+    def construct(
+      n: CtrlNode, seen: mutable.Set[CtrlNode], z: Zipper
+    ): Zipper = {
+      if (!seen(n)) {
+        seen += n
+        n.ctrlflowtree match {
+          case None =>
+            // inside the control-flow-construct, normal statement
+            val z1 = z.append(table.untyper.untypecheck(n.tree))
+            n.singleSuccessor match {
+              case Some(sn) => construct(sn, seen, z1)
+              case None => z1
+            }
+          case Some(cftree) if cftree eq n.tree =>
+            // node marks the start of a control-flow-construct
+            cftree match {
+              case q"if ($cond) $_ else $_" =>
+                val newZipper = Zipper(null, Nil, trees => q"..$trees")
+                val elsenode = n.successors(0)
+                val thennode = n.successors(1)
+                val elsebranch = construct(elsenode, seen, newZipper).root.result
+                val thenbranch = construct(thennode, seen, newZipper).root.result
+                val parsercond = table.untyper.untypecheck(cond)
+                val iftree = q"if ($parsercond) $thenbranch else $elsebranch"
+                val z1 = z.append(iftree)
+                z1
+              case _ =>
+                sys.error("Unknown control flow construct: $cftree")
+            }
+          case Some(cftree) if cftree ne n.tree =>
+            // node marks the end of a control-flow-construct
+            val z1 = construct(n.backwardSuccessor, seen, z)
+            val z2 = construct(n.forwardSuccessor, seen, z1)
+            z2
+        }
+      } else z
+    }
+
+    val startPoint = findStart(subgraph.start.chain)
+    val bodyZipper = construct(subgraph.start, mutable.Set(), startPoint)
+    val body = bodyZipper.root.result
+    val defname = TermName(s"ep$i")
+    val defdef = q"""
+      def $defname(): Unit = {
+        $body
+      }
+    """
+    defdef
+  }
+
+  private def generateEntryPoints(
+    args: List[Tree], body: Tree, table: Table, rettpt: Tree
+  ): Map[Int, Tree] = {
+    val cfg = generateControlFlowGraph(args, body, table)
+    val subgraphs = extractSubgraphs(table, cfg, rettpt)
+
+    val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
+      (i, generateEntryPoint(table, i, subgraph))
+    }
+    entrypoints.toMap
+  }
+
+  private def generateEnterMethod(entrypoints: Map[Int, Tree], tpt: Tree): Tree = {
+    if (entrypoints.size == 1) {
+      val q"def $ep(): Unit = $_" = entrypoints(0)
+
+      q"""
+        def enter(c: Coroutine[$tpt]): Unit = $ep()
+      """
+    } else if (entrypoints.size == 2) {
+      val q"def $ep0(): Unit = $_" = entrypoints(0)
+      val q"def $ep1(): Unit = $_" = entrypoints(1)
+
+      q"""
+        def enter(c: Coroutine[$tpt]): Unit = {
+          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+          if (pc == 0) $ep0() else $ep1()
+        }
+      """
+    } else {
+      val cases = for ((index, defdef) <- entrypoints) yield {
+        val q"def $ep(): Unit = $rhs" = defdef
+        cq"$index => $ep()"
+      }
+
+      q"""
+        def enter(c: Coroutine[$tpt]): Unit = {
+          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+          (pc: @scala.annotation.switch) match {
+            case ..$cases
+          }
+        }
+      """
+    }
+  }
+
+  def transform(f: Tree): Tree = {
+    val table = new Table(f)
+
+    // ensure that argument is a function literal
+    val (args, body) = f match {
+      case q"(..$args) => $body" => (args, body)
+      case _ => c.abort(f.pos, "The coroutine takes a single function literal.")
+    }
+    val argidents = for (arg <- args) yield {
+      val q"$_ val $argname: $_ = $_" = arg
+      q"$argname"
+    }
+
+    // extract argument names and types
+    val (argnames, argtpts) = (for (arg <- args) yield {
+      val q"$_ val $name: $tpt = $_" = arg
+      (name, tpt)
+    }).unzip
+
+    // infer coroutine return type
+    val rettpt = inferReturnType(body)
+
+    // generate entry points from yields and coroutine applies
+    val entrypoints = generateEntryPoints(args, body, table, rettpt)
+
+    // generate entry method
+    val entermethod = generateEnterMethod(entrypoints, rettpt)
+
+    // generate variable pushes and pops for stack variables
+    val (varpushes, varpops) = (for ((sym, info) <- table.all.toList) yield {
+      (info.pushTree, info.popTree)
+    }).unzip
+
+    // emit coroutine instantiation
+    val coroutineTpe = TypeName(s"Arity${args.size}")
+    val entrypointmethods = entrypoints.map(_._2)
+    val valnme = TermName(c.freshName("c"))
+    val co = q"""
+      new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
+        def call(..$args) = {
+          val $valnme = new Coroutine[$rettpt]
+          push($valnme, ..$argidents)
+          $valnme
+        }
+        def apply(..$args): $rettpt = {
+          sys.error(
+            "Coroutines can only be invoked directly from within other coroutines. " +
+            "Use `call` instead if you want to start a new coroutine.")
+        }
+        def push(c: Coroutine[$rettpt], ..$args): Unit = {
+          scala.coroutines.common.Stack.push(c.costack, this, -1)
+          scala.coroutines.common.Stack.push(c.pcstack, 0.toShort, -1)
+          ..$varpushes
+        }
+        def pop(c: Coroutine[$rettpt]): Unit = {
+          scala.coroutines.common.Stack.pop(c.pcstack)
+          scala.coroutines.common.Stack.pop(c.costack)
+          ..$varpops
+        }
+        $entermethod
+        ..$entrypointmethods
+      }
+    """
+    println(co)
+    co
+  }
+}
