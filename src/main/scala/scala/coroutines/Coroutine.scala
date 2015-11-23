@@ -4,7 +4,7 @@ package scala.coroutines
 
 import scala.annotation.tailrec
 import scala.collection._
-import scala.coroutines.common.Stack
+import scala.coroutines.common._
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
 
@@ -62,34 +62,7 @@ object Coroutine {
       else t
     }
 
-    // TODO: refactor this into a utility class
-    def traverseMirrored(t0: Tree, t1: Tree)(f: (Tree, Tree) => Unit) = {
-      def traverse(t0: Tree, t1: Tree): Unit = {
-        f(t0, t1)
-        (t0, t1) match {
-          case (q"(..$args0) => $body0", q"(..$args1) => $body1") =>
-            for ((a0, a1) <- args0 zip args1) traverse(a0, a1)
-            traverse(body0, body1)
-          case (q"$_ val $_: $tp0 = $rhs0", q"$_ val $_: $tp1 = $rhs1") =>
-            traverse(tp0, tp1)
-            traverse(rhs0, rhs1)
-          case (q"if ($c0) $t0 else $e0", q"if ($c1) $t1 else $e1") =>
-            traverse(c0, c1)
-            traverse(t0, t1)
-            traverse(e0, e1)
-          case (q"$r0.$m0(..$args0)", q"$r1.$m1(..$args1)") =>
-            traverse(r0, r1)
-            for ((a0, a1) <- args0 zip args1) traverse(a0, a1)
-          case (q"$r0.$m0", q"$r1.$m1") =>
-            traverse(r0, r1)
-          case (q"{ ..$ss0 }", q"{ ..$ss1 }") if ss0.length > 1 && ss1.length > 1 =>
-            for ((a, b) <- ss0 zip ss1) traverse(a, b)
-          case _ =>
-            // TODO: implement remaining cases
-        }
-      }
-      traverse(t0, t1)
-    }
+    val traverser = new TraverserUtil[c.type](c)
 
     class VarInfo(
       val uid: Int,
@@ -527,7 +500,7 @@ object Coroutine {
     def transform(f: Tree): Tree = {
       val varmap = new VarMap(f)
       val parserf = c.untypecheck(f)
-      traverseMirrored(f, parserf)((t, pt) => parserTrees(t) = pt)
+      traverser.traverseByShape(f, parserf)((t, pt) => parserTrees(t) = pt)
 
       // ensure that argument is a function literal
       val (args, body) = f match {
