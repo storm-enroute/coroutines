@@ -153,6 +153,9 @@ trait ControlFlowGraph[C <: Context] {
           c.addVar(t, name, false)
           val n = new Node.Statement(t, c)
           (n, n)
+        case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+          val n = new Node.YieldVal(t, c)
+          (n, n)
         case q"if ($cond) $thenbranch else $elsebranch" =>
           val ifnode = new Node.If(t, c)
           val mergenode = new Node.IfMerge(q"{}", c)
