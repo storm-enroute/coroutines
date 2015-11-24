@@ -128,13 +128,15 @@ extends Analyzer[C] with ControlFlowGraph[C] {
       }
       for ((sym, info) <- chain.vars) {
         if (subgraph.usesVar(sym) && !subgraph.declaresVar(sym)) {
-          val q"$mods val $name: $tpt = $_" = info.origtree
           val cparam = table.names.coroutineParam
           val stack = info.stackname
           val pos = info.stackpos
           val stackget = q"scala.coroutines.common.Stack.get($cparam.$stack, $pos)"
           val decodedget = info.decodeLong(stackget)
-          val valdef = q"$mods val $name: $tpt = $decodedget"
+          val valdef = info.origtree match {
+            case q"$mods val $name: $tpt = $_" => q"$mods val $name: $tpt = $decodedget"
+            case q"$mods var $name: $tpt = $_" => q"$mods var $name: $tpt = $decodedget"
+          }
           z = z.append(valdef)
         }
       }

@@ -120,9 +120,10 @@ trait ControlFlowGraph[C <: Context] {
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
+        // store state for non-val variables in scope
         val stacksets = for {
           (sym, info) <- chain.allvars
-          if subgraph.usesVar(sym)
+          if subgraph.mustStoreVar(sym)
         } yield {
           val cparam = table.names.coroutineParam
           val stack = info.stackname
@@ -130,6 +131,7 @@ trait ControlFlowGraph[C <: Context] {
           val encodedval = info.encodeLong(q"${info.name}")
           q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
         }
+        // store return value
         val termtree = q"""
           ..${stacksets.toList}
           ${table.names.coroutineParam}.result = ${table.untyper.untypecheck(x)}
@@ -163,12 +165,19 @@ trait ControlFlowGraph[C <: Context] {
     var start: Node = _
     def usesVar(sym: Symbol) = referencedVars.contains(sym)
     def declaresVar(sym: Symbol) = declaredVars.contains(sym)
+    def mustStoreVar(sym: Symbol) = {
+      usesVar(sym) && (sym.asTerm.isVar || declaresVar(sym))
+    }
   }
 
   def generateControlFlowGraph()(implicit table: Table): Node = {
     def traverse(t: Tree, c: Chain): (Node, Node) = {
       t match {
         case q"$_ val $name: $_ = $_" =>
+          c.addVar(t, name, false)
+          val n = new Node.Statement(t, c)
+          (n, n)
+        case q"$_ var $name: $_ = $_" =>
           c.addVar(t, name, false)
           val n = new Node.Statement(t, c)
           (n, n)

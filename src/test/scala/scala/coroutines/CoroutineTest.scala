@@ -55,7 +55,7 @@ class CoroutineTest extends FunSuite with Matchers {
     }
   }
 
-  test("should declare a variable in a nested scope") {
+  test("should declare a value in a nested scope") {
     val c = coroutine { (x: Int, y: Int) =>
       if (x > 0) {
         val z = -x
@@ -65,6 +65,20 @@ class CoroutineTest extends FunSuite with Matchers {
         yieldval(y)
       }
       x
+    }
+  }
+
+  test("should declare a variable in a nested scope") {
+    val c = coroutine { (x: Int, y: Int) =>
+      if (x > 0) {
+        var z = -x
+        yieldval(z)
+        z = -z
+        yieldval(z)
+      } else {
+        yieldval(x)
+      }
+      y
     }
   }
 
