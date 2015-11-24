@@ -87,10 +87,13 @@ extends Analyzer[C] with ControlFlowGraph[C] {
       n.tree match {
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
           addToNodeFront()
+          subgraph.exitPoints(current) = n.successors.head.uid
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
           addToNodeFront()
+          subgraph.exitPoints(current) = n.successors.head.uid
         case q"$_ val $_ = $co.apply(..$args)" if isCoroutineDefType(co.tpe) =>
           addCoroutineInvocationToNodeFront(co)
+          subgraph.exitPoints(current) = n.successors.head.uid
         case _ =>
           // traverse successors
           for (s <- n.successors) {
