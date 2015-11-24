@@ -35,10 +35,10 @@ trait ControlFlowGraph[C <: Context] {
 
     final def emitCode(z: Zipper, subgraph: Subgraph)(implicit t: Table): Zipper = {
       val seen = mutable.Set[Node]()
-      this.markAndEmitTree(z, seen, subgraph)
+      this.markEmit(z, seen, subgraph)
     }
 
-    final def markAndEmitTree(
+    final def markEmit(
       z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
     )(implicit t: Table): Zipper = {
       import Permissions.canEmit
@@ -92,8 +92,8 @@ trait ControlFlowGraph[C <: Context] {
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
         val elsenode = this.successors(0)
         val thennode = this.successors(1)
-        val elsebranch = elsenode.markAndEmitTree(newZipper, seen, subgraph).root.result
-        val thenbranch = thennode.markAndEmitTree(newZipper, seen, subgraph).root.result
+        val elsebranch = elsenode.markEmit(newZipper, seen, subgraph).root.result
+        val thenbranch = thennode.markEmit(newZipper, seen, subgraph).root.result
         val untypedcond = table.untyper.untypecheck(cond)
         val iftree = q"if ($untypedcond) $thenbranch else $elsebranch"
         z.append(iftree)
@@ -106,7 +106,7 @@ trait ControlFlowGraph[C <: Context] {
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         if (successors.length == 1) {
-          successors.head.markAndEmitTree(z, seen, subgraph)
+          successors.head.markEmit(z, seen, subgraph)
         } else if (successors.length == 0) {
           // do nothing
           z
@@ -147,7 +147,7 @@ trait ControlFlowGraph[C <: Context] {
         // inside the control-flow-construct, normal statement
         val z1 = z.append(table.untyper.untypecheck(tree))
         if (successors.length == 1) {
-          successors.head.markAndEmitTree(z1, seen, subgraph)
+          successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 0) {
           // do nothing
           z1
