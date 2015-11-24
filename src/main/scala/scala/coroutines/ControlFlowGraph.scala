@@ -27,6 +27,8 @@ trait ControlFlowGraph[C <: Context] {
   abstract class Node {
     var successors: List[Node] = Nil
 
+    val uid: Long
+
     val tree: Tree
 
     def chain: Chain
@@ -84,24 +86,24 @@ trait ControlFlowGraph[C <: Context] {
   }
 
   object Node {
-    class If(val tree: Tree, val chain: Chain) extends Node {
+    class If(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"if ($cond) $_ else $_" = tree
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
-        val elsenode = this.successors(0)
-        val thennode = this.successors(1)
+        val elsenode = this.successors(1)
+        val thennode = this.successors(0)
         val elsebranch = elsenode.markEmit(newZipper, seen, subgraph).root.result
         val thenbranch = thennode.markEmit(newZipper, seen, subgraph).root.result
         val untypedcond = table.untyper.untypecheck(cond)
         val iftree = q"if ($untypedcond) $thenbranch else $elsebranch"
         z.append(iftree)
       }
-      def copyWithoutSuccessors = new If(tree, chain)
+      def copyWithoutSuccessors = new If(tree, chain, uid)
     }
 
-    class IfMerge(val tree: Tree, val chain: Chain) extends Node {
+    class IfMerge(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
@@ -112,10 +114,10 @@ trait ControlFlowGraph[C <: Context] {
           z
         } else sys.error(s"Multiple successors for <$tree>.")
       }
-      def copyWithoutSuccessors = new IfMerge(tree, chain)
+      def copyWithoutSuccessors = new IfMerge(tree, chain, uid)
     }
 
-    class YieldVal(val tree: Tree, val chain: Chain) extends Node {
+    class YieldVal(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
@@ -139,10 +141,10 @@ trait ControlFlowGraph[C <: Context] {
         """
         z.append(termtree)
       }
-      def copyWithoutSuccessors = new YieldVal(tree, chain)
+      def copyWithoutSuccessors = new YieldVal(tree, chain, uid)
     }
 
-    class Statement(val tree: Tree, val chain: Chain) extends Node {
+    class Statement(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
@@ -155,13 +157,14 @@ trait ControlFlowGraph[C <: Context] {
           z1
         } else sys.error(s"Multiple successors for <$tree>.")
       }
-      def copyWithoutSuccessors = new Statement(tree, chain)
+      def copyWithoutSuccessors = new Statement(tree, chain, uid)
     }
   }
 
   class Subgraph {
     val referencedVars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val declaredVars = mutable.LinkedHashMap[Symbol, VarInfo]()
+    val exitPoints = mutable.LinkedHashMap[Node, Node]()
     var start: Node = _
     def usesVar(sym: Symbol) = referencedVars.contains(sym)
     def declaresVar(sym: Symbol) = declaredVars.contains(sym)
@@ -175,18 +178,18 @@ trait ControlFlowGraph[C <: Context] {
       t match {
         case q"$_ val $name: $_ = $_" =>
           c.addVar(t, name, false)
-          val n = new Node.Statement(t, c)
+          val n = new Node.Statement(t, c, table.newNodeUid())
           (n, n)
         case q"$_ var $name: $_ = $_" =>
           c.addVar(t, name, false)
-          val n = new Node.Statement(t, c)
+          val n = new Node.Statement(t, c, table.newNodeUid())
           (n, n)
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
-          val n = new Node.YieldVal(t, c)
+          val n = new Node.YieldVal(t, c, table.newNodeUid())
           (n, n)
         case q"if ($cond) $thenbranch else $elsebranch" =>
-          val ifnode = new Node.If(t, c)
-          val mergenode = new Node.IfMerge(q"{}", c)
+          val ifnode = new Node.If(t, c, table.newNodeUid())
+          val mergenode = new Node.IfMerge(q"{}", c, table.newNodeUid())
           def addBranch(branch: Tree) {
             val nestedchain = c.newChain(t)
             val (childhead, childlast) = traverse(branch, nestedchain)
@@ -207,7 +210,7 @@ trait ControlFlowGraph[C <: Context] {
           }
           (first, current)
         case _ =>
-          val n = new Node.Statement(t, c)
+          val n = new Node.Statement(t, c, table.newNodeUid())
           (n, n)
       }
     }

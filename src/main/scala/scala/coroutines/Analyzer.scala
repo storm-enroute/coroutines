@@ -95,12 +95,23 @@ trait Analyzer[C <: Context] {
   }
 
   class Table(val lambda: Tree) {
-    var varCount = 0
+    private var varCount = 0
+    private var nodeCount = 0L
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val topChain = new Chain(this, lambda, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
     object names {
       val coroutineParam = TermName(c.freshName())
+    }
+    def newVarUid(): Int = {
+      val c = varCount
+      varCount += 1
+      c
+    }
+    def newNodeUid(): Long = {
+      val c = nodeCount
+      nodeCount += 1
+      c
     }
     def foreach[U](f: ((Symbol, VarInfo)) => U): Unit = vars.foreach(f)
     def contains(s: Symbol) = vars.contains(s)
@@ -117,10 +128,9 @@ trait Analyzer[C <: Context] {
     def newChain(subtree: Tree) = new Chain(table, subtree, this)
     def addVar(valdef: Tree, name: TermName, isArg: Boolean) {
       val sym = valdef.symbol
-      val info = new VarInfo(table.varCount, valdef, sym.info, sym, name, isArg, table)
+      val info = new VarInfo(table.newVarUid, valdef, sym.info, sym, name, isArg, table)
       vars(sym) = info
       table.vars(sym) = info
-      table.varCount += 1
     }
     override def toString = {
       val s = s"[${vars.map(_._2.sym).mkString(", ")}] -> "
