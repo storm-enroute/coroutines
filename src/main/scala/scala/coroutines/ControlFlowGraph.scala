@@ -165,6 +165,7 @@ trait ControlFlowGraph[C <: Context] {
     val referencedVars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val declaredVars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val exitPoints = mutable.LinkedHashMap[Node, Long]()
+    val exitSubgraphs = mutable.LinkedHashMap[Node, Subgraph]()
     var start: Node = _
     def usesVar(sym: Symbol) = referencedVars.contains(sym)
     def declaresVar(sym: Symbol) = declaredVars.contains(sym)

@@ -112,6 +112,13 @@ extends Analyzer[C] with ControlFlowGraph[C] {
       subgraph.start = extract(nodefront.dequeue(), mutable.Map(), subgraph)
       subgraphs += subgraph
     }
+
+    // assign respective subgraph reference to each exit point node
+    val startPoints = subgraphs.map(s => s.start.uid -> s).toMap
+    for (s <- subgraphs; (node, nextUid) <- s.exitPoints) {
+      s.exitSubgraphs(node) = startPoints(nextUid)
+    }
+
     println(subgraphs
       .map(t => {
         "[" + t.referencedVars.keys.mkString(", ") + "]\n" + t.start.prettyPrint
@@ -122,7 +129,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   }
 
   private def synthesizeEntryPoint(
-    i: Int, subgraph: Subgraph, rettpt: Tree
+    i: Int, subgraph: Subgraph, subgraphs: Set[Subgraph], rettpt: Tree
   )(implicit table: Table): Tree = {
     def findStart(chain: Chain): Zipper = {
       var z = {
@@ -165,7 +172,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val subgraphs = extractSubgraphs(cfg, rettpt)
 
     val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
-      (i, synthesizeEntryPoint(i, subgraph, rettpt))
+      (i, synthesizeEntryPoint(i, subgraph, subgraphs, rettpt))
     }
     entrypoints.toMap
   }
