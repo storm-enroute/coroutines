@@ -36,6 +36,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     cfg: Node, rettpt: Tree
   )(implicit table: Table): Set[Subgraph] = {
     val subgraphs = mutable.LinkedHashSet[Subgraph]()
+    val exitPoints = mutable.Map[Subgraph, mutable.Map[Node, Long]]()
     val seenEntries = mutable.Set[Node]()
     val nodefront = mutable.Queue[Node]()
     seenEntries += cfg
@@ -87,13 +88,13 @@ extends Analyzer[C] with ControlFlowGraph[C] {
       n.tree match {
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
           addToNodeFront()
-          subgraph.exitPoints(current) = n.successors.head.uid
+          exitPoints(subgraph)(current) = n.successors.head.uid
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
           addToNodeFront()
-          subgraph.exitPoints(current) = n.successors.head.uid
+          exitPoints(subgraph)(current) = n.successors.head.uid
         case q"$_ val $_ = $co.apply(..$args)" if isCoroutineDefType(co.tpe) =>
           addCoroutineInvocationToNodeFront(co)
-          subgraph.exitPoints(current) = n.successors.head.uid
+          exitPoints(subgraph)(current) = n.successors.head.uid
         case _ =>
           // traverse successors
           for (s <- n.successors) {
@@ -109,14 +110,15 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     // as long as there are more nodes on the expansion front, extract them
     while (nodefront.nonEmpty) {
       val subgraph = new Subgraph
+      exitPoints(subgraph) = mutable.Map[Node, Long]()
       subgraph.start = extract(nodefront.dequeue(), mutable.Map(), subgraph)
       subgraphs += subgraph
     }
 
     // assign respective subgraph reference to each exit point node
     val startPoints = subgraphs.map(s => s.start.uid -> s).toMap
-    for (s <- subgraphs; (node, nextUid) <- s.exitPoints) {
-      s.exitSubgraphs(node) = startPoints(nextUid)
+    for ((subgraph, exitMap) <- exitPoints; (node, nextUid) <- exitMap) {
+      subgraph.exitSubgraphs(node) = startPoints(nextUid)
     }
 
     println(subgraphs
