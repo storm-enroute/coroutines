@@ -14,12 +14,6 @@ private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C] with ControlFlowGraph[C] {
   import c.universe._
 
-  class Subgraph {
-    val referencedvars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    val declaredvars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    var start: Node = _
-  }
-
   private def inferReturnType(body: Tree): Tree = {
     // return type must correspond to the return type of the function literal
     val rettpe = body.tpe
@@ -57,11 +51,11 @@ extends Analyzer[C] with ControlFlowGraph[C] {
       // detect referenced and declared stack variables
       for (t <- n.tree) {
         if (table.contains(t.symbol)) {
-          subgraph.referencedvars(t.symbol) = table(t.symbol)
+          subgraph.referencedVars(t.symbol) = table(t.symbol)
         }
         t match {
           case q"$_ val $_: $_ = $_" =>
-            subgraph.declaredvars(t.symbol) = table(t.symbol)
+            subgraph.declaredVars(t.symbol) = table(t.symbol)
           case _ =>
             // do nothing
         }
@@ -117,7 +111,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     }
     println(subgraphs
       .map(t => {
-        "[" + t.referencedvars.keys.mkString(", ") + "]\n" + t.start.prettyPrint
+        "[" + t.referencedVars.keys.mkString(", ") + "]\n" + t.start.prettyPrint
       })
       .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
       .mkString("\n"))
@@ -133,16 +127,14 @@ extends Analyzer[C] with ControlFlowGraph[C] {
         else findStart(chain.parent).descend(trees => q"..$trees")
       }
       for ((sym, info) <- chain.vars) {
-        val referenced = subgraph.referencedvars.contains(sym)
-        val declared = subgraph.declaredvars.contains(sym)
-        if (referenced && !declared) {
+        if (subgraph.usesVar(sym) && !subgraph.declaresVar(sym)) {
           val q"$mods val $name: $tpt = $_" = info.origtree
           val cparam = table.names.coroutineParam
           val stack = info.stackname
           val pos = info.stackpos
-          val stackpeek = q"scala.coroutines.common.Stack.peek($cparam.$stack, $pos)"
-          val decodedpeek = info.decodeLong(stackpeek)
-          val valdef = q"$mods val $name: $tpt = $decodedpeek"
+          val stackget = q"scala.coroutines.common.Stack.get($cparam.$stack, $pos)"
+          val decodedget = info.decodeLong(stackget)
+          val valdef = q"$mods val $name: $tpt = $decodedget"
           z = z.append(valdef)
         }
       }
@@ -150,7 +142,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     }
 
     val startPoint = findStart(subgraph.start.chain)
-    val bodyZipper = subgraph.start.emitCode(startPoint)
+    val bodyZipper = subgraph.start.emitCode(startPoint, subgraph)
     val body = bodyZipper.root.result
     val defname = TermName(s"ep$i")
     val defdef = q"""

@@ -33,23 +33,23 @@ trait ControlFlowGraph[C <: Context] {
 
     def copyWithoutSuccessors: Node
 
-    final def emitCode(z: Zipper)(implicit t: Table): Zipper = {
+    final def emitCode(z: Zipper, subgraph: Subgraph)(implicit t: Table): Zipper = {
       val seen = mutable.Set[Node]()
-      this.markAndEmitTree(z, seen)
+      this.markAndEmitTree(z, seen, subgraph)
     }
 
     final def markAndEmitTree(
-      z: Zipper, seen: mutable.Set[Node]
+      z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
     )(implicit t: Table): Zipper = {
       import Permissions.canEmit
       if (!seen(this)) {
         seen += this
-        this.emit(z, seen)
+        this.emit(z, seen, subgraph)
       } else z
     }
 
     def emit(
-      z: Zipper, seen: mutable.Set[Node]
+      z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
     )(implicit ce: CanEmit, t: Table): Zipper
 
     def prettyPrint = {
@@ -86,14 +86,14 @@ trait ControlFlowGraph[C <: Context] {
   object Node {
     class If(val tree: Tree, val chain: Chain) extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Node]
+        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"if ($cond) $_ else $_" = tree
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
         val elsenode = this.successors(0)
         val thennode = this.successors(1)
-        val elsebranch = elsenode.markAndEmitTree(newZipper, seen).root.result
-        val thenbranch = thennode.markAndEmitTree(newZipper, seen).root.result
+        val elsebranch = elsenode.markAndEmitTree(newZipper, seen, subgraph).root.result
+        val thenbranch = thennode.markAndEmitTree(newZipper, seen, subgraph).root.result
         val untypedcond = table.untyper.untypecheck(cond)
         val iftree = q"if ($untypedcond) $thenbranch else $elsebranch"
         z.append(iftree)
@@ -103,10 +103,10 @@ trait ControlFlowGraph[C <: Context] {
 
     class IfMerge(val tree: Tree, val chain: Chain) extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Node]
+        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         if (successors.length == 1) {
-          successors.head.markAndEmitTree(z, seen)
+          successors.head.markAndEmitTree(z, seen, subgraph)
         } else if (successors.length == 0) {
           // do nothing
           z
@@ -117,10 +117,21 @@ trait ControlFlowGraph[C <: Context] {
 
     class YieldVal(val tree: Tree, val chain: Chain) extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Node]
+        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
+        val stacksets = for {
+          (sym, info) <- chain.allvars
+          if subgraph.usesVar(sym)
+        } yield {
+          val cparam = table.names.coroutineParam
+          val stack = info.stackname
+          val pos = info.stackpos
+          val encodedval = info.encodeLong(q"${info.name}")
+          q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
+        }
         val termtree = q"""
+          ..${stacksets.toList}
           ${table.names.coroutineParam}.result = ${table.untyper.untypecheck(x)}
           return
         """
@@ -131,12 +142,12 @@ trait ControlFlowGraph[C <: Context] {
 
     class Statement(val tree: Tree, val chain: Chain) extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Node]
+        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         // inside the control-flow-construct, normal statement
         val z1 = z.append(table.untyper.untypecheck(tree))
         if (successors.length == 1) {
-          successors.head.markAndEmitTree(z1, seen)
+          successors.head.markAndEmitTree(z1, seen, subgraph)
         } else if (successors.length == 0) {
           // do nothing
           z1
@@ -144,6 +155,14 @@ trait ControlFlowGraph[C <: Context] {
       }
       def copyWithoutSuccessors = new Statement(tree, chain)
     }
+  }
+
+  class Subgraph {
+    val referencedVars = mutable.LinkedHashMap[Symbol, VarInfo]()
+    val declaredVars = mutable.LinkedHashMap[Symbol, VarInfo]()
+    var start: Node = _
+    def usesVar(sym: Symbol) = referencedVars.contains(sym)
+    def declaresVar(sym: Symbol) = declaredVars.contains(sym)
   }
 
   def generateControlFlowGraph()(implicit table: Table): Node = {

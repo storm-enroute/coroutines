@@ -95,7 +95,7 @@ trait Analyzer[C <: Context] {
   }
 
   class Table(val lambda: Tree) {
-    var varcount = 0
+    var varCount = 0
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val topChain = new Chain(this, lambda, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
@@ -111,13 +111,16 @@ trait Analyzer[C <: Context] {
 
   class Chain(val table: Table, val origtree: Tree, val parent: Chain) {
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
+    def allvars: Iterator[(Symbol, VarInfo)] = {
+      vars.iterator ++ (if (parent != null) parent.allvars else Iterator.empty)
+    }
     def newChain(subtree: Tree) = new Chain(table, subtree, this)
     def addVar(valdef: Tree, name: TermName, isArg: Boolean) {
       val sym = valdef.symbol
-      val info = new VarInfo(table.varcount, valdef, sym.info, sym, name, isArg, table)
+      val info = new VarInfo(table.varCount, valdef, sym.info, sym, name, isArg, table)
       vars(sym) = info
       table.vars(sym) = info
-      table.varcount += 1
+      table.varCount += 1
     }
     override def toString = {
       val s = s"[${vars.map(_._2.sym).mkString(", ")}] -> "
