@@ -122,21 +122,27 @@ trait ControlFlowGraph[C <: Context] {
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
+        val cparam = table.names.coroutineParam
         // store state for non-val variables in scope
         val stacksets = for {
           (sym, info) <- chain.allvars
           if subgraph.mustStoreVar(sym)
         } yield {
-          val cparam = table.names.coroutineParam
           val stack = info.stackname
           val pos = info.stackpos
           val encodedval = info.encodeLong(q"${info.name}")
           q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
         }
+        // update pc state
+        val pc = subgraph.exitSubgraphs(this).start.uid
+        val pcstackset = q"""
+          scala.coroutines.common.Stack.update($cparam.pcstack, $pc.toShort)
+        """
         // store return value
         val termtree = q"""
           ..${stacksets.toList}
-          ${table.names.coroutineParam}.result = ${table.untyper.untypecheck(x)}
+          $pcstackset
+          $cparam.result = ${table.untyper.untypecheck(x)}
           return
         """
         z.append(termtree)
