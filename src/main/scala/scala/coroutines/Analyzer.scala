@@ -97,6 +97,7 @@ trait Analyzer[C <: Context] {
   class Table(val lambda: Tree) {
     private var varCount = 0
     private var nodeCount = 0L
+    private var subgraphCount = 0L
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val topChain = new Chain(this, lambda, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
@@ -111,6 +112,11 @@ trait Analyzer[C <: Context] {
     def newNodeUid(): Long = {
       val c = nodeCount
       nodeCount += 1
+      c
+    }
+    def newSubgraphUid(): Long = {
+      val c = subgraphCount
+      subgraphCount += 1
       c
     }
     def foreach[U](f: ((Symbol, VarInfo)) => U): Unit = vars.foreach(f)

@@ -134,7 +134,7 @@ trait ControlFlowGraph[C <: Context] {
           q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
         }
         // update pc state
-        val pc = subgraph.exitSubgraphs(this).start.uid
+        val pc = subgraph.exitSubgraphs(this).uid
         val pcstackset = q"""
           scala.coroutines.common.Stack.update($cparam.pcstack, $pc.toShort)
         """
@@ -167,7 +167,7 @@ trait ControlFlowGraph[C <: Context] {
     }
   }
 
-  class Subgraph {
+  class Subgraph(val uid: Long) {
     val referencedVars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val declaredVars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val exitSubgraphs = mutable.LinkedHashMap[Node, Subgraph]()

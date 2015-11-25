@@ -109,7 +109,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
 
     // as long as there are more nodes on the expansion front, extract them
     while (nodefront.nonEmpty) {
-      val subgraph = new Subgraph
+      val subgraph = new Subgraph(table.newSubgraphUid())
       exitPoints(subgraph) = mutable.Map[Node, Long]()
       subgraph.start = extract(nodefront.dequeue(), mutable.Map(), subgraph)
       subgraphs += subgraph
@@ -131,7 +131,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   }
 
   private def synthesizeEntryPoint(
-    i: Int, subgraph: Subgraph, subgraphs: Set[Subgraph], rettpt: Tree
+    subgraph: Subgraph, subgraphs: Set[Subgraph], rettpt: Tree
   )(implicit table: Table): Tree = {
     def findStart(chain: Chain): Zipper = {
       var z = {
@@ -158,7 +158,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val startPoint = findStart(subgraph.start.chain)
     val bodyZipper = subgraph.start.emitCode(startPoint, subgraph)
     val body = bodyZipper.root.result
-    val defname = TermName(s"ep$i")
+    val defname = TermName(s"ep${subgraph.uid}")
     val defdef = q"""
       def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {
         $body
@@ -169,18 +169,18 @@ extends Analyzer[C] with ControlFlowGraph[C] {
 
   private def synthesizeEntryPoints(
     args: List[Tree], body: Tree, rettpt: Tree
-  )(implicit table: Table): Map[Int, Tree] = {
+  )(implicit table: Table): Map[Long, Tree] = {
     val cfg = generateControlFlowGraph()
     val subgraphs = extractSubgraphs(cfg, rettpt)
 
-    val entrypoints = for ((subgraph, i) <- subgraphs.zipWithIndex) yield {
-      (i, synthesizeEntryPoint(i, subgraph, subgraphs, rettpt))
+    val entrypoints = for (subgraph <- subgraphs) yield {
+      (subgraph.uid, synthesizeEntryPoint(subgraph, subgraphs, rettpt))
     }
     entrypoints.toMap
   }
 
   private def synthesizeEnterMethod(
-    entrypoints: Map[Int, Tree], tpt: Tree
+    entrypoints: Map[Long, Tree], tpt: Tree
   )(implicit table: Table): Tree = {
     val cparamname = table.names.coroutineParam
     if (entrypoints.size == 1) {
