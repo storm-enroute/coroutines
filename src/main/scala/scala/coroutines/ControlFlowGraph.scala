@@ -237,4 +237,97 @@ trait ControlFlowGraph[C <: Context] {
     println(head.prettyPrint)
     head
   }
+
+  def extractSubgraphs(
+    cfg: Node, rettpt: Tree
+  )(implicit table: Table): Set[Subgraph] = {
+    val subgraphs = mutable.LinkedHashSet[Subgraph]()
+    val exitPoints = mutable.Map[Subgraph, mutable.Map[Node, Long]]()
+    val seenEntries = mutable.Set[Node]()
+    val nodefront = mutable.Queue[Node]()
+    seenEntries += cfg
+    nodefront.enqueue(cfg)
+
+    def extract(
+      n: Node, seen: mutable.Map[Node, Node], subgraph: Subgraph
+    ): Node = {
+      // duplicate and mark current node as seen
+      val current = n.copyWithoutSuccessors
+      seen(n) = current
+
+      // detect referenced and declared stack variables
+      for (t <- n.tree) {
+        if (table.contains(t.symbol)) {
+          subgraph.referencedVars(t.symbol) = table(t.symbol)
+        }
+        t match {
+          case q"$_ val $_: $_ = $_" =>
+            subgraph.declaredVars(t.symbol) = table(t.symbol)
+          case _ =>
+            // do nothing
+        }
+      }
+
+      // check for termination condition
+      def addToNodeFront() {
+        // add successors to node front
+        for (s <- n.successors) if (!seenEntries(s)) {
+          seenEntries += s
+          nodefront.enqueue(s)
+        }
+      }
+      def addCoroutineInvocationToNodeFront(co: Tree) {
+        val coroutinetpe = coroutineTypeFor(rettpt.tpe)
+        if (!(co.tpe <:< coroutinetpe)) {
+          c.abort(co.pos,
+            s"Coroutine invocation site has invalid return type.\n" +
+            s"required: $coroutinetpe\n" +
+            s"found:    ${co.tpe} (with underlying type ${co.tpe.widen})")
+        }
+        addToNodeFront()
+      }
+      n.tree match {
+        case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+          addToNodeFront()
+          exitPoints(subgraph)(current) = n.successors.head.uid
+        case q"coroutines.this.`package`.yieldto[$_]($_)" =>
+          addToNodeFront()
+          exitPoints(subgraph)(current) = n.successors.head.uid
+        case q"$_ val $_ = $co.apply(..$args)" if isCoroutineDefType(co.tpe) =>
+          addCoroutineInvocationToNodeFront(co)
+          exitPoints(subgraph)(current) = n.successors.head.uid
+        case _ =>
+          // traverse successors
+          for (s <- n.successors) {
+            if (!seen.contains(s)) {
+              extract(s, seen, subgraph)
+            }
+            current.successors ::= seen(s)
+          }
+      }
+      current
+    }
+
+    // as long as there are more nodes on the expansion front, extract them
+    while (nodefront.nonEmpty) {
+      val subgraph = new Subgraph(table.newSubgraphUid())
+      exitPoints(subgraph) = mutable.Map[Node, Long]()
+      subgraph.start = extract(nodefront.dequeue(), mutable.Map(), subgraph)
+      subgraphs += subgraph
+    }
+
+    // assign respective subgraph reference to each exit point node
+    val startPoints = subgraphs.map(s => s.start.uid -> s).toMap
+    for ((subgraph, exitMap) <- exitPoints; (node, nextUid) <- exitMap) {
+      subgraph.exitSubgraphs(node) = startPoints(nextUid)
+    }
+
+    println(subgraphs
+      .map(t => {
+        "[" + t.referencedVars.keys.mkString(", ") + "]\n" + t.start.prettyPrint
+      })
+      .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
+      .mkString("\n"))
+    subgraphs
+  }
 }

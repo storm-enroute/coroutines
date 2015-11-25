@@ -82,10 +82,12 @@ class CoroutineTest extends FunSuite with Matchers {
   }
 
   test("coroutine should be called") {
-    val c = coroutine { (x: Int) =>
+    val emitTwice = coroutine { (x: Int) =>
       yieldval(x)
-      -x
+      x
     }
-    call(c(1))
+    val c = call(emitTwice(1))
+    c()
+    c()
   }
 }
