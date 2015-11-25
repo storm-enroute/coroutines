@@ -26,14 +26,14 @@ class CoroutineTest extends FunSuite with Matchers {
     val d: Coroutine.Definition[List[Any]] = c
   }
 
-  test("should lub yieldtos and returns") {
-    val f: Coroutine[List[String]] = null
-    val c = coroutine { (x: Int) =>
-      yieldto(f)
-      Vector(x)
-    }
-    val d: Coroutine.Definition[Seq[Any]] = null 
-  }
+  // test("should lub yieldtos and returns") {
+  //   val f: Coroutine[List[String]] = null
+  //   val c = coroutine { (x: Int) =>
+  //     yieldto(f)
+  //     Vector(x)
+  //   }
+  //   val d: Coroutine.Definition[Seq[Any]] = null 
+  // }
 
   test("should declare body with if statement") {
     val c = coroutine { (x: Int, y: Int) =>
@@ -46,13 +46,13 @@ class CoroutineTest extends FunSuite with Matchers {
     }
   }
 
-  test("should declare body with a coroutine call") {
-    val c1 = coroutine { (x: Int) => x }
-    val c2 = coroutine { (x: Int) =>
-      val y = c1(x)
-      y
-    }
-  }
+  // test("should declare body with a coroutine call") {
+  //   val c1 = coroutine { (x: Int) => x }
+  //   val c2 = coroutine { (x: Int) =>
+  //     val y = c1(x)
+  //     y
+  //   }
+  // }
 
   test("should declare a value in a nested scope") {
     val c = coroutine { (x: Int, y: Int) =>
@@ -83,18 +83,20 @@ class CoroutineTest extends FunSuite with Matchers {
 
   test("coroutine should be called") {
     val emitTwice = coroutine { (x: Int) =>
+      println("hi")
       yieldval(x)
+      println("good")
       x
     }
     val c = call(emitTwice(1))
     c()
     c()
-  }
+  } 
 
-  test("coroutine should contain an if statement and no yields") {
-    val c = coroutine { (x: Int) =>
-      if (x > 0) x
-      else -x
-    }
-  }
+  // test("coroutine should contain an if statement and no yields") {
+  //   coroutine { (x: Int) =>
+  //     if (x > 0) x
+  //     else -x
+  //   }
+  // }
 }

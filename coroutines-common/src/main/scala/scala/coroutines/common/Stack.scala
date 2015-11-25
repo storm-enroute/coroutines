@@ -128,7 +128,7 @@ object Stack {
     val stackptrname = TermName(s"${name}ptr")
     val stackptr = q"$path.$stackptrname"
     q"""
-      $stackptr > 0
+      $stackptr <= 0
     """
   }
 

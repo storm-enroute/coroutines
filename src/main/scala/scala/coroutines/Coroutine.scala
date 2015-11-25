@@ -45,6 +45,7 @@ object Coroutine {
 
   abstract class Definition[T] {
     def enter(c: Coroutine[T]): Unit
+    def pop(c: Coroutine[T]): Unit
   }
 
   def synthesize(c: Context)(f: c.Tree): c.Tree = {
@@ -56,18 +57,22 @@ object Coroutine {
   }
 
   abstract class Arity0[@specialized T] extends Coroutine.Definition[T] {
+    def call()(implicit cc: CanCall): Coroutine[T]
     def apply(): T
   }
 
   abstract class Arity1[A0, @specialized T] extends Coroutine.Definition[T] {
+    def call(a0: A0)(implicit cc: CanCall): Coroutine[T]
     def apply(a0: A0): T
   }
 
   abstract class Arity2[A0, A1, @specialized T] extends Coroutine.Definition[T] {
+    def call(a0: A0, a1: A1)(implicit cc: CanCall): Coroutine[T]
     def apply(a0: A0, a1: A1): T
   }
 
   abstract class Arity3[A0, A1, A2, @specialized T] extends Coroutine.Definition[T] {
+    def call(a0: A0, a1: A1, a2: A2)(implicit cc: CanCall): Coroutine[T]
     def apply(a0: A0, a1: A1, a2: A2): T
   }
 }
