@@ -90,4 +90,11 @@ class CoroutineTest extends FunSuite with Matchers {
     c()
     c()
   }
+
+  test("coroutine should contain an if statement and no yields") {
+    val c = coroutine { (x: Int) =>
+      if (x > 0) x
+      else -x
+    }
+  }
 }

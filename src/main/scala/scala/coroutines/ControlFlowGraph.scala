@@ -83,6 +83,35 @@ trait ControlFlowGraph[C <: Context] {
       emit(this, "")
       text.toString
     }
+
+    protected def generateTerminationTree(
+      value: Tree, chain: Chain, subgraph: Subgraph
+    )(implicit table: Table): Tree = {
+      val cparam = table.names.coroutineParam
+      // store state for non-val variables in scope
+      val stacksets = for {
+        (sym, info) <- chain.allvars
+        if subgraph.mustStoreVar(sym)
+      } yield {
+        val stack = info.stackname
+        val pos = info.stackpos
+        val encodedval = info.encodeLong(q"${info.name}")
+        q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
+      }
+      // update pc state
+      val pc = subgraph.exitSubgraphs(this).uid
+      val pcstackset = q"""
+        scala.coroutines.common.Stack.update($cparam.pcstack, $pc.toShort)
+      """
+      // store return value
+      val termtree = q"""
+        ..${stacksets.toList}
+        $pcstackset
+        $cparam.result = ${table.untyper.untypecheck(value)}
+        return
+      """
+      termtree
+    }
   }
 
   object Node {
@@ -122,29 +151,7 @@ trait ControlFlowGraph[C <: Context] {
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
-        val cparam = table.names.coroutineParam
-        // store state for non-val variables in scope
-        val stacksets = for {
-          (sym, info) <- chain.allvars
-          if subgraph.mustStoreVar(sym)
-        } yield {
-          val stack = info.stackname
-          val pos = info.stackpos
-          val encodedval = info.encodeLong(q"${info.name}")
-          q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
-        }
-        // update pc state
-        val pc = subgraph.exitSubgraphs(this).uid
-        val pcstackset = q"""
-          scala.coroutines.common.Stack.update($cparam.pcstack, $pc.toShort)
-        """
-        // store return value
-        val termtree = q"""
-          ..${stacksets.toList}
-          $pcstackset
-          $cparam.result = ${table.untyper.untypecheck(x)}
-          return
-        """
+        val termtree = generateTerminationTree(x, chain, subgraph)
         z.append(termtree)
       }
       def copyWithoutSuccessors = new YieldVal(tree, chain, uid)
@@ -155,12 +162,13 @@ trait ControlFlowGraph[C <: Context] {
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
         // inside the control-flow-construct, normal statement
-        val z1 = z.append(table.untyper.untypecheck(tree))
         if (successors.length == 1) {
+          val z1 = z.append(table.untyper.untypecheck(tree))
           successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 0) {
-          // do nothing
-          z1
+          // store expression to the return value position
+          val termtree = generateTerminationTree(tree, chain, subgraph)
+          z.append(termtree)
         } else sys.error(s"Multiple successors for <$tree>.")
       }
       def copyWithoutSuccessors = new Statement(tree, chain, uid)
