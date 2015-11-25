@@ -7,7 +7,6 @@ import org.scalatest._
 
 
 class CoroutineTest extends FunSuite with Matchers {
-
   test("should be declared") {
     val c = coroutine { (x: Int, y: Int) =>
       val sum = x + y
@@ -82,4 +81,11 @@ class CoroutineTest extends FunSuite with Matchers {
     }
   }
 
+  test("coroutine should be called") {
+    val c = coroutine { (x: Int) =>
+      yieldval(x)
+      -x
+    }
+    call(c(1))
+  }
 }

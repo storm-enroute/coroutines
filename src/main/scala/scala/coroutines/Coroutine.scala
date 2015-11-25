@@ -47,27 +47,27 @@ object Coroutine {
     def enter(c: Coroutine[T]): Unit
   }
 
-  def transform(c: Context)(f: c.Tree): c.Tree = {
+  def synthesize(c: Context)(f: c.Tree): c.Tree = {
     new Synthesizer[c.type](c).synthesize(f)
   }
 
+  def call[T: c.WeakTypeTag](c: Context)(f: c.Tree): c.Tree = {
+    new Synthesizer[c.type](c).call(f)
+  }
+
   abstract class Arity0[@specialized T] extends Coroutine.Definition[T] {
-    def call(): Coroutine[T]
     def apply(): T
   }
 
   abstract class Arity1[A0, @specialized T] extends Coroutine.Definition[T] {
-    def call(a0: A0): Coroutine[T]
     def apply(a0: A0): T
   }
 
   abstract class Arity2[A0, A1, @specialized T] extends Coroutine.Definition[T] {
-    def call(a0: A0, a1: A1): Coroutine[T]
     def apply(a0: A0, a1: A1): T
   }
 
   abstract class Arity3[A0, A1, A2, @specialized T] extends Coroutine.Definition[T] {
-    def call(a0: A0, a1: A1, a2: A2): Coroutine[T]
     def apply(a0: A0, a1: A1, a2: A2): T
   }
 }

@@ -143,4 +143,14 @@ trait Analyzer[C <: Context] {
       if (parent != null) s + parent.toString else s
     }
   }
+
+  def isCoroutineDefType(tpe: Type) = {
+    val codefsym = typeOf[Coroutine.Definition[_]].typeConstructor.typeSymbol
+    tpe.baseType(codefsym) != NoType
+  }
+
+  def coroutineTypeFor(tpe: Type) = {
+    val codeftpe = typeOf[Coroutine.Definition[_]].typeConstructor
+    appliedType(codeftpe, List(tpe))
+  }
 }

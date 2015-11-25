@@ -10,6 +10,8 @@ import scala.reflect.macros.whitebox.Context
 
 
 
+/** Synthesizes all coroutine-related functionality.
+ */
 private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C] with ControlFlowGraph[C] {
   import c.universe._
@@ -70,13 +72,8 @@ extends Analyzer[C] with ControlFlowGraph[C] {
           nodefront.enqueue(s)
         }
       }
-      def isCoroutineDefType(tpe: Type) = {
-        val codefsym = typeOf[Coroutine.Definition[_]].typeConstructor.typeSymbol
-        tpe.baseType(codefsym) != NoType
-      }
       def addCoroutineInvocationToNodeFront(co: Tree) {
-        val codeftpe = typeOf[Coroutine.Definition[_]].typeConstructor
-        val coroutinetpe = appliedType(codeftpe, List(rettpt.tpe))
+        val coroutinetpe = coroutineTypeFor(rettpt.tpe)
         if (!(co.tpe <:< coroutinetpe)) {
           c.abort(co.pos,
             s"Coroutine invocation site has invalid return type.\n" +
@@ -202,12 +199,12 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     } else {
       val cases = for ((index, defdef) <- entrypoints) yield {
         val q"def $ep($_): Unit = $rhs" = defdef
-        cq"$index => $ep($cparamname)"
+        cq"${index.toShort} => $ep($cparamname)"
       }
 
       q"""
         def enter($cparamname: Coroutine[$tpt]): Unit = {
-          val pc = scala.coroutines.common.Stack.top($cparamname.pcstack)
+          val pc: Short = scala.coroutines.common.Stack.top($cparamname.pcstack)
           (pc: @scala.annotation.switch) match {
             case ..$cases
           }
@@ -255,22 +252,25 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val valnme = TermName(c.freshName("c"))
     val co = q"""
       new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
-        def call(..$args) = {
-          val $valnme = new Coroutine[$rettpt]
+        def call(..$args)(
+          implicit cc: scala.coroutines.CanCall
+        ): scala.coroutines.Coroutine[$rettpt] = {
+          val $valnme = new scala.coroutines.Coroutine[$rettpt]
           push($valnme, ..$argidents)
           $valnme
         }
         def apply(..$args): $rettpt = {
           sys.error(
             "Coroutines can only be invoked directly from within other coroutines. " +
-            "Use `call` instead if you want to start a new coroutine.")
+            "Use `call(<coroutine>(<arg0>, ..., <argN>))` instead if you want to " +
+            "start a new coroutine.")
         }
-        def push(c: Coroutine[$rettpt], ..$args): Unit = {
+        def push(c: scala.coroutines.Coroutine[$rettpt], ..$args): Unit = {
           scala.coroutines.common.Stack.push(c.costack, this, -1)
           scala.coroutines.common.Stack.push(c.pcstack, 0.toShort, -1)
           ..$varpushes
         }
-        def pop(c: Coroutine[$rettpt]): Unit = {
+        def pop(c: scala.coroutines.Coroutine[$rettpt]): Unit = {
           scala.coroutines.common.Stack.pop(c.pcstack)
           scala.coroutines.common.Stack.pop(c.costack)
           ..$varpops
@@ -281,5 +281,30 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     """
     println(co)
     co
+  }
+
+  def call[T: WeakTypeTag](lambda: Tree): Tree = {
+    val (receiver, args) = lambda match {
+      case q"$r.apply(..$args)" =>
+        if (!isCoroutineDefType(r.tpe))
+          c.abort(r.pos,
+            s"Receiver must be a coroutine.\n" +
+            s"required: Coroutine.Definition[${implicitly[WeakTypeTag[T]]}]\n" +
+            s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
+        (r, args)
+      case _ =>
+        c.abort(
+          lambda.pos,
+          "The call statement must take a coroutine invocation expression:\n" +
+          "  call(<coroutine>.apply(<arg0>, ..., <argN>))")
+    }
+
+    val tpe = implicitly[WeakTypeTag[T]]
+    val t = q"""
+      import scala.coroutines.Permission.canCall
+      $receiver.call(..$args)
+    """
+    println(t)
+    t
   }
 }
