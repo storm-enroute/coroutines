@@ -152,6 +152,7 @@ trait ControlFlowGraph[C <: Context] {
           $co.push($cparam)
           $cparam.target = $co
         """
+        z.append(termtree)
         if (successors.length == 1) {
           successors.head.markEmit(z, seen, subgraph)
         } else if (successors.length == 0) {

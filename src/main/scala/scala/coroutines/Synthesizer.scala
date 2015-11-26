@@ -160,7 +160,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val co = q"""
       new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
         def call(..$args)(
-          implicit cc: scala.coroutines.CanCall
+          implicit cc: scala.coroutines.CanCallInternal
         ): scala.coroutines.Coroutine[$rettpt] = {
           val $valnme = new scala.coroutines.Coroutine[$rettpt]
           push($valnme, ..$argidents)
@@ -173,7 +173,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
             "start a new coroutine.")
         }
         def push(c: scala.coroutines.Coroutine[$rettpt], ..$args)(
-          implicit cc: scala.coroutines.CanCall
+          implicit cc: scala.coroutines.CanCallInternal
         ): Unit = {
           scala.coroutines.common.Stack.push(c.costack, this, -1)
           scala.coroutines.common.Stack.push(c.pcstack, 0.toShort, -1)

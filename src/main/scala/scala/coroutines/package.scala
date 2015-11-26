@@ -13,10 +13,10 @@ package object coroutines {
   @implicitNotFound(
     "To create a coroutine, use the call(<coroutine>(<arguments>)) expression " +
     "instead of invoking the coroutine definition's call method directly.")
-  sealed trait CanCall
+  sealed trait CanCallInternal
 
   object Permission {
-    implicit val canCall = new CanCall {}
+    implicit val canCall = new CanCallInternal {}
   }
 
   def yieldval[T](x: T): Unit = {

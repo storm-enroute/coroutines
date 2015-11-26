@@ -47,7 +47,7 @@ class CoroutineTest extends FunSuite with Matchers {
   }
 
   test("should declare body with a coroutine call") {
-    val c1 = coroutine { (x: Int) => x }
+     val c1 = coroutine { (x: Int) => x }
     val c2 = coroutine { (x: Int) =>
       val y = c1(x)
       y
