@@ -77,7 +77,7 @@ class CoroutineTest extends FunSuite with Matchers {
       } else {
         yieldval(x)
       }
-      // y
+      y
     }
   }
 
