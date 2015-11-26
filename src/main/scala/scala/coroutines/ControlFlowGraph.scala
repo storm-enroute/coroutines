@@ -191,10 +191,8 @@ trait ControlFlowGraph[C <: Context] {
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"while ($cond) $body" = tree
         val untypedcond = table.untyper.untypecheck(cond)
-        val untypedbody = table.untyper.untypecheck(body)
         val z1 = z.descend(trees => q"while ($untypedcond) ..$trees")
-        val z2 = z1.append(untypedbody)
-        term.markEmit(z2, seen, subgraph)
+        successors(0).markEmit(z1, seen, subgraph)
       }
       def copyWithoutSuccessors = While(term, tree, chain, uid)
     }
@@ -210,7 +208,7 @@ trait ControlFlowGraph[C <: Context] {
           successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 2) {
           val z1 = z.ascend
-          val z2 = successors.last.markEmit(z1, seen, subgraph)
+          val z2 = successors.last.markEmit(z1, mutable.Set(this), subgraph)
           successors.head.markEmit(z2, seen, subgraph)
         } else sys.error(s"Number of successors for <$tree>: ${successors.length}")
       }
