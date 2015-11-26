@@ -54,47 +54,47 @@ class CoroutineTest extends FunSuite with Matchers {
     }
   }
 
-  // test("should declare a value in a nested scope") {
-  //   val c = coroutine { (x: Int, y: Int) =>
-  //     if (x > 0) {
-  //       val z = -x
-  //       yieldval(z)
-  //       yieldval(-z)
-  //     } else {
-  //       yieldval(y)
-  //     }
-  //     x
-  //   }
-  // }
+  test("should declare a value in a nested scope") {
+    val c = coroutine { (x: Int, y: Int) =>
+      if (x > 0) {
+        val z = -x
+        yieldval(z)
+        yieldval(-z)
+      } else {
+        yieldval(y)
+      }
+      x
+    }
+  }
 
-  // test("should declare a variable in a nested scope") {
-  //   val c = coroutine { (x: Int, y: Int) =>
-  //     if (x > 0) {
-  //       var z = -x
-  //       yieldval(z)
-  //       z = -z
-  //       yieldval(z)
-  //     } else {
-  //       yieldval(x)
-  //     }
-  //     y
-  //   }
-  // }
+  test("should declare a variable in a nested scope") {
+    val c = coroutine { (x: Int, y: Int) =>
+      if (x > 0) {
+        var z = -x
+        yieldval(z)
+        z = -z
+        yieldval(z)
+      } else {
+        yieldval(x)
+      }
+      y
+    }
+  }
 
-  // test("coroutine should be called") {
-  //   val emitTwice = coroutine { (x: Int) =>
-  //     yieldval(x)
-  //     x
-  //   }
-  //   val c = call(emitTwice(1))
-  //   c()
-  //   c()
-  // }
+  test("coroutine should be called") {
+    val emitTwice = coroutine { (x: Int) =>
+      yieldval(x)
+      x
+    }
+    val c = call(emitTwice(1))
+    c()
+    c()
+  }
 
-  // test("coroutine should contain an if statement and no yields") {
-  //   val c = coroutine { (x: Int) =>
-  //     if (x > 0) x
-  //     else -x
-  //   }
-  // }
+  test("coroutine should contain an if statement and no yields") {
+    val c = coroutine { (x: Int) =>
+      if (x > 0) x
+      else -x
+    }
+  }
 }
