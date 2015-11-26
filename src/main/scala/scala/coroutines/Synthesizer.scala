@@ -184,6 +184,11 @@ extends Analyzer[C] with ControlFlowGraph[C] {
           scala.coroutines.common.Stack.pop(c.costack)
           ..$varpops
         }
+        def returnValue(c: scala.coroutines.Coroutine[$rettpt], v: $rettpt)(
+          implicit cc: scala.coroutines.CanCallInternal
+        ): Unit = {
+          ???
+        }
         $entermethod
         ..$entrypointmethods
       }

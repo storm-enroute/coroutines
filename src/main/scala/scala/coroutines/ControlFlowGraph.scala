@@ -202,14 +202,19 @@ trait ControlFlowGraph[C <: Context] {
           val z1 = z.append(table.untyper.untypecheck(tree))
           successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 0) {
-          // store expression to the return value position
+          // pop the stack and store expression to the return value position
           val cparam = table.names.coroutineParam
+          val untypedTree = table.untyper.untypecheck(tree)
           val termtree = q"""
             pop($cparam)
-            if (!scala.coroutines.common.Stack.isEmpty($cparam.costack)) {
+            if (scala.coroutines.common.Stack.isEmpty($cparam.costack)) {
+              $cparam.result = $untypedTree
+            } else {
+              import scala.coroutines.Permission.canCall
               $cparam.target = $cparam
+              scala.coroutines.common.Stack.top($cparam.costack)
+                .returnValue($cparam, $untypedTree)
             }
-            $cparam.result = ${table.untyper.untypecheck(tree)}
             return
           """
           z.append(termtree)
