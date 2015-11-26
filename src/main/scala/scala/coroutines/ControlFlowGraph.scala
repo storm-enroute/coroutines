@@ -218,7 +218,19 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = WhileTerm(chain, uid)
     }
 
-    abstract class CoroutineCall extends Node {
+    case class ValCoroutineCall(tree: Tree, chain: Chain, uid: Long) extends Node {
+      def coroutine: Tree = {
+        val q"$_ val $_: $_ = $co.apply(..$_)" = tree
+        co
+      }
+      def emit(
+        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+      )(implicit ce: CanEmit, table: Table): Zipper = {
+        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
+        val termtree = genCoroutineCall(co, args, chain, subgraph)
+        z.append(termtree)
+      }
+      def copyWithoutSuccessors = ValCoroutineCall(tree, chain, uid)
       def genCoroutineCall(
         co: Tree, args: List[Tree], chain: Chain, subgraph: SubCfg
       )(implicit table: Table): Tree = {
@@ -232,22 +244,6 @@ trait ControlFlowGraph[C <: Context] {
           $cparam.target = $cparam
         """
       }
-    }
-
-    case class ValCoroutineCall(tree: Tree, chain: Chain, uid: Long)
-    extends Node.CoroutineCall {
-      def coroutine: Tree = {
-        val q"$_ val $_: $_ = $co.apply(..$_)" = tree
-        co
-      }
-      def emit(
-        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
-      )(implicit ce: CanEmit, table: Table): Zipper = {
-        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
-        val termtree = genCoroutineCall(co, args, chain, subgraph)
-        z.append(termtree)
-      }
-      def copyWithoutSuccessors = ValCoroutineCall(tree, chain, uid)
     }
 
     case class YieldVal(tree: Tree, chain: Chain, uid: Long) extends Node {
