@@ -125,4 +125,14 @@ class CoroutineTest extends FunSuite with Matchers {
       y
     }
   }
+
+  test("coroutine should contain a while loop") {
+    val c = coroutine { () =>
+      var i = 0
+      while (i < 10) {
+        i += 1
+      }
+      i
+    }
+  }
 }
