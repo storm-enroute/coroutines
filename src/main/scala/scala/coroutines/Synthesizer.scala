@@ -101,23 +101,47 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   private def synthesizeReturnValueMethod(
     cfg: Cfg, tpt: Tree
   )(implicit table: Table): Tree = {
-    val returncases = cfg.start.dfs.collect {
+    val returnstores = cfg.start.dfs.collect {
       case n @ Node.ApplyCoroutine(t, chain, uid) =>
         val sub = cfg.subgraphs(n.successors.head)
         val pcvalue = sub.uid
         val info = table(t.symbol)
         val rvset = info.setTree(q"v")
-        cq"$pcvalue => $rvset"
+        (pcvalue, q"$rvset")
+    }
+
+    val body = {
+      if (returnstores.size == 0) {
+        q"()"
+      } else if (returnstores.size == 1) {
+        returnstores(0)._2
+      } else if (returnstores.size == 2) {
+        q"""
+          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+          if (pc == ${returnstores(0)._1.toShort}) {
+            ${returnstores(0)._2}
+          } else {
+            ${returnstores(1)._2}
+          }
+        """
+      } else {
+        val cases = for ((pcvalue, rvset) <- returnstores) yield {
+          cq"${pcvalue.toShort} => $rvset"
+        }
+        q"""
+          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+          (pc: @scala.annotation.switch) match {
+            case ..$cases
+          }
+        """
+      }
     }
 
     q"""
       def returnvalue(c: scala.coroutines.Coroutine[$tpt], v: $tpt)(
         implicit cc: scala.coroutines.CanCallInternal
       ): Unit = {
-        val pc = scala.coroutines.common.Stack.top(c.pcstack)
-        (pc: @scala.annotation.switch) match {
-          case ..$returncases
-        }
+        $body
       }
     """
   }
