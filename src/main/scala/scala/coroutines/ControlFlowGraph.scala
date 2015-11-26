@@ -90,6 +90,25 @@ trait ControlFlowGraph[C <: Context] {
       pcstackset :: stacksets.toList
     }
 
+    protected def generateExit(
+      n: Node, subgraph: SubCfg
+    )(implicit t: Table): Tree = {
+      val cparam = t.names.coroutineParam
+      val untypedTree = t.untyper.untypecheck(n.code)
+      q"""
+        pop($cparam)
+        if (scala.coroutines.common.Stack.isEmpty($cparam.costack)) {
+          $cparam.result = $untypedTree
+        } else {
+          import scala.coroutines.Permission.canCall
+          $cparam.target = $cparam
+          scala.coroutines.common.Stack.top($cparam.costack)
+            .returnvalue($cparam, $untypedTree)
+        }
+        return
+      """
+    }
+
     def prettyPrint = {
       val text = new StringBuilder
       var count = 0
@@ -215,8 +234,8 @@ trait ControlFlowGraph[C <: Context] {
       }
       def copyWithoutSuccessors = new YieldTo(tree, chain, uid)
     }
- 
-   case class Statement(tree: Tree, chain: Chain, uid: Long) extends Node {
+
+    case class Statement(tree: Tree, chain: Chain, uid: Long) extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
@@ -228,20 +247,7 @@ trait ControlFlowGraph[C <: Context] {
           if (!subgraph.exitSubgraphs.contains(this)) {
             // if this was the last expression in the original graph,
             // then pop the stack and store expression to the return value position
-            val cparam = table.names.coroutineParam
-            val untypedTree = table.untyper.untypecheck(tree)
-            val termtree = q"""
-              pop($cparam)
-              if (scala.coroutines.common.Stack.isEmpty($cparam.costack)) {
-                $cparam.result = $untypedTree
-              } else {
-                import scala.coroutines.Permission.canCall
-                $cparam.target = $cparam
-                scala.coroutines.common.Stack.top($cparam.costack)
-                  .returnvalue($cparam, $untypedTree)
-              }
-              return
-            """
+            val termtree = generateExit(this, subgraph)
             z.append(termtree)
           } else {
             z
@@ -269,31 +275,33 @@ trait ControlFlowGraph[C <: Context] {
   }
 
   def generateControlFlowGraph(tpt: Tree)(implicit table: Table): Cfg = {
-    def traverse(t: Tree, c: Chain): (Node, Node) = {
+    def traverse(t: Tree, ch: Chain): (Node, Node) = {
       t match {
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
-          val n = Node.YieldVal(t, c, table.newNodeUid())
+          val n = Node.YieldVal(t, ch, table.newNodeUid())
           (n, n)
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
-          val n = Node.YieldTo(t, c, table.newNodeUid())
+          val n = Node.YieldTo(t, ch, table.newNodeUid())
           (n, n)
         case ValDecl(t @ q"$_ val $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
-          c.addVar(t, false)
-          val n = Node.ApplyCoroutine(t, c, table.newNodeUid())
+          ch.addVar(t, false)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
           (n, n)
         case ValDecl(t @ q"$_ var $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
-          c.addVar(t, false)
-          val n = Node.ApplyCoroutine(t, c, table.newNodeUid())
+          ch.addVar(t, false)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
           (n, n)
         case ValDecl(t) =>
-          c.addVar(t, false)
-          val n = Node.Statement(t, c, table.newNodeUid())
+          ch.addVar(t, false)
+          val n = Node.Statement(t, ch, table.newNodeUid())
           (n, n)
+        case q"return $x" =>
+          c.abort(t.pos, "Return statements not allowed inside coroutines.")
         case q"if ($cond) $thenbranch else $elsebranch" =>
-          val ifnode = Node.If(t, c, table.newNodeUid())
-          val mergenode = Node.IfMerge(c, table.newNodeUid())
+          val ifnode = Node.If(t, ch, table.newNodeUid())
+          val mergenode = Node.IfMerge(ch, table.newNodeUid())
           def addBranch(branch: Tree) {
-            val nestedchain = c.newChain(t)
+            val nestedchain = ch.newChain(t)
             val (childhead, childlast) = traverse(branch, nestedchain)
             ifnode.successors ::= childhead
             childlast.tree match {
@@ -309,7 +317,7 @@ trait ControlFlowGraph[C <: Context] {
           addBranch(elsebranch)
           (ifnode, mergenode)
         case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
-          val nestedchain = c.newChain(t)
+          val nestedchain = ch.newChain(t)
           val (first, childlast) = traverse(stats.head, nestedchain)
           var current = childlast
           for (stat <- stats.tail) {
@@ -319,7 +327,7 @@ trait ControlFlowGraph[C <: Context] {
           }
           (first, current)
         case _ =>
-          val n = Node.Statement(t, c, table.newNodeUid())
+          val n = Node.Statement(t, ch, table.newNodeUid())
           (n, n)
       }
     }
