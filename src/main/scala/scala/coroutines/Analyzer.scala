@@ -19,14 +19,10 @@ trait Analyzer[C <: Context] {
   case class Zipper(above: Zipper, left: List[Tree], ctor: List[Tree] => Tree) {
     def append(x: Tree) = Zipper(above, x :: left, ctor)
     def isRoot = above == null
-    def root = {
+    def result: Tree = {
       var z = this
       while (z.above != null) z = z.ascend
-      z
-    }
-    def result: Tree = {
-      assert(above == null)
-      ctor(left.reverse)
+      ctor(z.left.reverse)
     }
     def ascend: Zipper = if (above == null) null else {
       Zipper(above.above, ctor(left.reverse) :: above.left, above.ctor)

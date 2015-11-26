@@ -142,7 +142,7 @@ trait ControlFlowGraph[C <: Context] {
   }
 
   object Node {
-    case class If(tree: Tree, chain: Chain, uid: Long) extends Node {
+    case class If(term: IfTerm, tree: Tree, chain: Chain, uid: Long) extends Node {
       override def code = {
         val q"if ($cond) $_ else $_" = tree
         cond
@@ -152,30 +152,32 @@ trait ControlFlowGraph[C <: Context] {
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"if ($cond) $_ else $_" = tree
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
-        val elsenode = this.successors(1)
-        val thennode = this.successors(0)
-        val elsebranch = elsenode.markEmit(newZipper, seen, subgraph).root.result
-        val thenbranch = thennode.markEmit(newZipper, seen, subgraph).root.result
+        val elsen = this.successors(1)
+        val thenn = this.successors(0)
+        val elsebranch = elsen.markEmit(newZipper, mutable.Set(term), subgraph).result
+        val thenbranch = thenn.markEmit(newZipper, mutable.Set(term), subgraph).result
         val untypedcond = table.untyper.untypecheck(cond)
         val iftree = q"if ($untypedcond) $thenbranch else $elsebranch"
-        z.append(iftree)
+        val z1 = z.append(iftree)
+        term.markEmit(z1, seen, subgraph)
       }
-      def copyWithoutSuccessors = If(tree, chain, uid)
+      def copyWithoutSuccessors = If(term, tree, chain, uid)
     }
 
-    case class IfMerge(chain: Chain, uid: Long) extends Node {
+    case class IfTerm(chain: Chain, uid: Long) extends Node {
       val tree: Tree = q"()"
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         if (successors.length == 1) {
-          successors.head.markEmit(z, seen, subgraph)
+          val z1 = z.ascend
+          successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 0) {
           // do nothing
           z
         } else sys.error(s"Multiple successors for <$tree>.")
       }
-      def copyWithoutSuccessors = IfMerge(chain, uid)
+      def copyWithoutSuccessors = IfTerm(chain, uid)
     }
 
     case class While(term: WhileTerm, tree: Tree, chain: Chain, uid: Long)
@@ -344,8 +346,8 @@ trait ControlFlowGraph[C <: Context] {
         case q"return $_" =>
           c.abort(t.pos, "Return statements not allowed inside coroutines.")
         case q"if ($cond) $thenbranch else $elsebranch" =>
-          val ifnode = Node.If(t, ch, table.newNodeUid())
-          val mergenode = Node.IfMerge(ch, table.newNodeUid())
+          val termnode = Node.IfTerm(ch, table.newNodeUid())
+          val ifnode = Node.If(termnode, t, ch, table.newNodeUid())
           def addBranch(branch: Tree) {
             val nestedchain = ch.newChain(t)
             val (childhead, childlast) = traverse(branch, nestedchain)
@@ -354,14 +356,14 @@ trait ControlFlowGraph[C <: Context] {
               case ValDecl(_) =>
                 val endnode = Node.Statement(q"()", nestedchain, table.newNodeUid())
                 childlast.successors ::= endnode
-                endnode.successors ::= mergenode
+                endnode.successors ::= termnode
               case _ =>
-                childlast.successors ::= mergenode
+                childlast.successors ::= termnode
             }
           }
           addBranch(thenbranch)
           addBranch(elsebranch)
-          (ifnode, mergenode)
+          (ifnode, termnode)
         case q"while ($cond) $body" =>
           val termnode = Node.WhileTerm(ch, table.newNodeUid())
           val whilenode = Node.While(termnode, t, ch, table.newNodeUid())
