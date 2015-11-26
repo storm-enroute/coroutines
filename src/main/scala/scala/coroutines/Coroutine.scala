@@ -3,6 +3,7 @@ package scala.coroutines
 
 
 import scala.annotation.tailrec
+import scala.annotation.unchecked.uncheckedVariance
 import scala.collection._
 import scala.coroutines.common._
 import scala.language.experimental.macros
@@ -10,20 +11,19 @@ import scala.reflect.macros.whitebox.Context
 
 
 
-class Coroutine[@specialized T] {
+class Coroutine[@specialized +T] {
   import Coroutine._
   private[coroutines] var costackptr = 0
-  private[coroutines] var costack = new Array[Definition[T]](INITIAL_CO_STACK_SIZE)
+  private[coroutines] var costack: Array[Definition[T]] @uncheckedVariance =
+    new Array[Definition[T]](INITIAL_CO_STACK_SIZE)
   private[coroutines] var pcstackptr = 0
   private[coroutines] var pcstack = new Array[Short](INITIAL_CO_STACK_SIZE)
-  private[coroutines] var rvstackptr = 0
-  private[coroutines] var rvstack: Array[Byte] = _
   private[coroutines] var refstackptr = 0
   private[coroutines] var refstack: Array[AnyRef] = _
   private[coroutines] var valstackptr = 0
   private[coroutines] var valstack: Array[Long] = _
-  private[coroutines] var target: Coroutine[T] = null
-  private[coroutines] var result: T = null.asInstanceOf[T]
+  private[coroutines] var target: Coroutine[T] @uncheckedVariance = null
+  private[coroutines] var result: T @uncheckedVariance = null.asInstanceOf[T]
 
   def apply(): T = Coroutine.enter[T](this)
 }
