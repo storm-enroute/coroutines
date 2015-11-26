@@ -147,9 +147,11 @@ trait ControlFlowGraph[C <: Context] {
         val q"$_ val $_: $_ = $co.apply(..$args)" = tree
         val cparam = table.names.coroutineParam
         val savestate = generateSaveState(chain, subgraph)
+        val untypedArgs = for (a <- args) yield table.untyper.untypecheck(a)
         val termtree = q"""
+          import scala.coroutines.Permission.canCall
           ..$savestate
-          $co.push($cparam)
+          $co.push($cparam, ..$untypedArgs)
           $cparam.target = $cparam
         """
         z.append(termtree)
