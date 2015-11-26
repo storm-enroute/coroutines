@@ -37,6 +37,18 @@ trait ControlFlowGraph[C <: Context] {
 
     def code: Tree = tree
 
+    final def dfs: Seq[Node] = {
+      val seen = mutable.LinkedHashSet[Node]()
+      def traverse(n: Node) {
+        if (!seen(n)) {
+          seen += n
+          for (sn <- n.successors) traverse(sn)
+        }
+      }
+      traverse(this)
+      seen.toSeq
+    }
+
     final def emitCode(z: Zipper, subgraph: Subgraph)(implicit t: Table): Zipper = {
       val seen = mutable.Set[Node]()
       this.markEmit(z, seen, subgraph)

@@ -119,7 +119,6 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   private def synthesizeReturnPoints(
     body: Tree, cfg: Node, subgraphs: Set[Subgraph], rettpt: Tree
   )(implicit table: Table): Map[Long, Tree] = {
-    // for
     // val trees = body.collect {
     //   case t @ q"$_ val $_: $_ = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
     //   case t @ q"$_ var $_: $_ = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
