@@ -68,7 +68,7 @@ trait ControlFlowGraph[C <: Context] {
       z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
     )(implicit ce: CanEmit, t: Table): Zipper
 
-    protected def generateSaveState(
+    protected def genSaveState(
       chain: Chain, subgraph: SubCfg
     )(implicit t: Table): List[Tree] = {
       val cparam = t.names.coroutineParam
@@ -90,7 +90,7 @@ trait ControlFlowGraph[C <: Context] {
       pcstackset :: stacksets.toList
     }
 
-    protected def generateExit(
+    protected def genExit(
       n: Node, subgraph: SubCfg
     )(implicit t: Table): Tree = {
       val cparam = t.names.coroutineParam
@@ -178,27 +178,36 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new IfMerge(chain, uid)
     }
 
-    case class ApplyCoroutine(tree: Tree, chain: Chain, uid: Long) extends Node {
+    abstract class CoroutineCall extends Node {
+      def genCoroutineCall(
+        co: Tree, args: List[Tree], chain: Chain, subgraph: SubCfg
+      )(implicit table: Table): Tree = {
+        val cparam = table.names.coroutineParam
+        val savestate = genSaveState(chain, subgraph)
+        val untypedArgs = for (a <- args) yield table.untyper.untypecheck(a)
+        q"""
+          import scala.coroutines.Permission.canCall
+          ..$savestate
+          $co.push($cparam, ..$untypedArgs)
+          $cparam.target = $cparam
+        """
+      }
+    }
+
+    case class ValCoroutineCall(tree: Tree, chain: Chain, uid: Long)
+    extends Node.CoroutineCall {
       def coroutine: Tree = {
-        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
+        val q"$_ val $_: $_ = $co.apply(..$_)" = tree
         co
       }
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"$_ val $_: $_ = $co.apply(..$args)" = tree
-        val cparam = table.names.coroutineParam
-        val savestate = generateSaveState(chain, subgraph)
-        val untypedArgs = for (a <- args) yield table.untyper.untypecheck(a)
-        val termtree = q"""
-          import scala.coroutines.Permission.canCall
-          ..$savestate
-          $co.push($cparam, ..$untypedArgs)
-          $cparam.target = $cparam
-        """
+        val termtree = genCoroutineCall(co, args, chain, subgraph)
         z.append(termtree)
       }
-      def copyWithoutSuccessors = new ApplyCoroutine(tree, chain, uid)
+      def copyWithoutSuccessors = new ValCoroutineCall(tree, chain, uid)
     }
 
     case class YieldVal(tree: Tree, chain: Chain, uid: Long) extends Node {
@@ -207,7 +216,7 @@ trait ControlFlowGraph[C <: Context] {
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
         val cparam = table.names.coroutineParam
-        val savestate = generateSaveState(chain, subgraph)
+        val savestate = genSaveState(chain, subgraph)
         val termtree = q"""
           ..$savestate
           $cparam.result = ${table.untyper.untypecheck(x)}
@@ -224,7 +233,7 @@ trait ControlFlowGraph[C <: Context] {
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldto[$_]($co)" = tree
         val cparam = table.names.coroutineParam
-        val savestate = generateSaveState(chain, subgraph)
+        val savestate = genSaveState(chain, subgraph)
         val termtree = q"""
           ..$savestate
           $cparam.target = ${table.untyper.untypecheck(co)}
@@ -247,7 +256,7 @@ trait ControlFlowGraph[C <: Context] {
           if (!subgraph.exitSubgraphs.contains(this)) {
             // if this was the last expression in the original graph,
             // then pop the stack and store expression to the return value position
-            val termtree = generateExit(this, subgraph)
+            val termtree = genExit(this, subgraph)
             z.append(termtree)
           } else {
             z
@@ -274,7 +283,7 @@ trait ControlFlowGraph[C <: Context] {
     }
   }
 
-  def generateControlFlowGraph(tpt: Tree)(implicit table: Table): Cfg = {
+  def genControlFlowGraph(tpt: Tree)(implicit table: Table): Cfg = {
     def traverse(t: Tree, ch: Chain): (Node, Node) = {
       t match {
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
@@ -285,17 +294,17 @@ trait ControlFlowGraph[C <: Context] {
           (n, n)
         case ValDecl(t @ q"$_ val $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
           ch.addVar(t, false)
-          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
+          val n = Node.ValCoroutineCall(t, ch, table.newNodeUid())
           (n, n)
         case ValDecl(t @ q"$_ var $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
           ch.addVar(t, false)
-          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
+          val n = Node.ValCoroutineCall(t, ch, table.newNodeUid())
           (n, n)
         case ValDecl(t) =>
           ch.addVar(t, false)
           val n = Node.Statement(t, ch, table.newNodeUid())
           (n, n)
-        case q"return $x" =>
+        case q"return $_" =>
           c.abort(t.pos, "Return statements not allowed inside coroutines.")
         case q"if ($cond) $thenbranch else $elsebranch" =>
           val ifnode = Node.If(t, ch, table.newNodeUid())
@@ -377,6 +386,8 @@ trait ControlFlowGraph[C <: Context] {
       for (t <- n.code) {
         t match {
           case q"$_ val $_: $_ = $_" =>
+            subgraph.declaredVars(t.symbol) = table(t.symbol)
+          case q"$_ var $_: $_ = $_" =>
             subgraph.declaredVars(t.symbol) = table(t.symbol)
           case _ =>
            if (table.contains(t.symbol)) {

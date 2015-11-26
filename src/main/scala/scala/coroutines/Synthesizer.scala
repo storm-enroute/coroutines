@@ -16,7 +16,7 @@ private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C] with ControlFlowGraph[C] {
   import c.universe._
 
-  private def synthesizeEntryPoint(
+  private def genEntryPoint(
     subgraph: SubCfg, rettpt: Tree
   )(implicit table: Table): Tree = {
     def findStart(chain: Chain): Zipper = {
@@ -53,16 +53,16 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     defdef
   }
 
-  private def synthesizeEntryPoints(
+  private def genEntryPoints(
     cfg: Cfg, rettpt: Tree
   )(implicit table: Table): Map[Long, Tree] = {
     val entrypoints = for ((orignode, subgraph) <- cfg.subgraphs) yield {
-      (subgraph.uid, synthesizeEntryPoint(subgraph, rettpt))
+      (subgraph.uid, genEntryPoint(subgraph, rettpt))
     }
     entrypoints.toMap
   }
 
-  private def synthesizeEnterMethod(
+  private def genEnterMethod(
     entrypoints: Map[Long, Tree], tpt: Tree
   )(implicit table: Table): Tree = {
     if (entrypoints.size == 1) {
@@ -98,16 +98,18 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     }
   }
 
-  private def synthesizeReturnValueMethod(
+  private def genReturnValueMethod(
     cfg: Cfg, tpt: Tree
   )(implicit table: Table): Tree = {
+    def genReturnValueStore(n: Node) = {
+      val sub = cfg.subgraphs(n.successors.head)
+      val pcvalue = sub.uid
+      val info = table(n.tree.symbol)
+      val rvset = info.setTree(q"v")
+      (pcvalue, q"$rvset")
+    }
     val returnstores = cfg.start.dfs.collect {
-      case n @ Node.ApplyCoroutine(t, chain, uid) =>
-        val sub = cfg.subgraphs(n.successors.head)
-        val pcvalue = sub.uid
-        val info = table(t.symbol)
-        val rvset = info.setTree(q"v")
-        (pcvalue, q"$rvset")
+      case n @ Node.ValCoroutineCall(_, _, _) => genReturnValueStore(n)
     }
 
     val body = {
@@ -169,16 +171,16 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val rettpt = inferReturnType(body)
 
     // generate control flow graph
-    val cfg = generateControlFlowGraph(rettpt)
+    val cfg = genControlFlowGraph(rettpt)
 
     // generate entry points from yields and coroutine applications
-    val entrypoints = synthesizeEntryPoints(cfg, rettpt)
+    val entrypoints = genEntryPoints(cfg, rettpt)
 
     // generate entry method
-    val entermethod = synthesizeEnterMethod(entrypoints, rettpt)
+    val entermethod = genEnterMethod(entrypoints, rettpt)
 
     // generate return value method
-    val returnvaluemethod = synthesizeReturnValueMethod(cfg, rettpt)
+    val returnvaluemethod = genReturnValueMethod(cfg, rettpt)
 
     // generate variable pushes and pops for stack variables
     val varpushes = {

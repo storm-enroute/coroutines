@@ -116,4 +116,13 @@ class CoroutineTest extends FunSuite with Matchers {
       s
     }
   }
+
+  test("coroutine should assign") {
+    val c1 = coroutine { (x: Int) => x }
+    val c2 = coroutine { (x: Int) =>
+      var y = 0
+      y = 1
+      y
+    }
+  }
 }
