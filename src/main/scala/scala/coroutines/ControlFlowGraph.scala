@@ -390,9 +390,9 @@ trait ControlFlowGraph[C <: Context] {
           case q"$_ var $_: $_ = $_" =>
             subgraph.declaredVars(t.symbol) = table(t.symbol)
           case _ =>
-           if (table.contains(t.symbol)) {
-             subgraph.referencedVars(t.symbol) = table(t.symbol)
-           }
+            if (table.contains(t.symbol)) {
+              subgraph.referencedVars(t.symbol) = table(t.symbol)
+            }
         }
       }
 
