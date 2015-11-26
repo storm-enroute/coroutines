@@ -181,9 +181,20 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val returnvaluemethod = synthesizeReturnValueMethod(cfg, rettpt)
 
     // generate variable pushes and pops for stack variables
-    val (varpushes, varpops) = (for ((sym, info) <- table.vars.toList) yield {
-      (info.pushTree, info.popTree)
-    }).unzip
+    val varpushes = {
+      val refnum = table.refvars.size
+      val valnum = table.valvars.size
+      val stacksize = table.initialStackSize
+      List(
+        q"scala.coroutines.common.Stack.bulkPush(c.refstack, $refnum, $stacksize)",
+        q"scala.coroutines.common.Stack.bulkPush(c.valstack, $valnum, $stacksize)"
+      )
+    }
+    val varpops = (for ((sym, info) <- table.vars.toList if info.isRefType) yield {
+      info.popTree
+    }) ++ List(
+      q"scala.coroutines.common.Stack.bulkPop(c.valstack, ${table.valvars.size})"
+    )
 
     // emit coroutine instantiation
     val coroutineTpe = TypeName(s"Arity${args.size}")

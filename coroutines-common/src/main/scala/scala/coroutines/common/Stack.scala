@@ -42,6 +42,29 @@ object Stack {
     """
   }
 
+  def bulkPush[T](stack: Array[T], n: Int, size: Int): Unit = macro bulkPushMacro[T]
+
+  def bulkPushMacro[T: c.WeakTypeTag](c: Context)(
+    stack: c.Tree, n: c.Tree, size: c.Tree
+  ): c.Tree = {
+    import c.universe._
+
+    val q"$path.${name: TermName}" = stack
+    val stackptrname = TermName(s"${name}ptr")
+    val stackptr = q"$path.$stackptrname"
+    val tpe = implicitly[WeakTypeTag[T]]
+    val valnme = TermName(c.freshName())
+    q"""
+      scala.coroutines.common.Stack.init[$tpe]($stack, $size)
+      $stackptr += $n
+      while ($stackptr >= $stack.length) {
+        val nstack = new Array[$tpe]($stack.length * 2)
+        java.lang.System.arraycopy($stack, 0, nstack, 0, $stack.length)
+        $stack = nstack
+      }
+    """
+  }
+
   def pop[T](stack: Array[T]): T = macro popMacro[T]
 
   def popMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree): c.Tree = {
@@ -57,6 +80,21 @@ object Stack {
       val $valnme = $stack($stackptr)
       $stack($stackptr) = null.asInstanceOf[$tpe]
       $valnme
+    """
+  }
+
+  def bulkPop[T](stack: Array[T], n: Int): Unit = macro bulkPopMacro[T]
+
+  def bulkPopMacro[T: c.WeakTypeTag](c: Context)(stack: c.Tree, n: c.Tree): c.Tree = {
+    import c.universe._
+
+    val q"$path.${name: TermName}" = stack
+    val stackptrname = TermName(s"${name}ptr")
+    val stackptr = q"$path.$stackptrname"
+    val tpe = implicitly[WeakTypeTag[T]]
+    val valnme = TermName(c.freshName())
+    q"""
+      $stackptr -= $n
     """
   }
 

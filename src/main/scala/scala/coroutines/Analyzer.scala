@@ -85,10 +85,9 @@ trait Analyzer[C <: Context] {
       if (isRefType) typeOf[AnyRef]
       else typeOf[Long]
     }
-    def initialSize: Tree = q"4"
-    def pushTree: Tree = q"""
+    def pushTree(implicit t: Table): Tree = q"""
       scala.coroutines.common.Stack.push[$stacktpe](
-        c.$stackname, $initialValue, $initialSize)
+        c.$stackname, $initialValue, ${t.initialStackSize})
     """
     def popTree = q"""
       scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
@@ -106,6 +105,7 @@ trait Analyzer[C <: Context] {
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val topChain = new Chain(this, lambda, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
+    def initialStackSize: Int = 4
     object names {
       val coroutineParam = TermName(c.freshName())
     }

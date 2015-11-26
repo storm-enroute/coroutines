@@ -109,4 +109,11 @@ class CoroutineTest extends FunSuite with Matchers {
       x
     }
   }
+
+  test("coroutine should have an integer argument and a string local variable") {
+    val c = coroutine { (x: Int) =>
+      val s = x.toString
+      s
+    }
+  }
 }
