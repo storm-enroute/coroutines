@@ -49,7 +49,6 @@ object Coroutine {
 
   abstract class Definition[T] {
     def enter(c: Coroutine[T]): Unit
-    def pop(c: Coroutine[T]): Unit
   }
 
   def synthesize(c: Context)(f: c.Tree): c.Tree = {
