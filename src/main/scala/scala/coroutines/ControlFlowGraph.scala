@@ -54,6 +54,28 @@ trait ControlFlowGraph[C <: Context] {
       z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
     )(implicit ce: CanEmit, t: Table): Zipper
 
+    protected def generateSaveState(
+      chain: Chain, subgraph: Subgraph
+    )(implicit t: Table): List[Tree] = {
+      val cparam = t.names.coroutineParam
+      // store state for non-val variables in scope
+      val stacksets = for {
+        (sym, info) <- chain.allvars
+        if subgraph.mustStoreVar(sym)
+      } yield {
+        val stack = info.stackname
+        val pos = info.stackpos
+        val encodedval = info.encodeLong(q"${info.name}")
+        q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
+      }
+      // update pc state
+      val pc = subgraph.exitSubgraphs(this).uid
+      val pcstackset = q"""
+        scala.coroutines.common.Stack.update($cparam.pcstack, $pc.toShort)
+      """
+      pcstackset :: stacksets.toList
+    }
+
     def prettyPrint = {
       val text = new StringBuilder
       var count = 0
@@ -64,7 +86,8 @@ trait ControlFlowGraph[C <: Context] {
         }
         seen(n) = count
         val treerepr = shorten(n.tree.toString)
-        text.append(s"$prefix|-> $count: Node($treerepr)\n")
+        text.append(
+          s"$prefix|-> $count: ${getClass.getName.dropWhile(_ != '$')}($treerepr)\n")
         count += 1
         def emitChild(c: Node, newPrefix: String) {
           if (seen.contains(c)) {
@@ -117,19 +140,27 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new IfMerge(tree, chain, uid)
     }
 
-    // class CoroutineApply(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
-    //   def emit(
-    //     z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
-    //   )(implicit ce: CanEmit, table: Table): Zipper = {
-    //     if (successors.length == 1) {
-    //       successors.head.markEmit(z, seen, subgraph)
-    //     } else if (successors.length == 0) {
-    //       // do nothing
-    //       z
-    //     } else sys.error(s"Multiple successors for <$tree>.")
-    //   }
-    //   def copyWithoutSuccessors = new CoroutineApply(tree, chain, uid)
-    // }
+    class ApplyCoroutine(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
+      def emit(
+        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
+      )(implicit ce: CanEmit, table: Table): Zipper = {
+        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
+        val cparam = table.names.coroutineParam
+        val savestate = generateSaveState(chain, subgraph)
+        val termtree = q"""
+          ..$savestate
+          $co.push($cparam)
+          $cparam.target = $co
+        """
+        if (successors.length == 1) {
+          successors.head.markEmit(z, seen, subgraph)
+        } else if (successors.length == 0) {
+          // do nothing
+          z
+        } else sys.error(s"Multiple successors for <$tree>.")
+      }
+      def copyWithoutSuccessors = new ApplyCoroutine(tree, chain, uid)
+    }
 
     class YieldVal(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
       def emit(
@@ -137,25 +168,9 @@ trait ControlFlowGraph[C <: Context] {
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
         val cparam = table.names.coroutineParam
-        // store state for non-val variables in scope
-        val stacksets = for {
-          (sym, info) <- chain.allvars
-          if subgraph.mustStoreVar(sym)
-        } yield {
-          val stack = info.stackname
-          val pos = info.stackpos
-          val encodedval = info.encodeLong(q"${info.name}")
-          q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
-        }
-        // update pc state
-        val pc = subgraph.exitSubgraphs(this).uid
-        val pcstackset = q"""
-          scala.coroutines.common.Stack.update($cparam.pcstack, $pc.toShort)
-        """
-        // store return value
+        val savestate = generateSaveState(chain, subgraph)
         val termtree = q"""
-          ..${stacksets.toList}
-          $pcstackset
+          ..$savestate
           $cparam.result = ${table.untyper.untypecheck(x)}
           return
         """
@@ -170,25 +185,9 @@ trait ControlFlowGraph[C <: Context] {
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldto[$_]($co)" = tree
         val cparam = table.names.coroutineParam
-        // store state for non-val variables in scope
-        val stacksets = for {
-          (sym, info) <- chain.allvars
-          if subgraph.mustStoreVar(sym)
-        } yield {
-          val stack = info.stackname
-          val pos = info.stackpos
-          val encodedval = info.encodeLong(q"${info.name}")
-          q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
-        }
-        // update pc state
-        val pc = subgraph.exitSubgraphs(this).uid
-        val pcstackset = q"""
-          scala.coroutines.common.Stack.update($cparam.pcstack, $pc.toShort)
-        """
-        // store return value
+        val savestate = generateSaveState(chain, subgraph)
         val termtree = q"""
-          ..${stacksets.toList}
-          $pcstackset
+          ..$savestate
           $cparam.target = ${table.untyper.untypecheck(co)}
           return
         """
@@ -238,6 +237,16 @@ trait ControlFlowGraph[C <: Context] {
   def generateControlFlowGraph()(implicit table: Table): Node = {
     def traverse(t: Tree, c: Chain): (Node, Node) = {
       t match {
+        case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+          val n = new Node.YieldVal(t, c, table.newNodeUid())
+          (n, n)
+        case q"coroutines.this.`package`.yieldto[$_]($_)" =>
+          val n = new Node.YieldTo(t, c, table.newNodeUid())
+          (n, n)
+        case q"$_ val $name = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
+          c.addVar(t, name, false)
+          val n = new Node.ApplyCoroutine(t, c, table.newNodeUid())
+          (n, n)
         case q"$_ val $name: $_ = $_" =>
           c.addVar(t, name, false)
           val n = new Node.Statement(t, c, table.newNodeUid())
@@ -245,12 +254,6 @@ trait ControlFlowGraph[C <: Context] {
         case q"$_ var $name: $_ = $_" =>
           c.addVar(t, name, false)
           val n = new Node.Statement(t, c, table.newNodeUid())
-          (n, n)
-        case q"coroutines.this.`package`.yieldval[$_]($_)" =>
-          val n = new Node.YieldVal(t, c, table.newNodeUid())
-          (n, n)
-        case q"coroutines.this.`package`.yieldto[$_]($_)" =>
-          val n = new Node.YieldTo(t, c, table.newNodeUid())
           (n, n)
         case q"if ($cond) $thenbranch else $elsebranch" =>
           val ifnode = new Node.If(t, c, table.newNodeUid())

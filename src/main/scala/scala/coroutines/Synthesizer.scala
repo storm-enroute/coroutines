@@ -172,7 +172,9 @@ extends Analyzer[C] with ControlFlowGraph[C] {
             "Use `call(<coroutine>(<arg0>, ..., <argN>))` instead if you want to " +
             "start a new coroutine.")
         }
-        def push(c: scala.coroutines.Coroutine[$rettpt], ..$args): Unit = {
+        def push(c: scala.coroutines.Coroutine[$rettpt], ..$args)(
+          implicit cc: scala.coroutines.CanCall
+        ): Unit = {
           scala.coroutines.common.Stack.push(c.costack, this, -1)
           scala.coroutines.common.Stack.push(c.pcstack, 0.toShort, -1)
           ..$varpushes
