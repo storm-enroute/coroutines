@@ -64,7 +64,8 @@ trait Analyzer[C <: Context] {
       else sys.error(s"Unknown type: $tpe")
     }
     def encodeLong(t: Tree): Tree = {
-      if (tpe =:= typeOf[Int]) q"$t.toLong"
+      if (tpe =:= typeOf[Boolean]) q"if ($t) 1L else 0L"
+      else if (tpe =:= typeOf[Int]) q"$t.toLong"
       else sys.error(s"Cannot encode type $tpe as Long.")
     }
     def decodeLong(t: Tree): Tree = {
@@ -92,6 +93,7 @@ trait Analyzer[C <: Context] {
     def popTree = q"""
       scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
     """
+    override def toString = s"VarInfo($uid, $sym)"
   }
 
   class Table(val lambda: Tree) {

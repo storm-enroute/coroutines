@@ -35,6 +35,8 @@ trait ControlFlowGraph[C <: Context] {
 
     def copyWithoutSuccessors: Node
 
+    def executionTree: Tree = tree
+
     final def emitCode(z: Zipper, subgraph: Subgraph)(implicit t: Table): Zipper = {
       val seen = mutable.Set[Node]()
       this.markEmit(z, seen, subgraph)
@@ -87,7 +89,7 @@ trait ControlFlowGraph[C <: Context] {
         seen(n) = count
         val treerepr = shorten(n.tree.toString)
         text.append(
-          s"$prefix|-> $count: ${getClass.getName.dropWhile(_ != '$')}($treerepr)\n")
+          s"$prefix|-> $count: ${n.getClass.getName.dropWhile(_ != '$')}($treerepr)\n")
         count += 1
         def emitChild(c: Node, newPrefix: String) {
           if (seen.contains(c)) {
@@ -110,6 +112,10 @@ trait ControlFlowGraph[C <: Context] {
 
   object Node {
     class If(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
+      override def executionTree = {
+        val q"if ($cond) $_ else $_" = tree
+        cond
+      }
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
@@ -320,7 +326,7 @@ trait ControlFlowGraph[C <: Context] {
       seen(n) = current
 
       // detect referenced and declared stack variables
-      for (t <- n.tree) {
+      for (t <- n.executionTree) {
         t match {
           case q"$_ val $_: $_ = $_" =>
             subgraph.declaredVars(t.symbol) = table(t.symbol)
@@ -387,7 +393,7 @@ trait ControlFlowGraph[C <: Context] {
 
     println(subgraphs
       .map(t => {
-        "[" + t.referencedVars.keys.mkString(", ") + "]\n" + t.start.prettyPrint
+        "[" + t.referencedVars.keys.mkString(", ") + "]\n" + t.start.prettyPrint + "\n"
       })
       .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
       .mkString("\n"))

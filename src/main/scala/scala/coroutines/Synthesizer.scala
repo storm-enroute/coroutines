@@ -72,11 +72,8 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   }
 
   private def synthesizeEntryPoints(
-    args: List[Tree], body: Tree, rettpt: Tree
+    cfg: Node, subgraphs: Set[Subgraph], rettpt: Tree
   )(implicit table: Table): Map[Long, Tree] = {
-    val cfg = generateControlFlowGraph()
-    val subgraphs = extractSubgraphs(cfg, rettpt)
-
     val entrypoints = for (subgraph <- subgraphs) yield {
       (subgraph.uid, synthesizeEntryPoint(subgraph, subgraphs, rettpt))
     }
@@ -86,38 +83,60 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   private def synthesizeEnterMethod(
     entrypoints: Map[Long, Tree], tpt: Tree
   )(implicit table: Table): Tree = {
-    val cparamname = table.names.coroutineParam
     if (entrypoints.size == 1) {
       val q"def $ep($_): Unit = $_" = entrypoints(0)
 
       q"""
-        def enter($cparamname: Coroutine[$tpt]): Unit = $ep($cparamname)
+        def enter(c: Coroutine[$tpt]): Unit = $ep(c)
       """
     } else if (entrypoints.size == 2) {
       val q"def $ep0($_): Unit = $_" = entrypoints(0)
       val q"def $ep1($_): Unit = $_" = entrypoints(1)
 
       q"""
-        def enter($cparamname: Coroutine[$tpt]): Unit = {
-          val pc = scala.coroutines.common.Stack.top($cparamname.pcstack)
-          if (pc == 0) $ep0($cparamname) else $ep1($cparamname)
+        def enter(c: Coroutine[$tpt]): Unit = {
+          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+          if (pc == 0) $ep0(c) else $ep1(c)
         }
       """
     } else {
       val cases = for ((index, defdef) <- entrypoints) yield {
         val q"def $ep($_): Unit = $rhs" = defdef
-        cq"${index.toShort} => $ep($cparamname)"
+        cq"${index.toShort} => $ep(c)"
       }
 
       q"""
-        def enter($cparamname: Coroutine[$tpt]): Unit = {
-          val pc: Short = scala.coroutines.common.Stack.top($cparamname.pcstack)
+        def enter(c: Coroutine[$tpt]): Unit = {
+          val pc: Short = scala.coroutines.common.Stack.top(c.pcstack)
           (pc: @scala.annotation.switch) match {
             case ..$cases
           }
         }
       """
     }
+  }
+
+  private def synthesizeReturnPoints(
+    body: Tree, cfg: Node, subgraphs: Set[Subgraph], rettpt: Tree
+  )(implicit table: Table): Map[Long, Tree] = {
+    // for
+    // val trees = body.collect {
+    //   case t @ q"$_ val $_: $_ = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
+    //   case t @ q"$_ var $_: $_ = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
+    // }
+    mutable.Map()
+  }
+
+  private def synthesizeReturnValueMethod(
+    returnpoints: Map[Long, Tree], tpt: Tree
+  )(implicit table: Table): Tree = {
+    q"""
+      def returnValue(c: scala.coroutines.Coroutine[$tpt], v: $tpt)(
+        implicit cc: scala.coroutines.CanCallInternal
+      ): Unit = {
+        ???
+      }
+    """
   }
 
   def synthesize(lambda: Tree): Tree = {
@@ -142,11 +161,23 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     // infer coroutine return type
     val rettpt = inferReturnType(body)
 
-    // generate entry points from yields and coroutine applies
-    val entrypoints = synthesizeEntryPoints(args, body, rettpt)
+    // generate control flow graph
+    val cfg = generateControlFlowGraph()
+
+    // extract subgraphs in the control flow graph
+    val subgraphs = extractSubgraphs(cfg, rettpt)
+
+    // generate entry points from yields and coroutine applications
+    val entrypoints = synthesizeEntryPoints(cfg, subgraphs, rettpt)
 
     // generate entry method
     val entermethod = synthesizeEnterMethod(entrypoints, rettpt)
+
+    // generate return point methods for coroutine applications
+    val returnpoints = synthesizeReturnPoints(body, cfg, subgraphs, rettpt)
+
+    // generate return value method
+    val returnvaluemethod = synthesizeReturnValueMethod(returnpoints, rettpt)
 
     // generate variable pushes and pops for stack variables
     val (varpushes, varpops) = (for ((sym, info) <- table.vars.toList) yield {
@@ -184,13 +215,9 @@ extends Analyzer[C] with ControlFlowGraph[C] {
           scala.coroutines.common.Stack.pop(c.costack)
           ..$varpops
         }
-        def returnValue(c: scala.coroutines.Coroutine[$rettpt], v: $rettpt)(
-          implicit cc: scala.coroutines.CanCallInternal
-        ): Unit = {
-          ???
-        }
         $entermethod
         ..$entrypointmethods
+        $returnvaluemethod
       }
     """
     println(co)

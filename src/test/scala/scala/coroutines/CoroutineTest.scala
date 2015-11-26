@@ -97,4 +97,18 @@ class CoroutineTest extends FunSuite with Matchers {
       else -x
     }
   }
+
+  test("coroutine should contain two applications at the end of two branches") {
+    val c1 = coroutine { (x: Int) => x }
+    val c2 = coroutine { (x: Int) =>
+      if (x > 0) {
+        val y = c1(x)
+        y
+      } else {
+        val z = c1(-x)
+        z
+      }
+      x
+    }
+  }
 }
