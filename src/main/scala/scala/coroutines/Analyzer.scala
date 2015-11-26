@@ -147,6 +147,21 @@ trait Analyzer[C <: Context] {
     }
   }
 
+  object ValDecl {
+    def unapply(t: Tree): Option[Tree] = t match {
+      case q"$_ val $name: $_ = $_" =>
+        Some(t)
+      case q"$_ var $name: $_ = $_" =>
+        Some(t)
+      case q"{ $_ val $name: $_ = $_ }" =>
+        Some(t.collect({ case t @ q"$_ val $_: $_ = $_" => t }).head)
+      case q"{ $_ var $name: $_ = $_ }" =>
+        Some(t.collect({ case t @ q"$_ var $_: $_ = $_" => t }).head)
+      case _ =>
+        None
+    }
+  }
+
   def isCoroutineDefType(tpe: Type) = {
     val codefsym = typeOf[Coroutine.Definition[_]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) != NoType

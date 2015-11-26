@@ -15,9 +15,9 @@ class Coroutine[@specialized +T] {
   import Coroutine._
   private[coroutines] var costackptr = 0
   private[coroutines] var costack: Array[Definition[T]] @uncheckedVariance =
-    new Array[Definition[T]](INITIAL_CO_STACK_SIZE)
+    new Array[Definition[T]](INITIAL_COSTACK_SIZE)
   private[coroutines] var pcstackptr = 0
-  private[coroutines] var pcstack = new Array[Short](INITIAL_CO_STACK_SIZE)
+  private[coroutines] var pcstack = new Array[Short](INITIAL_COSTACK_SIZE)
   private[coroutines] var refstackptr = 0
   private[coroutines] var refstack: Array[AnyRef] = _
   private[coroutines] var valstackptr = 0
@@ -30,7 +30,7 @@ class Coroutine[@specialized +T] {
 
 
 object Coroutine {
-  private[coroutines] val INITIAL_CO_STACK_SIZE = 4
+  private[coroutines] val INITIAL_COSTACK_SIZE = 4
 
   @tailrec
   private[coroutines] final def enter[T](c: Coroutine[T]): T = {

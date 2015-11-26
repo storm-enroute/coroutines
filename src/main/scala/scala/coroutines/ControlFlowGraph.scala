@@ -132,7 +132,8 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new If(tree, chain, uid)
     }
 
-    class IfMerge(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
+    class IfMerge(val chain: Chain, val uid: Long) extends Node {
+      val tree: Tree = q"()"
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
       )(implicit ce: CanEmit, table: Table): Zipper = {
@@ -143,7 +144,7 @@ trait ControlFlowGraph[C <: Context] {
           z
         } else sys.error(s"Multiple successors for <$tree>.")
       }
-      def copyWithoutSuccessors = new IfMerge(tree, chain, uid)
+      def copyWithoutSuccessors = new IfMerge(chain, uid)
     }
 
     class ApplyCoroutine(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
@@ -249,20 +250,6 @@ trait ControlFlowGraph[C <: Context] {
 
   def generateControlFlowGraph()(implicit table: Table): Node = {
     def traverse(t: Tree, c: Chain): (Node, Node) = {
-      object ValDef {
-        def unapply(t: Tree): Option[Tree] = t match {
-          case q"$_ val $name: $_ = $_" =>
-            Some(t)
-          case q"$_ var $name: $_ = $_" =>
-            Some(t)
-          case q"{ $_ val $name: $_ = $_ }" =>
-            Some(t.collect({ case t @ q"$_ val $_: $_ = $_" => t }).head)
-          case q"{ $_ var $name: $_ = $_ }" =>
-            Some(t.collect({ case t @ q"$_ var $_: $_ = $_" => t }).head)
-          case _ =>
-            None
-        }
-      }
       t match {
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
           val n = new Node.YieldVal(t, c, table.newNodeUid())
@@ -270,26 +257,33 @@ trait ControlFlowGraph[C <: Context] {
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
           val n = new Node.YieldTo(t, c, table.newNodeUid())
           (n, n)
-        case ValDef(t @ q"$_ val $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
+        case ValDecl(t @ q"$_ val $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
           c.addVar(t, false)
           val n = new Node.ApplyCoroutine(t, c, table.newNodeUid())
           (n, n)
-        case ValDef(t @ q"$_ var $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
+        case ValDecl(t @ q"$_ var $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
           c.addVar(t, false)
           val n = new Node.ApplyCoroutine(t, c, table.newNodeUid())
           (n, n)
-        case ValDef(t) =>
+        case ValDecl(t) =>
           c.addVar(t, false)
           val n = new Node.Statement(t, c, table.newNodeUid())
           (n, n)
         case q"if ($cond) $thenbranch else $elsebranch" =>
           val ifnode = new Node.If(t, c, table.newNodeUid())
-          val mergenode = new Node.IfMerge(q"{}", c, table.newNodeUid())
+          val mergenode = new Node.IfMerge(c, table.newNodeUid())
           def addBranch(branch: Tree) {
             val nestedchain = c.newChain(t)
             val (childhead, childlast) = traverse(branch, nestedchain)
             ifnode.successors ::= childhead
-            childlast.successors ::= mergenode
+            childlast.tree match {
+              case ValDecl(_) =>
+                val endnode = new Node.Statement(q"()", nestedchain, table.newNodeUid())
+                childlast.successors ::= endnode
+                endnode.successors ::= mergenode
+              case _ =>
+                childlast.successors ::= mergenode
+            }
           }
           addBranch(thenbranch)
           addBranch(elsebranch)
