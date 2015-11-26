@@ -40,7 +40,11 @@ object Coroutine {
       val nc = c.target
       c.target = null
       enter(nc)
-    } else c.result
+    } else {
+      val res = c.result
+      c.result = null.asInstanceOf[T]
+      res
+    }
   }
 
   abstract class Definition[T] {
