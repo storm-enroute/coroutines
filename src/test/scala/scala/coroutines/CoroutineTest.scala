@@ -104,7 +104,7 @@ class CoroutineTest extends FunSuite with Matchers {
       if (x > 0) {
         val y = c1(x)
       } else {
-        val z = c1(-x)
+         val z = c1(-x)
       }
       x
     }

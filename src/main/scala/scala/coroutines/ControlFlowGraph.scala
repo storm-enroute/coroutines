@@ -249,8 +249,7 @@ trait ControlFlowGraph[C <: Context] {
 
   def generateControlFlowGraph()(implicit table: Table): Node = {
     def traverse(t: Tree, c: Chain): (Node, Node) = {
-      println(t)
-      object valDefSym {
+      object ValDef {
         def unapply(t: Tree): Option[Tree] = t match {
           case q"$_ val $name: $_ = $_" =>
             Some(t)
@@ -271,11 +270,15 @@ trait ControlFlowGraph[C <: Context] {
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
           val n = new Node.YieldTo(t, c, table.newNodeUid())
           (n, n)
-        case q"$_ val $name = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
+        case ValDef(t @ q"$_ val $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
           c.addVar(t, false)
           val n = new Node.ApplyCoroutine(t, c, table.newNodeUid())
           (n, n)
-        case valDefSym(t) =>
+        case ValDef(t @ q"$_ var $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
+          c.addVar(t, false)
+          val n = new Node.ApplyCoroutine(t, c, table.newNodeUid())
+          (n, n)
+        case ValDef(t) =>
           c.addVar(t, false)
           val n = new Node.Statement(t, c, table.newNodeUid())
           (n, n)
@@ -315,9 +318,7 @@ trait ControlFlowGraph[C <: Context] {
 
     for (t <- args) {
       val q"$_ val $name: $_ = $_" = t
-      println("adding arg: " + t)
       table.topChain.addVar(t, true)
-      println(table.vars)
     }
 
     // traverse tree to construct CFG and extract local variables
@@ -345,10 +346,8 @@ trait ControlFlowGraph[C <: Context] {
 
       // detect referenced and declared stack variables
       for (t <- n.code) {
-        println(t)
         t match {
           case q"$_ val $_: $_ = $_" =>
-            println(table.vars, t.symbol)
             subgraph.declaredVars(t.symbol) = table(t.symbol)
           case _ =>
            if (table.contains(t.symbol)) {

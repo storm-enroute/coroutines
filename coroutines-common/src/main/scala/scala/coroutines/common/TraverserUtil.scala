@@ -106,6 +106,10 @@ class TraverserUtil[C <: Context](val c: C) {
         case (q"{ ..$ss0 }", q"{ ..$ss1 }") if ss0.length > 1 && ss1.length > 1 =>
           // stats
           for ((a, b) <- ss0 zip ss1) traverse(a, b)
+        case (Block(List(s0), e0), Block(List(s1), e1)) =>
+          // stats, single
+          traverse(s0, s1)
+          traverse(e0, e1)
         case (tq"$tpt0.type", tq"$tpt1.type") =>
           // singleton type
           traverse(tpt0, tpt1)
