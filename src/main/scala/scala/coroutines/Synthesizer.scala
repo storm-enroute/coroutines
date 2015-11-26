@@ -16,26 +16,8 @@ private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C] with ControlFlowGraph[C] {
   import c.universe._
 
-  private def inferReturnType(body: Tree): Tree = {
-    // return type must correspond to the return type of the function literal
-    val rettpe = body.tpe
-
-    // return type is the lub of the function return type and yield argument types
-    def isCoroutinesPackage(q: Tree) = q match {
-      case q"coroutines.this.`package`" => true
-      case t => false
-    }
-    // TODO: ensure that this does not capture constraints from nested class scopes
-    // TODO: ensure that this does not collect nested coroutine invocations
-    val constraintTpes = body.collect {
-      case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
-      case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
-    }
-    tq"${lub(rettpe :: constraintTpes)}"
-  }
-
   private def synthesizeEntryPoint(
-    subgraph: Subgraph, subgraphs: Set[Subgraph], rettpt: Tree
+    subgraph: SubCfg, rettpt: Tree
   )(implicit table: Table): Tree = {
     def findStart(chain: Chain): Zipper = {
       var z = {
@@ -72,10 +54,10 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   }
 
   private def synthesizeEntryPoints(
-    cfg: Node, subgraphs: Set[Subgraph], rettpt: Tree
+    cfg: Cfg, rettpt: Tree
   )(implicit table: Table): Map[Long, Tree] = {
-    val entrypoints = for (subgraph <- subgraphs) yield {
-      (subgraph.uid, synthesizeEntryPoint(subgraph, subgraphs, rettpt))
+    val entrypoints = for ((orignode, subgraph) <- cfg.subgraphs) yield {
+      (subgraph.uid, synthesizeEntryPoint(subgraph, rettpt))
     }
     entrypoints.toMap
   }
@@ -117,8 +99,11 @@ extends Analyzer[C] with ControlFlowGraph[C] {
   }
 
   private def synthesizeReturnPoints(
-    body: Tree, cfg: Node, subgraphs: Set[Subgraph], rettpt: Tree
+    body: Tree, cfg: Cfg, rettpt: Tree
   )(implicit table: Table): Map[Long, Tree] = {
+    // cfg.start.dfs.collect {
+    //   case n @ ApplyCoroutine(tree, chain, uid) =>
+    // }
     // val trees = body.collect {
     //   case t @ q"$_ val $_: $_ = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
     //   case t @ q"$_ var $_: $_ = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
@@ -161,19 +146,16 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val rettpt = inferReturnType(body)
 
     // generate control flow graph
-    val cfg = generateControlFlowGraph()
-
-    // extract subgraphs in the control flow graph
-    val subgraphs = extractSubgraphs(cfg, rettpt)
+    val cfg = generateControlFlowGraph(rettpt)
 
     // generate entry points from yields and coroutine applications
-    val entrypoints = synthesizeEntryPoints(cfg, subgraphs, rettpt)
+    val entrypoints = synthesizeEntryPoints(cfg, rettpt)
 
     // generate entry method
     val entermethod = synthesizeEnterMethod(entrypoints, rettpt)
 
     // generate return point methods for coroutine applications
-    val returnpoints = synthesizeReturnPoints(body, cfg, subgraphs, rettpt)
+    val returnpoints = synthesizeReturnPoints(body, cfg, rettpt)
 
     // generate return value method
     val returnvaluemethod = synthesizeReturnValueMethod(returnpoints, rettpt)

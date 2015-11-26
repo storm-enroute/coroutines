@@ -49,13 +49,13 @@ trait ControlFlowGraph[C <: Context] {
       seen.toSeq
     }
 
-    final def emitCode(z: Zipper, subgraph: Subgraph)(implicit t: Table): Zipper = {
+    final def emitCode(z: Zipper, subgraph: SubCfg)(implicit t: Table): Zipper = {
       val seen = mutable.Set[Node]()
       this.markEmit(z, seen, subgraph)
     }
 
     final def markEmit(
-      z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
+      z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
     )(implicit t: Table): Zipper = {
       import Permissions.canEmit
       if (!seen(this)) {
@@ -65,11 +65,11 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     def emit(
-      z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
+      z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
     )(implicit ce: CanEmit, t: Table): Zipper
 
     protected def generateSaveState(
-      chain: Chain, subgraph: Subgraph
+      chain: Chain, subgraph: SubCfg
     )(implicit t: Table): List[Tree] = {
       val cparam = t.names.coroutineParam
       // store state for non-val variables in scope
@@ -123,13 +123,13 @@ trait ControlFlowGraph[C <: Context] {
   }
 
   object Node {
-    class If(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
+    case class If(tree: Tree, chain: Chain, uid: Long) extends Node {
       override def code = {
         val q"if ($cond) $_ else $_" = tree
         cond
       }
       def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"if ($cond) $_ else $_" = tree
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
@@ -144,10 +144,10 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new If(tree, chain, uid)
     }
 
-    class IfMerge(val chain: Chain, val uid: Long) extends Node {
+    case class IfMerge(chain: Chain, uid: Long) extends Node {
       val tree: Tree = q"()"
       def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         if (successors.length == 1) {
           successors.head.markEmit(z, seen, subgraph)
@@ -159,9 +159,13 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new IfMerge(chain, uid)
     }
 
-    class ApplyCoroutine(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
+    case class ApplyCoroutine(tree: Tree, chain: Chain, uid: Long) extends Node {
+      def coroutine: Tree = {
+        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
+        co
+      }
       def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"$_ val $_: $_ = $co.apply(..$args)" = tree
         val cparam = table.names.coroutineParam
@@ -178,9 +182,9 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new ApplyCoroutine(tree, chain, uid)
     }
 
-    class YieldVal(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
+    case class YieldVal(tree: Tree, chain: Chain, uid: Long) extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
         val cparam = table.names.coroutineParam
@@ -195,9 +199,9 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new YieldVal(tree, chain, uid)
     }
 
-    class YieldTo(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
+    case class YieldTo(tree: Tree, chain: Chain, uid: Long) extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldto[$_]($co)" = tree
         val cparam = table.names.coroutineParam
@@ -212,9 +216,9 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = new YieldTo(tree, chain, uid)
     }
  
-   class Statement(val tree: Tree, val chain: Chain, val uid: Long) extends Node {
+   case class Statement(tree: Tree, chain: Chain, uid: Long) extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: Subgraph
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         // inside the control-flow-construct, normal statement
         if (successors.length == 1) {
@@ -248,10 +252,14 @@ trait ControlFlowGraph[C <: Context] {
     }
   }
 
-  class Subgraph(val uid: Long) {
+  class Cfg(val start: Node) {
+    val subgraphs = mutable.Map[Node, SubCfg]()
+  }
+
+  class SubCfg(val uid: Long) {
     val referencedVars = mutable.LinkedHashMap[Symbol, VarInfo]()
     val declaredVars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    val exitSubgraphs = mutable.LinkedHashMap[Node, Subgraph]()
+    val exitSubgraphs = mutable.LinkedHashMap[Node, SubCfg]()
     var start: Node = _
     def usesVar(sym: Symbol) = referencedVars.contains(sym)
     def declaresVar(sym: Symbol) = declaredVars.contains(sym)
@@ -260,7 +268,7 @@ trait ControlFlowGraph[C <: Context] {
     }
   }
 
-  def generateControlFlowGraph()(implicit table: Table): Node = {
+  def generateControlFlowGraph(tpt: Tree)(implicit table: Table): Cfg = {
     def traverse(t: Tree, c: Chain): (Node, Node) = {
       t match {
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
@@ -330,21 +338,28 @@ trait ControlFlowGraph[C <: Context] {
     // traverse tree to construct CFG and extract local variables
     val (head, last) = traverse(body, table.topChain)
     println(head.prettyPrint)
-    head
+
+    // extract subgraphs in the control flow graph
+    val subgraphs = extractSubgraphs(head, tpt)
+
+    // construct graph object
+    val cfg = new Cfg(head)
+    cfg.subgraphs ++= subgraphs
+    cfg
   }
 
   def extractSubgraphs(
-    cfg: Node, rettpt: Tree
-  )(implicit table: Table): Set[Subgraph] = {
-    val subgraphs = mutable.LinkedHashSet[Subgraph]()
-    val exitPoints = mutable.Map[Subgraph, mutable.Map[Node, Long]]()
+    start: Node, rettpt: Tree
+  )(implicit table: Table): Map[Node, SubCfg] = {
+    val subgraphs = mutable.LinkedHashMap[Node, SubCfg]()
+    val exitPoints = mutable.Map[SubCfg, mutable.Map[Node, Long]]()
     val seenEntries = mutable.Set[Node]()
     val nodefront = mutable.Queue[Node]()
-    seenEntries += cfg
-    nodefront.enqueue(cfg)
+    seenEntries += start
+    nodefront.enqueue(start)
 
     def extract(
-      n: Node, seen: mutable.Map[Node, Node], subgraph: Subgraph
+      n: Node, seen: mutable.Map[Node, Node], subgraph: SubCfg
     ): Node = {
       // duplicate and mark current node as seen
       val current = n.copyWithoutSuccessors
@@ -404,21 +419,22 @@ trait ControlFlowGraph[C <: Context] {
 
     // as long as there are more nodes on the expansion front, extract them
     while (nodefront.nonEmpty) {
-      val subgraph = new Subgraph(table.newSubgraphUid())
+      val subgraph = new SubCfg(table.newSubgraphUid())
+      val node = nodefront.dequeue()
       exitPoints(subgraph) = mutable.Map[Node, Long]()
-      subgraph.start = extract(nodefront.dequeue(), mutable.Map(), subgraph)
-      subgraphs += subgraph
+      subgraph.start = extract(node, mutable.Map(), subgraph)
+      subgraphs(node) = subgraph
     }
 
     // assign respective subgraph reference to each exit point node
-    val startPoints = subgraphs.map(s => s.start.uid -> s).toMap
+    val startPoints = subgraphs.map(s => s._2.start.uid -> s._2).toMap
     for ((subgraph, exitMap) <- exitPoints; (node, nextUid) <- exitMap) {
       subgraph.exitSubgraphs(node) = startPoints(nextUid)
     }
 
     println(subgraphs
-      .map(t => {
-        "[" + t.referencedVars.keys.mkString(", ") + "]\n" + t.start.prettyPrint + "\n"
+      .map({ case (k, v) => 
+        "[" + v.referencedVars.keys.mkString(", ") + "]\n" + v.start.prettyPrint + "\n"
       })
       .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
       .mkString("\n"))

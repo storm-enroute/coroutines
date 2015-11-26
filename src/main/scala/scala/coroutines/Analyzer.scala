@@ -171,4 +171,22 @@ trait Analyzer[C <: Context] {
     val codeftpe = typeOf[Coroutine.Definition[_]].typeConstructor
     appliedType(codeftpe, List(tpe))
   }
+
+  def inferReturnType(body: Tree): Tree = {
+    // return type must correspond to the return type of the function literal
+    val rettpe = body.tpe
+
+    // return type is the lub of the function return type and yield argument types
+    def isCoroutinesPackage(q: Tree) = q match {
+      case q"coroutines.this.`package`" => true
+      case t => false
+    }
+    // TODO: ensure that this does not capture constraints from nested class scopes
+    // TODO: ensure that this does not collect nested coroutine invocations
+    val constraintTpes = body.collect {
+      case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
+      case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
+    }
+    tq"${lub(rettpe :: constraintTpes)}"
+  }
 }
