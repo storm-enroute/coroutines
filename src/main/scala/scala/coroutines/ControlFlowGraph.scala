@@ -150,15 +150,9 @@ trait ControlFlowGraph[C <: Context] {
         val termtree = q"""
           ..$savestate
           $co.push($cparam)
-          $cparam.target = $co
+          $cparam.target = $cparam
         """
         z.append(termtree)
-        if (successors.length == 1) {
-          successors.head.markEmit(z, seen, subgraph)
-        } else if (successors.length == 0) {
-          // do nothing
-          z
-        } else sys.error(s"Multiple successors for <$tree>.")
       }
       def copyWithoutSuccessors = new ApplyCoroutine(tree, chain, uid)
     }
@@ -320,14 +314,13 @@ trait ControlFlowGraph[C <: Context] {
 
       // detect referenced and declared stack variables
       for (t <- n.tree) {
-        if (table.contains(t.symbol)) {
-          subgraph.referencedVars(t.symbol) = table(t.symbol)
-        }
         t match {
           case q"$_ val $_: $_ = $_" =>
             subgraph.declaredVars(t.symbol) = table(t.symbol)
           case _ =>
-            // do nothing
+           if (table.contains(t.symbol)) {
+             subgraph.referencedVars(t.symbol) = table(t.symbol)
+           }
         }
       }
 
