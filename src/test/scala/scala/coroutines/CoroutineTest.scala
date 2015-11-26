@@ -121,7 +121,7 @@ class CoroutineTest extends FunSuite with Matchers {
     val c1 = coroutine { (x: Int) => x }
     val c2 = coroutine { (x: Int) =>
       var y = 0
-      y = 1
+       y = 1
       y
     }
   }

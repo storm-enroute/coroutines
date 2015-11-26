@@ -178,7 +178,8 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = IfMerge(chain, uid)
     }
 
-    case class While(tree: Tree, chain: Chain, uid: Long) extends Node {
+    case class While(term: WhileTerm, tree: Tree, chain: Chain, uid: Long)
+    extends Node {
       override def code = {
         val q"while ($cond) $_" = tree
         cond
@@ -186,13 +187,14 @@ trait ControlFlowGraph[C <: Context] {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
-        val q"while ($cond) $_" = tree
+        val q"while ($cond) $body" = tree
         val untypedcond = table.untyper.untypecheck(cond)
+        val untypedbody = table.untyper.untypecheck(body)
         val z1 = z.descend(trees => q"while ($untypedcond) ..$trees")
-        val bodynode = this.successors(0)
-        bodynode.markEmit(z1, seen, subgraph).ascend
+        val z2 = z1.append(untypedbody)
+        term.markEmit(z2, seen, subgraph)
       }
-      def copyWithoutSuccessors = While(tree, chain, uid)
+      def copyWithoutSuccessors = While(term, tree, chain, uid)
     }
 
     case class WhileTerm(chain: Chain, uid: Long) extends Node {
@@ -202,10 +204,12 @@ trait ControlFlowGraph[C <: Context] {
       )(implicit ce: CanEmit, table: Table): Zipper = {
         if (successors.length == 1) {
           // do nothing
-          z
+          val z1 = z.ascend
+          successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 2) {
-          println(successors)
-          successors.last.markEmit(z, seen, subgraph)
+          val z1 = z.ascend
+          val z2 = successors.last.markEmit(z1, seen, subgraph)
+          successors.head.markEmit(z2, seen, subgraph)
         } else sys.error(s"Number of successors for <$tree>: ${successors.length}")
       }
       def copyWithoutSuccessors = WhileTerm(chain, uid)
@@ -359,8 +363,8 @@ trait ControlFlowGraph[C <: Context] {
           addBranch(elsebranch)
           (ifnode, mergenode)
         case q"while ($cond) $body" =>
-          val whilenode = Node.While(t, ch, table.newNodeUid())
           val termnode = Node.WhileTerm(ch, table.newNodeUid())
+          val whilenode = Node.While(termnode, t, ch, table.newNodeUid())
           val nestedchain = ch.newChain(t)
           val (childhead, childlast) = traverse(body, nestedchain)
           whilenode.successors ::= childhead
