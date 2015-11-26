@@ -98,27 +98,26 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     }
   }
 
-  private def synthesizeReturnPoints(
-    body: Tree, cfg: Cfg, rettpt: Tree
-  )(implicit table: Table): Map[Long, Tree] = {
-    // cfg.start.dfs.collect {
-    //   case n @ ApplyCoroutine(tree, chain, uid) =>
-    // }
-    // val trees = body.collect {
-    //   case t @ q"$_ val $_: $_ = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
-    //   case t @ q"$_ var $_: $_ = $co.apply($_)" if isCoroutineDefType(co.tpe) =>
-    // }
-    mutable.Map()
-  }
-
   private def synthesizeReturnValueMethod(
-    returnpoints: Map[Long, Tree], tpt: Tree
+    cfg: Cfg, tpt: Tree
   )(implicit table: Table): Tree = {
+    val returncases = cfg.start.dfs.collect {
+      case n @ Node.ApplyCoroutine(t, chain, uid) =>
+        val sub = cfg.subgraphs(n.successors.head)
+        val pcvalue = sub.uid
+        val info = table(t.symbol)
+        val rvset = info.setTree(q"v")
+        cq"$pcvalue => $rvset"
+    }
+
     q"""
-      def returnValue(c: scala.coroutines.Coroutine[$tpt], v: $tpt)(
+      def returnvalue(c: scala.coroutines.Coroutine[$tpt], v: $tpt)(
         implicit cc: scala.coroutines.CanCallInternal
       ): Unit = {
-        ???
+        val pc = scala.coroutines.common.Stack.top(c.pcstack)
+        (pc: @scala.annotation.switch) match {
+          case ..$returncases
+        }
       }
     """
   }
@@ -154,11 +153,8 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     // generate entry method
     val entermethod = synthesizeEnterMethod(entrypoints, rettpt)
 
-    // generate return point methods for coroutine applications
-    val returnpoints = synthesizeReturnPoints(body, cfg, rettpt)
-
     // generate return value method
-    val returnvaluemethod = synthesizeReturnValueMethod(returnpoints, rettpt)
+    val returnvaluemethod = synthesizeReturnValueMethod(cfg, rettpt)
 
     // generate variable pushes and pops for stack variables
     val (varpushes, varpops) = (for ((sym, info) <- table.vars.toList) yield {

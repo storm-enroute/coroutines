@@ -238,7 +238,7 @@ trait ControlFlowGraph[C <: Context] {
                 import scala.coroutines.Permission.canCall
                 $cparam.target = $cparam
                 scala.coroutines.common.Stack.top($cparam.costack)
-                  .returnValue($cparam, $untypedTree)
+                  .returnvalue($cparam, $untypedTree)
               }
               return
             """
@@ -272,33 +272,33 @@ trait ControlFlowGraph[C <: Context] {
     def traverse(t: Tree, c: Chain): (Node, Node) = {
       t match {
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
-          val n = new Node.YieldVal(t, c, table.newNodeUid())
+          val n = Node.YieldVal(t, c, table.newNodeUid())
           (n, n)
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
-          val n = new Node.YieldTo(t, c, table.newNodeUid())
+          val n = Node.YieldTo(t, c, table.newNodeUid())
           (n, n)
         case ValDecl(t @ q"$_ val $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
           c.addVar(t, false)
-          val n = new Node.ApplyCoroutine(t, c, table.newNodeUid())
+          val n = Node.ApplyCoroutine(t, c, table.newNodeUid())
           (n, n)
         case ValDecl(t @ q"$_ var $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
           c.addVar(t, false)
-          val n = new Node.ApplyCoroutine(t, c, table.newNodeUid())
+          val n = Node.ApplyCoroutine(t, c, table.newNodeUid())
           (n, n)
         case ValDecl(t) =>
           c.addVar(t, false)
-          val n = new Node.Statement(t, c, table.newNodeUid())
+          val n = Node.Statement(t, c, table.newNodeUid())
           (n, n)
         case q"if ($cond) $thenbranch else $elsebranch" =>
-          val ifnode = new Node.If(t, c, table.newNodeUid())
-          val mergenode = new Node.IfMerge(c, table.newNodeUid())
+          val ifnode = Node.If(t, c, table.newNodeUid())
+          val mergenode = Node.IfMerge(c, table.newNodeUid())
           def addBranch(branch: Tree) {
             val nestedchain = c.newChain(t)
             val (childhead, childlast) = traverse(branch, nestedchain)
             ifnode.successors ::= childhead
             childlast.tree match {
               case ValDecl(_) =>
-                val endnode = new Node.Statement(q"()", nestedchain, table.newNodeUid())
+                val endnode = Node.Statement(q"()", nestedchain, table.newNodeUid())
                 childlast.successors ::= endnode
                 endnode.successors ::= mergenode
               case _ =>
@@ -319,7 +319,7 @@ trait ControlFlowGraph[C <: Context] {
           }
           (first, current)
         case _ =>
-          val n = new Node.Statement(t, c, table.newNodeUid())
+          val n = Node.Statement(t, c, table.newNodeUid())
           (n, n)
       }
     }
