@@ -284,26 +284,26 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = YieldTo(tree, chain, uid)
     }
 
-    case class Statement(tree: Tree, chain: Chain, uid: Long) extends Node {
+    case class Statement(atreturn: Boolean, tree: Tree, chain: Chain, uid: Long)
+    extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         // inside the control-flow-construct, normal statement
-        if (successors.length == 1) {
+        if (atreturn) {
+          // if this was the last expression in the original graph,
+          // then pop the stack and store expression to the return value position
+          val termtree = genExit(this, subgraph)
+          z.append(termtree)
+        } else if (successors.length == 1) {
           val z1 = z.append(table.untyper.untypecheck(tree))
           successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 0) {
-          if (!subgraph.exitSubgraphs.contains(this)) {
-            // if this was the last expression in the original graph,
-            // then pop the stack and store expression to the return value position
-            val termtree = genExit(this, subgraph)
-            z.append(termtree)
-          } else {
-            z
-          }
+          // do nothing
+          z
         } else sys.error(s"Multiple successors for <$tree>.")
       }
-      def copyWithoutSuccessors = Statement(tree, chain, uid)
+      def copyWithoutSuccessors = Statement(atreturn, tree, chain, uid)
     }
   }
 
@@ -325,7 +325,7 @@ trait ControlFlowGraph[C <: Context] {
   }
 
   def genControlFlowGraph(tpt: Tree)(implicit table: Table): Cfg = {
-    def traverse(t: Tree, ch: Chain): (Node, Node) = {
+    def traverse(t: Tree, ch: Chain, atreturn: Boolean): (Node, Node) = {
       t match {
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
           val n = Node.YieldVal(t, ch, table.newNodeUid())
@@ -343,7 +343,7 @@ trait ControlFlowGraph[C <: Context] {
           (n, n)
         case ValDecl(t) =>
           ch.addVar(t, false)
-          val n = Node.Statement(t, ch, table.newNodeUid())
+          val n = Node.Statement(atreturn, t, ch, table.newNodeUid())
           (n, n)
         case q"return $_" =>
           c.abort(t.pos, "Return statements not allowed inside coroutines.")
@@ -352,11 +352,12 @@ trait ControlFlowGraph[C <: Context] {
           val ifnode = Node.If(termnode.uid, t, ch, table.newNodeUid())
           def addBranch(branch: Tree) {
             val nestedchain = ch.newChain(t)
-            val (childhead, childlast) = traverse(branch, nestedchain)
+            val (childhead, childlast) = traverse(branch, nestedchain, atreturn)
             ifnode.successors ::= childhead
             childlast.tree match {
               case ValDecl(_) =>
-                val endnode = Node.Statement(q"()", nestedchain, table.newNodeUid())
+                val endnode =
+                  Node.Statement(atreturn, q"()", nestedchain, table.newNodeUid())
                 childlast.successors ::= endnode
                 endnode.successors ::= termnode
               case _ =>
@@ -370,23 +371,24 @@ trait ControlFlowGraph[C <: Context] {
           val termnode = Node.WhileTerm(ch, table.newNodeUid())
           val whilenode = Node.While(t, ch, table.newNodeUid())
           val nestedchain = ch.newChain(t)
-          val (childhead, childlast) = traverse(body, nestedchain)
+          val (childhead, childlast) = traverse(body, nestedchain, false)
           whilenode.successors ::= childhead
           childlast.successors ::= termnode
           termnode.successors ::= whilenode
           (whilenode, termnode)
         case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
           val nestedchain = ch.newChain(t)
-          val (first, childlast) = traverse(stats.head, nestedchain)
+          val (first, childlast) = traverse(stats.head, nestedchain, false)
           var current = childlast
-          for (stat <- stats.tail) {
-            val (childhead, childlast) = traverse(stat, nestedchain)
+          val lentail = stats.tail.length
+          for ((stat, i) <- stats.tail.zipWithIndex) {
+            val (childhead, childlast) = traverse(stat, nestedchain, i == lentail - 1)
             current.successors ::= childhead
             current = childlast
           }
           (first, current)
         case _ =>
-          val n = Node.Statement(t, ch, table.newNodeUid())
+          val n = Node.Statement(atreturn, t, ch, table.newNodeUid())
           (n, n)
       }
     }
@@ -403,7 +405,7 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     // traverse tree to construct CFG and extract local variables
-    val (head, last) = traverse(body, table.topChain)
+    val (head, last) = traverse(body, table.topChain, true)
     println(head.prettyPrint)
 
     // extract subgraphs in the control flow graph
