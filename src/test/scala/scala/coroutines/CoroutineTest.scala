@@ -103,10 +103,8 @@ class CoroutineTest extends FunSuite with Matchers {
     val c2 = coroutine { (x: Int) =>
       if (x > 0) {
         val y = c1(x)
-        y
       } else {
         val z = c1(-x)
-        z
       }
       x
     }

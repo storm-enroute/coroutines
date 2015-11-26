@@ -134,8 +134,9 @@ trait Analyzer[C <: Context] {
       vars.iterator ++ (if (parent != null) parent.allvars else Iterator.empty)
     }
     def newChain(subtree: Tree) = new Chain(table, subtree, this)
-    def addVar(valdef: Tree, name: TermName, isArg: Boolean) {
+    def addVar(valdef: Tree, isArg: Boolean) {
       val sym = valdef.symbol
+      val name = sym.name.toTermName
       val info = new VarInfo(table.newVarUid, valdef, sym.info, sym, name, isArg, table)
       vars(sym) = info
       table.vars(sym) = info
