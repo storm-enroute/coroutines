@@ -2,6 +2,7 @@ package scala
 
 
 
+import scala.annotation.implicitNotFound
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
 
@@ -9,6 +10,9 @@ import scala.reflect.macros.whitebox.Context
 
 package object coroutines {
 
+  @implicitNotFound(
+    "To create a coroutine, use the call(<coroutine>(<arguments>)) expression " +
+    "instead of invoking the coroutine definition's call method directly.")
   sealed trait CanCall
 
   object Permission {
