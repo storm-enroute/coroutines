@@ -23,24 +23,31 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == -5)
   }
 
-  // test("should yield several times") {
-  //   val c = coroutine { (x: Int, y: Int) =>
-  //     val sum = x + y
-  //     yieldval(sum)
-  //     val diff1 = x - y
-  //     yieldval(diff1)
-  //     val diff2 = y - x
-  //     diff2
-  //   }
-  // }
+  test("should yield several times") {
+    val sumAndDiffs = coroutine { (x: Int, y: Int) =>
+      val sum = x + y
+      yieldval(sum)
+      val diff1 = x - y
+      yieldval(diff1)
+      val diff2 = y - x
+      diff2
+    }
+    val c = call(sumAndDiffs(1, 2))
+    assert(c() == 3)
+    assert(c() == -1)
+    assert(c() == 1)
+  }
 
-  // test("should lub yieldvals and returns") {
-  //   val c = coroutine { (x: Int) =>
-  //     yieldval(List(x))
-  //     List(x.toString)
-  //   }
-  //   val d: Coroutine.Definition[List[Any]] = c
-  // }
+  test("should lub yieldvals and returns") {
+    val lists = coroutine { (x: Int) =>
+      yieldval(List(x))
+      List(x.toString)
+    }
+    val anotherLists: Coroutine.Definition[List[Any]] = lists
+    val c = call(lists(5))
+    assert(c() == List(5))
+    assert(c() == List("5"))
+  }
 
   // test("should lub yieldtos and returns") {
   //   val f: Coroutine[List[String]] = null
