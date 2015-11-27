@@ -37,6 +37,8 @@ trait ControlFlowGraph[C <: Context] {
 
     def code: Tree = tree
 
+    def isEmptyAtReturn = false
+
     final def dfs: Seq[Node] = {
       val seen = mutable.LinkedHashSet[Node]()
       def traverse(n: Node) {
@@ -186,6 +188,10 @@ trait ControlFlowGraph[C <: Context] {
         } else sys.error(s"Multiple successors for <$tree>.")
       }
       def copyWithoutSuccessors = IfTerm(chain, uid)
+      override def isEmptyAtReturn = {
+        if (successors.length == 0) true
+        else successors.head.isEmptyAtReturn
+      }
     }
 
     case class While(tree: Tree, chain: Chain, uid: Long)
@@ -293,10 +299,14 @@ trait ControlFlowGraph[C <: Context] {
       )(implicit ce: CanEmit, table: Table): Zipper = {
         // inside the control-flow-construct, normal statement
         if (successors.length == 1) {
-          val z1 = z.append(table.untyper.untypecheck(tree))
-          successors.head.markEmit(z1, seen, subgraph)
+          if (successors.head.isEmptyAtReturn) {
+            val termtree = genExit(this, subgraph)
+            z.append(termtree)
+          } else {
+            val z1 = z.append(table.untyper.untypecheck(tree))
+            successors.head.markEmit(z1, seen, subgraph)
+          }
         } else if (successors.length == 0) {
-          // do nothing
           val termtree = genExit(this, subgraph)
           z.append(termtree)
         } else sys.error(s"Multiple successors for <$tree>.")
