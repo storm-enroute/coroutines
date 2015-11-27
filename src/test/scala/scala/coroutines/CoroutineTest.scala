@@ -7,7 +7,13 @@ import org.scalatest._
 
 
 class CoroutineTest extends FunSuite with Matchers {
-  test("should be declared") {
+  test("should not yield") {
+    val getOk = coroutine { () => "ok" }
+    val c = call(getOk())
+    assert(c() == "ok")
+  }
+
+  test("should yield several times") {
     val c = coroutine { (x: Int, y: Int) =>
       val sum = x + y
       yieldval(sum)

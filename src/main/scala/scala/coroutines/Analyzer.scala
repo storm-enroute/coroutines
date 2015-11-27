@@ -186,6 +186,6 @@ trait Analyzer[C <: Context] {
       case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
       case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
     }
-    tq"${lub(rettpe :: constraintTpes)}"
+    tq"${lub(rettpe :: constraintTpes).widen}"
   }
 }

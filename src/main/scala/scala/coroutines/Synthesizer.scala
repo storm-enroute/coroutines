@@ -187,16 +187,20 @@ extends Analyzer[C] with ControlFlowGraph[C] {
       val refnum = table.refvars.size
       val valnum = table.valvars.size
       val stacksize = table.initialStackSize
-      List(
-        q"scala.coroutines.common.Stack.bulkPush(c.refstack, $refnum, $stacksize)",
-        q"scala.coroutines.common.Stack.bulkPush(c.valstack, $valnum, $stacksize)"
-      )
+      val trees = mutable.Buffer[Tree]()
+      if (refnum > 0) trees += q"""
+        scala.coroutines.common.Stack.bulkPush(c.refstack, $refnum, $stacksize)
+      """
+      if (valnum > 0) trees += q"""
+        scala.coroutines.common.Stack.bulkPush(c.valstack, $valnum, $stacksize)
+      """
+      trees
     }
     val varpops = (for ((sym, info) <- table.vars.toList if info.isRefType) yield {
       info.popTree
-    }) ++ List(
+    }) ++ (if (table.valvars.size == 0) Nil else List(
       q"scala.coroutines.common.Stack.bulkPop(c.valstack, ${table.valvars.size})"
-    )
+    ))
 
     // emit coroutine instantiation
     val coroutineTpe = TypeName(s"Arity${args.size}")
