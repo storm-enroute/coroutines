@@ -22,7 +22,7 @@ trait Analyzer[C <: Context] {
     def result: Tree = {
       var z = this
       while (z.above != null) z = z.ascend
-      ctor(z.left.reverse)
+      z.ctor(z.left.reverse)
     }
     def ascend: Zipper = if (above == null) null else {
       Zipper(above.above, ctor(left.reverse) :: above.left, above.ctor)

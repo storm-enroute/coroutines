@@ -25,7 +25,7 @@ trait ControlFlowGraph[C <: Context] {
   }
 
   abstract class Node {
-    var successors: List[Node] = Nil
+    val successors = mutable.Buffer[Node]()
 
     val uid: Long
 
@@ -50,22 +50,23 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     final def emitCode(z: Zipper, subgraph: SubCfg)(implicit t: Table): Zipper = {
-      val seen = mutable.Set[Long]()
-      this.markEmit(z, seen, subgraph)
+      val seen = mutable.Set[Node]()
+      val finalzipper = this.markEmit(z, seen, subgraph)
+      finalzipper
     }
 
     final def markEmit(
-      z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+      z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
     )(implicit t: Table): Zipper = {
       import Permissions.canEmit
-      if (!seen(this.uid)) {
-        seen += this.uid
+      if (!seen(this)) {
+        seen += this
         this.emit(z, seen, subgraph)
       } else z
     }
 
     def emit(
-      z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+      z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
     )(implicit ce: CanEmit, t: Table): Zipper
 
     protected def genSaveState(
@@ -119,12 +120,16 @@ trait ControlFlowGraph[C <: Context] {
         }
         seen(n) = count
         val treerepr = shorten(n.tree.toString)
+        val name = n.getClass.getName.dropWhile(_ != '$')
+        val hc = System.identityHashCode(n)
         text.append(
-          s"$prefix|-> $count: ${n.getClass.getName.dropWhile(_ != '$')}($treerepr)\n")
+          s"$prefix|-> $count: $name(uid = ${n.uid}, $hc) <$treerepr>\n")
         count += 1
         def emitChild(c: Node, newPrefix: String) {
           if (seen.contains(c)) {
-            text.append(s"$newPrefix|-> label ${seen(c)}")
+            val sn = seen(c)
+            val hc = System.identityHashCode(c)
+            text.append(s"$newPrefix|-> label $sn (uid = ${c.uid}, $hc)\n")
           } else {
             emit(c, newPrefix)
           }
@@ -148,14 +153,14 @@ trait ControlFlowGraph[C <: Context] {
         cond
       }
       def emit(
-        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"if ($cond) $_ else $_" = tree
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
         val elsen = this.successors(1)
         val thenn = this.successors(0)
-        val elseb = elsen.markEmit(newZipper, mutable.Set(termuid), subgraph).result
-        val thenb = thenn.markEmit(newZipper, mutable.Set(termuid), subgraph).result
+        val elseb = elsen.markEmit(newZipper, seen, subgraph).result
+        val thenb = thenn.markEmit(newZipper, seen, subgraph).result
         val untypedcond = table.untyper.untypecheck(cond)
         val iftree = q"if ($untypedcond) $thenb else $elseb"
         val z1 = z.append(iftree)
@@ -170,7 +175,7 @@ trait ControlFlowGraph[C <: Context] {
     case class IfTerm(chain: Chain, uid: Long) extends Node {
       val tree: Tree = q""
       def emit(
-        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         if (successors.length == 1) {
           val z1 = z.ascend
@@ -190,7 +195,7 @@ trait ControlFlowGraph[C <: Context] {
         cond
       }
       def emit(
-        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"while ($cond) $body" = tree
         val untypedcond = table.untyper.untypecheck(cond)
@@ -203,7 +208,7 @@ trait ControlFlowGraph[C <: Context] {
     case class WhileTerm(chain: Chain, uid: Long) extends Node {
       val tree: Tree = q""
       def emit(
-        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         if (successors.length == 1) {
           // do nothing
@@ -211,8 +216,8 @@ trait ControlFlowGraph[C <: Context] {
           successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 2) {
           val z1 = z.ascend
-          val z2 = successors.last.markEmit(z1, mutable.Set(this.uid), subgraph)
-          successors.head.markEmit(z2, seen, subgraph)
+          val z2 = successors.head.markEmit(z1, seen, subgraph)
+          successors.last.markEmit(z2, seen, subgraph)
         } else sys.error(s"Number of successors for <$tree>: ${successors.length}")
       }
       def copyWithoutSuccessors = WhileTerm(chain, uid)
@@ -224,7 +229,7 @@ trait ControlFlowGraph[C <: Context] {
         co
       }
       def emit(
-        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"$_ val $_: $_ = $co.apply(..$args)" = tree
         val termtree = genCoroutineCall(co, args, chain, subgraph)
@@ -248,7 +253,7 @@ trait ControlFlowGraph[C <: Context] {
 
     case class YieldVal(tree: Tree, chain: Chain, uid: Long) extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
         val cparam = table.names.coroutineParam
@@ -258,14 +263,15 @@ trait ControlFlowGraph[C <: Context] {
           $cparam.result = ${table.untyper.untypecheck(x)}
           return
         """
-        z.append(termtree)
+        val z1 = z.append(termtree)
+        z1
       }
       def copyWithoutSuccessors = YieldVal(tree, chain, uid)
     }
 
     case class YieldTo(tree: Tree, chain: Chain, uid: Long) extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"coroutines.this.`package`.yieldto[$_]($co)" = tree
         val cparam = table.names.coroutineParam
@@ -280,26 +286,22 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = YieldTo(tree, chain, uid)
     }
 
-    case class Statement(atreturn: Boolean, tree: Tree, chain: Chain, uid: Long)
+    case class Statement(tree: Tree, chain: Chain, uid: Long)
     extends Node {
       def emit(
-        z: Zipper, seen: mutable.Set[Long], subgraph: SubCfg
+        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
         // inside the control-flow-construct, normal statement
-        if (atreturn) {
-          // if this was the last expression in the original graph,
-          // then pop the stack and store expression to the return value position
-          val termtree = genExit(this, subgraph)
-          z.append(termtree)
-        } else if (successors.length == 1) {
+        if (successors.length == 1) {
           val z1 = z.append(table.untyper.untypecheck(tree))
           successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 0) {
           // do nothing
-          z
+          val termtree = genExit(this, subgraph)
+          z.append(termtree)
         } else sys.error(s"Multiple successors for <$tree>.")
       }
-      def copyWithoutSuccessors = Statement(atreturn, tree, chain, uid)
+      def copyWithoutSuccessors = Statement(tree, chain, uid)
     }
   }
 
@@ -339,7 +341,7 @@ trait ControlFlowGraph[C <: Context] {
           (n, n)
         case ValDecl(t) =>
           ch.addVar(t, false)
-          val n = Node.Statement(atreturn, t, ch, table.newNodeUid())
+          val n = Node.Statement(t, ch, table.newNodeUid())
           (n, n)
         case q"return $_" =>
           c.abort(t.pos, "Return statements not allowed inside coroutines.")
@@ -349,15 +351,15 @@ trait ControlFlowGraph[C <: Context] {
           def addBranch(branch: Tree) {
             val nestedchain = ch.newChain(t)
             val (childhead, childlast) = traverse(branch, nestedchain, atreturn)
-            ifnode.successors ::= childhead
+            ifnode.successors += childhead
             childlast.tree match {
               case ValDecl(_) =>
                 val endnode =
-                  Node.Statement(atreturn, q"()", nestedchain, table.newNodeUid())
-                childlast.successors ::= endnode
-                endnode.successors ::= termnode
+                  Node.Statement(q"()", nestedchain, table.newNodeUid())
+                childlast.successors += endnode
+                endnode.successors += termnode
               case _ =>
-                childlast.successors ::= termnode
+                childlast.successors += termnode
             }
           }
           addBranch(thenbranch)
@@ -368,9 +370,9 @@ trait ControlFlowGraph[C <: Context] {
           val whilenode = Node.While(t, ch, table.newNodeUid())
           val nestedchain = ch.newChain(t)
           val (childhead, childlast) = traverse(body, nestedchain, false)
-          whilenode.successors ::= childhead
-          childlast.successors ::= termnode
-          termnode.successors ::= whilenode
+          whilenode.successors += childhead
+          childlast.successors += termnode
+          termnode.successors += whilenode
           (whilenode, termnode)
         case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
           val nestedchain = ch.newChain(t)
@@ -379,12 +381,12 @@ trait ControlFlowGraph[C <: Context] {
           val lentail = stats.tail.length
           for ((stat, i) <- stats.tail.zipWithIndex) {
             val (childhead, childlast) = traverse(stat, nestedchain, i == lentail - 1)
-            current.successors ::= childhead
+            current.successors += childhead
             current = childlast
           }
           (first, current)
         case _ =>
-          val n = Node.Statement(atreturn, t, ch, table.newNodeUid())
+          val n = Node.Statement(t, ch, table.newNodeUid())
           (n, n)
       }
     }
@@ -478,7 +480,7 @@ trait ControlFlowGraph[C <: Context] {
             if (!seen.contains(s)) {
               extract(s, seen, subgraph)
             }
-            current.successors ::= seen(s)
+            current.successors += seen(s)
           }
       }
       current

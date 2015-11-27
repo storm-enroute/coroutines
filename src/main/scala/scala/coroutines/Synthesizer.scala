@@ -42,8 +42,8 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     }
 
     val startPoint = findStart(subgraph.start.chain)
-    val bodyZipper = subgraph.start.emitCode(startPoint, subgraph)
-    val body = bodyZipper.result
+    val bodyzipper = subgraph.start.emitCode(startPoint, subgraph)
+    val body = bodyzipper.result
     val defname = TermName(s"ep${subgraph.uid}")
     val defdef = q"""
       def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {

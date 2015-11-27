@@ -104,7 +104,7 @@ class CoroutineTest extends FunSuite with Matchers {
       if (x > 0) {
         val y = c1(x)
       } else {
-         val z = c1(-x)
+        val z = c1(-x)
       }
       x
     }
@@ -130,6 +130,17 @@ class CoroutineTest extends FunSuite with Matchers {
     val c = coroutine { () =>
       var i = 0
       while (i < 10) {
+        i += 1
+      }
+      i
+    }
+  }
+
+  test("coroutine should contains a while loop with a yieldval") {
+    val c = coroutine { () =>
+      var i = 0
+      while (i < 10) {
+        yieldval(i)
         i += 1
       }
       i
