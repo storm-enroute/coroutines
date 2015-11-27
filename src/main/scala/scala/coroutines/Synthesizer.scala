@@ -148,6 +148,30 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     """
   }
 
+  def genVarPushesAndPops(
+    tpt: Tree
+  )(implicit table: Table): (List[Tree], List[Tree]) = {
+    def genVarPushes(vars: Map[Symbol, VarInfo], stack: Tree): List[Tree] = {
+      val stacksize = math.max(table.initialStackSize, vars.size)
+      val bulkpushes = if (vars.size == 0) Nil else List(q"""
+        scala.coroutines.common.Stack.bulkPush($stack, ${vars.size}, $stacksize)
+      """)
+      val args = vars.values.filter(_.isArg).toList
+      val argsets = for (a <- args) yield a.setTree(q"${a.name}")
+      bulkpushes ::: argsets
+    }
+    val varpushes = {
+      genVarPushes(table.refvars, q"c.refstack") ++
+      genVarPushes(table.valvars, q"c.valstack")
+    }
+    val varpops = (for ((sym, info) <- table.vars.toList if info.isRefType) yield {
+      info.popTree
+    }) ++ (if (table.valvars.size == 0) Nil else List(
+      q"scala.coroutines.common.Stack.bulkPop(c.valstack, ${table.valvars.size})"
+    ))
+    (varpushes, varpops)
+  }
+
   def synthesize(lambda: Tree): Tree = {
     implicit val table = new Table(lambda)
 
@@ -183,24 +207,7 @@ extends Analyzer[C] with ControlFlowGraph[C] {
     val returnvaluemethod = genReturnValueMethod(cfg, rettpt)
 
     // generate variable pushes and pops for stack variables
-    val varpushes = {
-      val refnum = table.refvars.size
-      val valnum = table.valvars.size
-      val stacksize = table.initialStackSize
-      val trees = mutable.Buffer[Tree]()
-      if (refnum > 0) trees += q"""
-        scala.coroutines.common.Stack.bulkPush(c.refstack, $refnum, $stacksize)
-      """
-      if (valnum > 0) trees += q"""
-        scala.coroutines.common.Stack.bulkPush(c.valstack, $valnum, $stacksize)
-      """
-      trees
-    }
-    val varpops = (for ((sym, info) <- table.vars.toList if info.isRefType) yield {
-      info.popTree
-    }) ++ (if (table.valvars.size == 0) Nil else List(
-      q"scala.coroutines.common.Stack.bulkPop(c.valstack, ${table.valvars.size})"
-    ))
+    val (varpushes, varpops) = genVarPushesAndPops(rettpt)
 
     // emit coroutine instantiation
     val coroutineTpe = TypeName(s"Arity${args.size}")
