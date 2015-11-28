@@ -89,18 +89,22 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == 10)
   }
 
-  // test("should declare a value in a nested scope") {
-  //   val c = coroutine { (x: Int, y: Int) =>
-  //     if (x > 0) {
-  //       val z = -x
-  //       yieldval(z)
-  //       yieldval(-z)
-  //     } else {
-  //       yieldval(y)
-  //     }
-  //     x
-  //   }
-  // }
+  test("should declare a value in a nested scope") {
+    val someValues = coroutine { (x: Int, y: Int) =>
+      if (x > 0) {
+        val z = -x
+        yieldval(z)
+        yieldval(-z)
+      } else {
+        yieldval(y)
+      }
+      x
+    }
+    val c = call(someValues(5, 7))
+    assert(c() == -5)
+    assert(c() == 5)
+    assert(c() == 5)
+  }
 
   // test("should declare a variable in a nested scope") {
   //   val c = coroutine { (x: Int, y: Int) =>
