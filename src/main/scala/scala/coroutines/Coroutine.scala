@@ -8,6 +8,7 @@ import scala.collection._
 import scala.coroutines.common._
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
+import scala.util.Try
 
 
 
@@ -26,6 +27,10 @@ class Coroutine[@specialized +T] {
   private[coroutines] var result: T @uncheckedVariance = null.asInstanceOf[T]
 
   def apply(): T = Coroutine.enter[T](this)
+
+  def get(): Option[T] = ???
+
+  def tryGet(): Try[T] = ???
 }
 
 
