@@ -14,7 +14,7 @@ object Stack {
     import c.universe._
 
     val tpe = implicitly[c.WeakTypeTag[T]]
-    q"""
+    if (size == q"-1") q"" else q"""
       if ($stack == null) $stack = new Array[$tpe]($size)
     """
   }
