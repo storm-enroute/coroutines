@@ -251,4 +251,19 @@ class CoroutineTest extends FunSuite with Matchers {
   test("an anonymous coroutine should be applied") {
     coroutine { (x: Int) => x }
   }
+
+  test("if statement should be properly regenerated") {
+    val addOne = coroutine { (x: Int) =>
+      if (x > 0) {
+        x
+      } else {
+        -x
+      }
+      x + 1
+    }
+    val c1 = call(addOne(1))
+    assert(c1() == 2)
+    val c2 = call(addOne(-1))
+    assert(c2() == 0)
+  }
 }

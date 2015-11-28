@@ -159,10 +159,14 @@ trait ControlFlowGraph[C <: Context] {
       )(implicit ce: CanEmit, table: Table): Zipper = {
         val q"if ($cond) $_ else $_" = tree
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
+        val newSeen = subgraph.all.get(termuid) match {
+          case Some(term) => mutable.Set(term)
+          case None => mutable.Set[Node]()
+        }
         val elsen = this.successors(1)
         val thenn = this.successors(0)
-        val elseb = elsen.markEmit(newZipper, seen, subgraph).result
-        val thenb = thenn.markEmit(newZipper, seen, subgraph).result
+        val elseb = elsen.markEmit(newZipper, newSeen, subgraph).result
+        val thenb = thenn.markEmit(newZipper, newSeen, subgraph).result
         val untypedcond = table.untyper.untypecheck(cond)
         val iftree = q"if ($untypedcond) $thenb else $elseb"
         val z1 = z.append(iftree)
