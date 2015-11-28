@@ -151,17 +151,36 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c2() == 5)
   }
 
-  // test("coroutine should contain two applications at the end of two branches") {
-  //   val c1 = coroutine { (x: Int) => x }
-  //   val c2 = coroutine { (x: Int) =>
-  //     if (x > 0) {
-  //       val y = c1(x)
-  //     } else {
-  //       val z = c1(-x)
-  //     }
-  //     x
-  //   }
-  // }
+  test("coroutine should contain two applications at the end of two branches") {
+    val c1 = coroutine { (x: Int) => x }
+    val c2 = coroutine { (x: Int) =>
+      if (x > 0) {
+        val y = c1(x)
+      } else {
+        val z = c1(-x)
+      }
+      x
+    }
+    val c = call(c2(5))
+    assert(c() == 5)
+  }
+
+  test("coroutine should contain two assignments at the end of two branches") {
+    val c1 = coroutine { (x: Int) => 2 * x }
+    val c2 = coroutine { (x: Int) =>
+      var y = 0
+      if (x > 0) {
+        val z = c1(x)
+        y = z
+      } else {
+        val z = c1(-x)
+        y = z
+      }
+      y
+    }
+    val c = call(c2(5))
+    assert(c() == 10)
+  }
 
   // test("coroutine should have an integer argument and a string local variable") {
   //   val c = coroutine { (x: Int) =>
