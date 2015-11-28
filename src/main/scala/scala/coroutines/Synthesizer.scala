@@ -29,8 +29,8 @@ extends Analyzer[C] with ControlFlowGraph[C] {
           val cparam = table.names.coroutineParam
           val stack = info.stackname
           val pos = info.stackpos
-          val stackget = q"scala.coroutines.common.Stack.get($cparam.$stack, $pos)"
-          val decodedget = info.decodeLong(stackget)
+          val stackget = info.getTree(q"$cparam")
+          val decodedget = if (info.isRefType) stackget else info.decodeLong(stackget)
           val valdef = info.origtree match {
             case q"$mods val $name: $tpt = $_" => q"$mods val $name: $tpt = $decodedget"
             case q"$mods var $name: $tpt = $_" => q"$mods var $name: $tpt = $decodedget"

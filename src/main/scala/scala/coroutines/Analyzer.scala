@@ -91,6 +91,10 @@ trait Analyzer[C <: Context] {
     def setTree(x: Tree): Tree = q"""
       scala.coroutines.common.Stack.set[$stacktpe](c.$stackname, $stackpos, $x)
     """
+    def getTree(coroutine: Tree): Tree = q"""
+      scala.coroutines.common.Stack.get[$stacktpe]($coroutine.$stackname, $stackpos)
+        .asInstanceOf[$tpe]
+    """
     override def toString = s"VarInfo($uid, $sym)"
   }
 

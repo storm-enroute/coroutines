@@ -49,14 +49,19 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == List("5"))
   }
 
-  // test("should lub yieldtos and returns") {
-  //   val f: Coroutine[List[String]] = null
-  //   val c = coroutine { (x: Int) =>
-  //     yieldto(f)
-  //     Vector(x)
-  //   }
-  //   val d: Coroutine.Definition[Seq[Any]] = null 
-  // }
+  test("should lub yieldtos and returns") {
+    val wrapString = coroutine { (x: String) =>
+      List(x.toString)
+    }
+    val f: Coroutine[List[String]] = call(wrapString("ok"))
+    val wrapInt = coroutine { (x: Int) =>
+      yieldto(f)
+      Vector(x)
+    }
+    val c = call(wrapInt(7))
+    assert(c() == List("ok"))
+    assert(c() == Vector(7))
+  }
 
   // test("should declare body with if statement") {
   //   val c = coroutine { (x: Int, y: Int) =>
