@@ -182,40 +182,47 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == 10)
   }
 
-  // test("coroutine should have an integer argument and a string local variable") {
-  //   val c = coroutine { (x: Int) =>
-  //     val s = x.toString
-  //     s
-  //   }
-  // }
+  test("coroutine should have an integer argument and a string local variable") {
+    val stringify = coroutine { (x: Int) =>
+      val s = x.toString
+      s
+    }
+    val c = call(stringify(11))
+    assert(c() == "11")
+  }
 
-  // test("coroutine should assign") {
-  //   val c1 = coroutine { (x: Int) => x }
-  //   val c2 = coroutine { (x: Int) =>
-  //     var y = 0
-  //     y = 1
-  //     y
-  //   }
-  // }
+  test("coroutine should assign") {
+    val assign = coroutine { (x: Int) =>
+      var y = 0
+      y = x + 1
+      y
+    }
+    val c = call(assign(5))
+    assert(c() == 6)
+  }
 
-  // test("coroutine should contain a while loop") {
-  //   val c = coroutine { () =>
-  //     var i = 0
-  //     while (i < 10) {
-  //       i += 1
-  //     }
-  //     i
-  //   }
-  // }
+  test("coroutine should contain a while loop") {
+    val number = coroutine { () =>
+      var i = 0
+      while (i < 10) {
+        i += 1
+      }
+      i
+    }
+    val c = call(number())
+    assert(c() == 10)
+  }
 
-  // test("coroutine should contains a while loop with a yieldval") {
-  //   val c = coroutine { () =>
-  //     var i = 0
-  //     while (i < 10) {
-  //       yieldval(i)
-  //       i += 1
-  //     }
-  //     i
-  //   }
-  // }
+  test("coroutine should contains a while loop with a yieldval") {
+    val numbers = coroutine { () =>
+      var i = 0
+      while (i < 10) {
+        yieldval(i)
+        i += 1
+      }
+      i
+    }
+    val c = call(numbers())
+    for (i <- 0 to 10) assert(c() == i)
+  }
 }

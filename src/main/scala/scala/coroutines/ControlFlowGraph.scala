@@ -227,7 +227,9 @@ trait ControlFlowGraph[C <: Context] {
           successors.head.markEmit(z1, seen, subgraph)
         } else if (successors.length == 2) {
           val z1 = z.ascend
-          val z2 = successors.head.markEmit(z1, seen, subgraph)
+          val newZipper = Zipper(null, Nil, trees => q"..$trees")
+          val whiletree = successors.head.markEmit(newZipper, seen, subgraph).result
+          val z2 = z1.append(whiletree)
           successors.last.markEmit(z2, seen, subgraph)
         } else sys.error(s"Number of successors for <$tree>: ${successors.length}")
       }
