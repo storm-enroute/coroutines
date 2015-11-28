@@ -29,6 +29,6 @@ package object coroutines {
 
   def call[T](f: T): Coroutine[T] = macro Coroutine.call[T]
 
-  def coroutine[T](f: Any): Coroutine.Definition[T] = macro Coroutine.synthesize
+  def coroutine[T](f: Any): Any = macro Coroutine.synthesize
 
 }
