@@ -179,18 +179,17 @@ trait ControlFlowGraph[C <: Context] {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
-        val z1 = z.ascend
         if (successors.length == 1) {
           if (successors.head.isEmptyAtReturn) {
             val termtree = genExit(this, subgraph)
-            z1.append(termtree)
+            z.append(termtree)
           } else {
-            successors.head.markEmit(z1, seen, subgraph)
+            successors.head.markEmit(z, seen, subgraph)
           }
         } else if (successors.length == 0) {
           // do nothing
           val termtree = genExit(this, subgraph)
-          z1.append(termtree)
+          z.append(termtree)
         } else sys.error(s"Multiple successors for <$tree>.")
       }
       def copyWithoutSuccessors = IfTerm(chain, uid)

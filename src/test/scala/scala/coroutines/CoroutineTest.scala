@@ -140,12 +140,16 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == 7)
   }
 
-  // test("coroutine should contain an if statement and no yields") {
-  //   val c = coroutine { (x: Int) =>
-  //     if (x > 0) x
-  //     else -x
-  //   }
-  // }
+  test("coroutine should contain an if statement and no yields") {
+    val abs = coroutine { (x: Int) =>
+      if (x > 0) x
+      else -x
+    }
+    val c1 = call(abs(-5))
+    assert(c1() == 5)
+    val c2 = call(abs(5))
+    assert(c2() == 5)
+  }
 
   // test("coroutine should contain two applications at the end of two branches") {
   //   val c1 = coroutine { (x: Int) => x }
