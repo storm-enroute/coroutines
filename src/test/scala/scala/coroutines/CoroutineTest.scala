@@ -71,6 +71,12 @@ class CoroutineTest extends FunSuite with Matchers {
         yieldval(y)
       }
     }
+    val c1 = call(xOrY(5, 2))
+    assert(c1() == 5)
+    assert(c1() == (()))
+    val c2 = call(xOrY(-2, 7))
+    assert(c2() == 7)
+    assert(c2() == (()))
   }
 
   // test("should declare body with a coroutine call") {
