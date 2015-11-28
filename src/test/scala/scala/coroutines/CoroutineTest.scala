@@ -43,7 +43,7 @@ class CoroutineTest extends FunSuite with Matchers {
       yieldval(List(x))
       List(x.toString)
     }
-    val anotherLists: Coroutine.Definition[List[Any]] = lists
+    val anotherLists: Coroutine.Blueprint[List[Any]] = lists
     val c = call(lists(5))
     assert(c() == List(5))
     assert(c() == List("5"))

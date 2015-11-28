@@ -15,8 +15,8 @@ import scala.util.Try
 class Coroutine[@specialized +T] {
   import Coroutine._
   private[coroutines] var costackptr = 0
-  private[coroutines] var costack: Array[Definition[T]] @uncheckedVariance =
-    new Array[Definition[T]](INITIAL_COSTACK_SIZE)
+  private[coroutines] var costack: Array[Blueprint[T]] @uncheckedVariance =
+    new Array[Blueprint[T]](INITIAL_COSTACK_SIZE)
   private[coroutines] var pcstackptr = 0
   private[coroutines] var pcstack = new Array[Short](INITIAL_COSTACK_SIZE)
   private[coroutines] var refstackptr = 0
@@ -52,7 +52,7 @@ object Coroutine {
     }
   }
 
-  abstract class Definition[T] {
+  abstract class Blueprint[T] {
     def enter(c: Coroutine[T]): Unit
     def returnvalue(c: Coroutine[T], v: T)(implicit cc: CanCallInternal): Unit
   }
@@ -65,25 +65,25 @@ object Coroutine {
     new Synthesizer[c.type](c).call(f)
   }
 
-  abstract class Arity0[@specialized T] extends Coroutine.Definition[T] {
+  abstract class Arity0[@specialized T] extends Coroutine.Blueprint[T] {
     def call()(implicit cc: CanCallInternal): Coroutine[T]
     def apply(): T
     def push(c: Coroutine[T])(implicit cc: CanCallInternal): Unit
   }
 
-  abstract class Arity1[A0, @specialized T] extends Coroutine.Definition[T] {
+  abstract class Arity1[A0, @specialized T] extends Coroutine.Blueprint[T] {
     def call(a0: A0)(implicit cc: CanCallInternal): Coroutine[T]
     def apply(a0: A0): T
     def push(c: Coroutine[T], a0: A0)(implicit cc: CanCallInternal): Unit
   }
 
-  abstract class Arity2[A0, A1, @specialized T] extends Coroutine.Definition[T] {
+  abstract class Arity2[A0, A1, @specialized T] extends Coroutine.Blueprint[T] {
     def call(a0: A0, a1: A1)(implicit cc: CanCallInternal): Coroutine[T]
     def apply(a0: A0, a1: A1): T
     def push(c: Coroutine[T], a0: A0, a1: A1)(implicit cc: CanCallInternal): Unit
   }
 
-  abstract class Arity3[A0, A1, A2, @specialized T] extends Coroutine.Definition[T] {
+  abstract class Arity3[A0, A1, A2, @specialized T] extends Coroutine.Blueprint[T] {
     def call(a0: A0, a1: A1, a2: A2)(implicit cc: CanCallInternal): Coroutine[T]
     def apply(a0: A0, a1: A1, a2: A2): T
     def push(c: Coroutine[T], a0: A0, a1: A1, a2: A2)(
