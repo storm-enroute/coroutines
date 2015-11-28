@@ -79,13 +79,15 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c2() == (()))
   }
 
-  // test("should declare body with a coroutine call") {
-  //   val c1 = coroutine { (x: Int) => x }
-  //   val c2 = coroutine { (x: Int) =>
-  //     val y = c1(x)
-  //     y
-  //   }
-  // }
+  test("should declare body with a coroutine call") {
+    val doubleInt = coroutine { (x: Int) => 2 * x }
+    val callOther = coroutine { (x: Int) =>
+      val y = doubleInt(x)
+      y
+    }
+    val c = call(callOther(5))
+    assert(c() == 10)
+  }
 
   // test("should declare a value in a nested scope") {
   //   val c = coroutine { (x: Int, y: Int) =>
