@@ -179,12 +179,18 @@ trait ControlFlowGraph[C <: Context] {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
+        val z1 = z.ascend
         if (successors.length == 1) {
-          val z1 = z.ascend
-          successors.head.markEmit(z1, seen, subgraph)
+          if (successors.head.isEmptyAtReturn) {
+            val termtree = genExit(this, subgraph)
+            z1.append(termtree)
+          } else {
+            successors.head.markEmit(z1, seen, subgraph)
+          }
         } else if (successors.length == 0) {
           // do nothing
-          z
+          val termtree = genExit(this, subgraph)
+          z1.append(termtree)
         } else sys.error(s"Multiple successors for <$tree>.")
       }
       def copyWithoutSuccessors = IfTerm(chain, uid)
@@ -362,14 +368,12 @@ trait ControlFlowGraph[C <: Context] {
             val nestedchain = ch.newChain(t)
             val (childhead, childlast) = traverse(branch, nestedchain)
             ifnode.successors += childhead
-            childlast.tree match {
-              case ValDecl(_) =>
-                val endnode =
-                  Node.Statement(q"()", nestedchain, table.newNodeUid())
-                childlast.successors += endnode
-                endnode.successors += termnode
-              case _ =>
-                childlast.successors += termnode
+            if (childlast.tree.tpe =:= typeOf[Unit]) {
+              val endnode = Node.Statement(q"()", nestedchain, table.newNodeUid())
+              childlast.successors += endnode
+              endnode.successors += termnode
+            } else {
+              childlast.successors += termnode
             }
           }
           addBranch(thenbranch)
