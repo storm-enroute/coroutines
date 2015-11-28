@@ -3,6 +3,7 @@ package scala.coroutines
 
 
 import org.scalatest._
+import scala.util.Failure
 
 
 
@@ -10,7 +11,22 @@ class CoroutineTest extends FunSuite with Matchers {
   test("should not yield") {
     val getOk = coroutine { () => "ok" }
     val c = call(getOk())
+    assert(c.isAlive)
     assert(c() == "ok")
+    assert(!c.isAlive)
+  }
+
+  test("should throw when not alive") {
+    val gimmeFive = coroutine { () => 5 }
+    val c = call(gimmeFive())
+    assert(c.isAlive)
+    assert(c() == 5)
+    assert(!c.isAlive)
+    intercept[CoroutineStoppedException] {
+      c()
+    }
+    assert(c.get() == None)
+    assert(c.tryGet() == Failure(CoroutineStoppedException()))
   }
 
   test("should yield once") {
@@ -19,8 +35,11 @@ class CoroutineTest extends FunSuite with Matchers {
       -x
     }
     val c = call(plusMinus(5))
+    assert(c.isAlive)
     assert(c() == 5)
+    assert(c.isAlive)
     assert(c() == -5)
+    assert(!c.isAlive)
   }
 
   test("should yield several times") {
@@ -33,9 +52,13 @@ class CoroutineTest extends FunSuite with Matchers {
       diff2
     }
     val c = call(sumAndDiffs(1, 2))
+    assert(c.isAlive)
     assert(c() == 3)
+    assert(c.isAlive)
     assert(c() == -1)
+    assert(c.isAlive)
     assert(c() == 1)
+    assert(!c.isAlive)
   }
 
   test("should lub yieldvals and returns") {

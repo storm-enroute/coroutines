@@ -8,6 +8,8 @@ import scala.collection._
 import scala.coroutines.common._
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
+import scala.util.Failure
+import scala.util.Success
 import scala.util.Try
 
 
@@ -26,11 +28,23 @@ class Coroutine[@specialized +T] {
   private[coroutines] var target: Coroutine[T] @uncheckedVariance = null
   private[coroutines] var result: T @uncheckedVariance = null.asInstanceOf[T]
 
-  def apply(): T = Coroutine.enter[T](this)
+  def apply(): T = {
+    if (isAlive) Coroutine.enter[T](this)
+    else throw new CoroutineStoppedException
+  }
 
-  def get(): Option[T] = ???
+  def isAlive: Boolean = costackptr > 0
 
-  def tryGet(): Try[T] = ???
+  def isStopped: Boolean = !isAlive
+
+  def get(): Option[T] = if (isAlive) Some(apply()) else None
+
+  def tryGet(): Try[T] = {
+    try Success(apply())
+    catch {
+      case t: Throwable => Failure(t)
+    }
+  }
 }
 
 

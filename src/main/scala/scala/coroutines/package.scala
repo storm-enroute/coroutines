@@ -15,6 +15,8 @@ package object coroutines {
     "instead of invoking the coroutine definition's call method directly.")
   sealed trait CanCallInternal
 
+  case class CoroutineStoppedException() extends Exception
+
   object Permission {
     implicit val canCall = new CanCallInternal {}
   }
