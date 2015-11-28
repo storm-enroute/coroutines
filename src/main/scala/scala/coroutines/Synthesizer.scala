@@ -13,7 +13,9 @@ import scala.reflect.macros.whitebox.Context
 /** Synthesizes all coroutine-related functionality.
  */
 private[coroutines] class Synthesizer[C <: Context](val c: C)
-extends Analyzer[C] with ControlFlowGraph[C] {
+extends Analyzer[C]
+with ControlFlowGraph[C]
+with TwoOperandTransform[C] {
   import c.universe._
 
   private def genEntryPoint(
