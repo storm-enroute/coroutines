@@ -247,4 +247,8 @@ class CoroutineTest extends FunSuite with Matchers {
       assert(c() == -i)
     }
   }
+
+  test("an anonymous coroutine should be applied") {
+    coroutine { (x: Int) => x }
+  }
 }
