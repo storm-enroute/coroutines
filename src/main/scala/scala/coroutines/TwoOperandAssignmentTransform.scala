@@ -49,6 +49,13 @@ trait TwoOperandAssignmentTransform[C <: Context] {
     case _ =>
   }
 
+  def validateTypeTree(tpt: Tree): Unit = {
+    for (t <- tpt) t match {
+      case CoroutineOp(t) => c.abort(t.pos, "Types cannot contain coroutine ops.")
+      case _ => // fine
+    }
+  }
+
   private def tearExpression(tree: Tree)(
     implicit table: Table
   ): (List[Tree], Tree) = tree match {
@@ -68,10 +75,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       (rdecls ++ argdecls.flatten ++ List(localvartree), q"$localvarname")
     case q"$r[..$tpts]" if tpts.length > 0 =>
       // type application
-      for (tpt <- tpts; t <- tpt) t match {
-        case CoroutineOp(t) => c.abort(t.pos, "Types cannot contain coroutine ops.")
-        case _ => // fine
-      }
+      for (tpt <- tpts) validateTypeTree(tpt)
       val (rdecls, rident) = tearExpression(r)
       (rdecls, q"$rident[..$tpts]")
     case q"$x(..$args) = $v" =>
@@ -81,6 +85,26 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       val (argdecls, argidents) = args.map(tearExpression).unzip
       val (vdecls, vident) = tearExpression(v)
       (xdecls ++ argdecls.flatten ++ vdecls, q"$xident(..$argidents) = $vident")
+    case q"return $_" =>
+      // return
+      c.abort(tree.pos, "The return statement is not allowed inside coroutines.")
+    case q"throw $e" =>
+      // throw
+      val (edecls, eident) = tearExpression(e)
+      (edecls, q"throw $eident")
+    case q"$x: $tpt" =>
+      // ascription
+      validateTypeTree(tpt)
+      val (xdecls, xident) = tearExpression(x)
+      (xdecls, q"xident: $tpt")
+    case q"$x: @$annot" =>
+      // annotation
+      val (xdecls, xident) = tearExpression(x)
+      (xdecls, q"xident: $annot")
+    case q"(..$xs)" if xs.length > 1 =>
+      // tuples
+      val (xsdecls, xsidents) = xs.map(tearExpression).unzip
+      (xsdecls.flatten, q"(..$xsidents)")
     case Block(stats, expr) =>
       // block
       val localvarname = TermName(c.freshName())

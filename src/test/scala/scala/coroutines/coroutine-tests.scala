@@ -318,5 +318,13 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c() == 2)
   }
 
+  test("if statements with complex tuples should be transformed to TOA form") {
+    val rube = coroutine { () =>
+      if (0 < ({ math.abs(1); math.abs(3) + 2 }, 2)._1) 2 else 1
+    }
+    val c = call(rube())
+    assert(c() == 2)
+  }
+
   //fdsg
 }
