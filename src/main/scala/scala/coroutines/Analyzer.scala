@@ -178,6 +178,21 @@ trait Analyzer[C <: Context] {
     appliedType(codeftpe, List(tpe))
   }
 
+  object CoroutineOp {
+    def unapply(t: Tree): Option[Tree] = t match {
+      case q"coroutines.this.`package`.coroutine[$_]($_)" =>
+        Some(t)
+      case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+        Some(t)
+      case q"coroutines.this.`package`.yieldto[$_]($_)" =>
+        Some(t)
+      case q"coroutines.this.`package`.call($co.apply(..$args))" =>
+        Some(t)
+      case q"$co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
+        Some(t)
+    }
+  }
+
   def inferReturnType(body: Tree): Tree = {
     // return type must correspond to the return type of the function literal
     val rettpe = body.tpe

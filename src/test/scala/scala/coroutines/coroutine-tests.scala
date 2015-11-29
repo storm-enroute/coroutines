@@ -308,4 +308,15 @@ class ToaTransformationTest extends FunSuite with Matchers {
     val c = call(rube())
     assert(c() == 2)
   }
+
+  test("if statements with updates should be transformed to TOA form") {
+    val rube = coroutine { () =>
+      val xs = new Array[Int](2)
+      if (0 < { xs(0) = 1; xs(0) }) 2 else 1
+    }
+    val c = call(rube())
+    assert(c() == 2)
+  }
+
+  //fdsg
 }

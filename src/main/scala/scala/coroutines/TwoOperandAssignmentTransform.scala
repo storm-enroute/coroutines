@@ -54,35 +54,56 @@ trait TwoOperandAssignmentTransform[C <: Context] {
   ): (List[Tree], Tree) = tree match {
     case q"$r.$member" =>
       // selection
-      val (rdecls, rval) = tearExpression(r)
+      val (rdecls, rident) = tearExpression(r)
       val localvarname = TermName(c.freshName())
-      val localvartree = q"val $localvarname = $rval.$member"
+      val localvartree = q"val $localvarname = $rident.$member"
       (rdecls ++ List(localvartree), q"$localvarname")
     case q"$r.$method(..$args)" =>
       // application
-      val (rdecls, rval) = tearExpression(r)
-      val (argdecls, argvals) = args.map(tearExpression(_)).unzip
+      val (rdecls, rident) = tearExpression(r)
+      val (argdecls, argidents) = args.map(tearExpression).unzip
+      println(argdecls)
       val localvarname = TermName(c.freshName())
-      val localvartree = q"val $localvarname = $rval.$method(..$argvals)"
+      val localvartree = q"val $localvarname = $rident.$method(..$argidents)"
       (rdecls ++ argdecls.flatten ++ List(localvartree), q"$localvarname")
+    case q"$r[..$tpts]" if tpts.length > 0 =>
+      // type application
+      for (tpt <- tpts; t <- tpt) t match {
+        case CoroutineOp(t) => c.abort(t.pos, "Types cannot contain coroutine ops.")
+        case _ => // fine
+      }
+      val (rdecls, rident) = tearExpression(r)
+      (rdecls, q"$rident[..$tpts]")
+    case q"$x(..$args) = $v" =>
+      // assignment
+      // update
+      val (xdecls, xident) = tearExpression(x)
+      val (argdecls, argidents) = args.map(tearExpression).unzip
+      val (vdecls, vident) = tearExpression(v)
+      (xdecls ++ argdecls.flatten ++ vdecls, q"$xident(..$argidents) = $vident")
     case Block(stats, expr) =>
       // block
       val localvarname = TermName(c.freshName())
       val toastats = stats.map(transform)
       val toaexpr = transform(q"$localvarname = $expr")
-      val decls = q"""
-        var $localvarname = null.asInstanceOf[${expr.tpe}]
-
-        {
-          ..$toastats
-          $toaexpr
-        }
-      """
-      (List(decls), q"$localvarname")
+      val decls = List(
+        q"""
+          var $localvarname = null.asInstanceOf[${expr.tpe}]
+        """,
+        q"""
+          {
+            ..$toastats
+            $toaexpr
+          }
+        """
+      )
+      (decls, q"$localvarname")
     case _ =>
       // empty
       // literal
       // identifier
+      // super selection
+      // this selection
       (Nil, tree)
   }
 
