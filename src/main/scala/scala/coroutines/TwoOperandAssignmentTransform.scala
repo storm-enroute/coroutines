@@ -52,25 +52,37 @@ trait TwoOperandAssignmentTransform[C <: Context] {
   private def tearExpression(tree: Tree)(
     implicit table: Table
   ): (List[Tree], Tree) = tree match {
+    case q"$r.$member" =>
+      // selection
+      val (rdecls, rval) = tearExpression(r)
+      val localvarname = TermName(c.freshName())
+      val localvartree = q"val $localvarname = $rval.$member"
+      (rdecls ++ List(localvartree), q"$localvarname")
     case q"$r.$method(..$args)" =>
+      // application
       val (rdecls, rval) = tearExpression(r)
       val (argdecls, argvals) = args.map(tearExpression(_)).unzip
       val localvarname = TermName(c.freshName())
       val localvartree = q"val $localvarname = $rval.$method(..$argvals)"
       (rdecls ++ argdecls.flatten ++ List(localvartree), q"$localvarname")
     case Block(stats, expr) =>
+      // block
       val localvarname = TermName(c.freshName())
       val toastats = stats.map(transform)
       val toaexpr = transform(q"$localvarname = $expr")
       val decls = q"""
-        var $localvarname = _
+        var $localvarname = null.asInstanceOf[${expr.tpe}]
+
         {
-          $toastats
+          ..$toastats
           $toaexpr
         }
       """
       (List(decls), q"$localvarname")
     case _ =>
+      // empty
+      // literal
+      // identifier
       (Nil, tree)
   }
 
@@ -83,11 +95,12 @@ trait TwoOperandAssignmentTransform[C <: Context] {
     case q"(..$params) => $body" =>
       validateNestedContext(body)
       tree
+    // TODO: handle partial functions
     // case q"{ case ..$cs }" =>
-    //   validateNestedContext(body)
+    //   validateNestedContext(???)
+    //   println(cs)
     //   tree
     case q"if ($cond) $thenbranch else $elsebranch" =>
-      println("!!!")
       val (decls, ncond) = tearExpression(cond)
       q"""
         ..$decls

@@ -51,6 +51,7 @@ class TraverserUtil[C <: Context](val c: C) {
           q"new { ..$eds0 } with ..$ps0 { $self0 => ..$stats0 }",
           q"new { ..$eds1 } with ..$ps1 { $self1 => ..$stats1 }"
         ) =>
+          // new
           for ((e0, e1) <- eds0 zip eds1) traverse(e0, e1)
           for ((p0, p1) <- ps0 zip ps1) traverse(p0, p1)
           traverse(self0, self1)
