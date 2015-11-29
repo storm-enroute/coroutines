@@ -289,4 +289,10 @@ class CoroutineTest extends FunSuite with Matchers {
     val c2 = call(addOne(-1))
     assert(c2() == 0)
   }
+
+  test("if statements with complex expressions should be transformed to TOA form") {
+    coroutine { () =>
+      if (0 < math.max(1, 2)) 2 else 1
+    }
+  }
 }

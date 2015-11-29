@@ -352,11 +352,11 @@ trait ControlFlowGraph[C <: Context] {
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
           val n = Node.YieldTo(t, ch, table.newNodeUid())
           (n, n)
-        case ValDecl(t @ q"$_ val $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
+        case ValDecl(t @ q"$_ val $_ = $c.apply($_)") if isCoroutineBlueprint(c.tpe) =>
           ch.addVar(t, false)
           val n = Node.ValCoroutineCall(t, ch, table.newNodeUid())
           (n, n)
-        case ValDecl(t @ q"$_ var $_ = $co.apply($_)") if isCoroutineDefType(co.tpe) =>
+        case ValDecl(t @ q"$_ var $_ = $c.apply($_)") if isCoroutineBlueprint(c.tpe) =>
           ch.addVar(t, false)
           val n = Node.ValCoroutineCall(t, ch, table.newNodeUid())
           (n, n)
@@ -490,7 +490,7 @@ trait ControlFlowGraph[C <: Context] {
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
           addToNodeFront()
           exitPoints(subgraph)(current) = n.successors.head.uid
-        case q"$_ val $_ = $co.apply(..$args)" if isCoroutineDefType(co.tpe) =>
+        case q"$_ val $_ = $co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
           addCoroutineInvocationToNodeFront(co)
           exitPoints(subgraph)(current) = n.successors.head.uid
         case _ =>

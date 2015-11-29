@@ -168,7 +168,7 @@ trait Analyzer[C <: Context] {
     }
   }
 
-  def isCoroutineDefType(tpe: Type) = {
+  def isCoroutineBlueprint(tpe: Type) = {
     val codefsym = typeOf[Coroutine.Blueprint[_]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) != NoType
   }

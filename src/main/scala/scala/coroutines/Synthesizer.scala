@@ -15,7 +15,7 @@ import scala.reflect.macros.whitebox.Context
 private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C]
 with ControlFlowGraph[C]
-with TwoOperandTransform[C] {
+with TwoOperandAssignmentTransform[C] {
   import c.universe._
 
   private def genEntryPoint(
@@ -175,7 +175,7 @@ with TwoOperandTransform[C] {
 
   def synthesize(lambda: Tree): Tree = {
     implicit val table = new Table(lambda)
-
+    
     // ensure that argument is a function literal
     val (args, body) = lambda match {
       case q"(..$args) => $body" => (args, body)
@@ -185,6 +185,10 @@ with TwoOperandTransform[C] {
       val q"$_ val $argname: $_ = $_" = arg
       q"$argname"
     }
+
+    // transform to two operand assignment form
+    val toabody = transformToTwoOperandForm(args, body)
+    println("toa = " + toabody)
 
     // extract argument names and types
     val (argnames, argtpts) = (for (arg <- args) yield {
@@ -253,7 +257,7 @@ with TwoOperandTransform[C] {
   def call[T: WeakTypeTag](lambda: Tree): Tree = {
     val (receiver, args) = lambda match {
       case q"$r.apply(..$args)" =>
-        if (!isCoroutineDefType(r.tpe))
+        if (!isCoroutineBlueprint(r.tpe))
           c.abort(r.pos,
             s"Receiver must be a coroutine.\n" +
             s"required: Coroutine.Definition[${implicitly[WeakTypeTag[T]]}]\n" +
