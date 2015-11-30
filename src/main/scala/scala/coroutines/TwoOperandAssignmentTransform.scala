@@ -176,6 +176,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       """
       (List(nwhile), q"()")
     case q"do $body while ($cond)" =>
+      // do-while
       val (xdecls, xident) = tearExpression(cond)
       val localvarname = TermName(c.freshName())
       val nwhile = if (xdecls != Nil) q"""
@@ -192,6 +193,16 @@ trait TwoOperandAssignmentTransform[C <: Context] {
         } while ($cond)
       """
       (List(nwhile), q"()")
+    case q"for (..$enums) $body" =>
+      // for loop
+      for (e <- enums) NestedContextValidator.traverse(e)
+      NestedContextValidator.traverse(body)
+      (Nil, tree)
+    case q"for (..$enums) yield $body" =>
+      // for-yield loop
+      for (e <- enums) NestedContextValidator.traverse(e)
+      NestedContextValidator.traverse(body)
+      (Nil, tree)
     case Block(stats, expr) =>
       // block
       val localvarname = TermName(c.freshName())
