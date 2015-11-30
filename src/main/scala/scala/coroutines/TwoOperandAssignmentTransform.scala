@@ -25,28 +25,33 @@ trait TwoOperandAssignmentTransform[C <: Context] {
 
   import c.universe._
 
-  private def validateNestedContext(tree: Tree): Unit = tree match {
-    case q"coroutines.this.`package`.coroutine[$_]($_)" =>
-      // no need to check further, this is checked in a different expansion
-    case q"coroutines.this.`package`.yieldval[$_]($_)" =>
-      c.abort(
-        tree.pos,
-        "The yieldval statement can only be called directly inside the coroutine. " +
-        "Nested classes and functions must declare another coroutine to yield values.")
-    case q"coroutines.this.`package`.yieldto[$_]($_)" =>
-      c.abort(
-        tree.pos,
-        "The yieldto statement can only be called directly inside the coroutine. " +
-        "Nested classes and functions must declare another coroutine to yield values.")
-    case q"coroutines.this.`package`.call($co.apply(..$args))" =>
-      // no need to check further, the call macro will validate the coroutine type
-    case q"$co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
-      c.abort(
-        tree.pos,
-        "Coroutine blueprints can only be invoked directly inside the coroutine. " +
-        "Nested classes and functions should either use the call statement or " +
-        "declare another coroutine.")
-    case _ =>
+  object NestedContextValidator extends Traverser {
+    override def traverse(tree: Tree): Unit = tree match {
+      case q"coroutines.this.`package`.coroutine[$_]($_)" =>
+        // no need to check further, this is checked in a different expansion
+      case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+        c.abort(
+          tree.pos,
+          "The yieldval statement can only be called directly inside the coroutine. " +
+          "Nested classes and functions must declare a separate nested coroutine to " +
+          "yield values.")
+      case q"coroutines.this.`package`.yieldto[$_]($_)" =>
+        c.abort(
+          tree.pos,
+          "The yieldto statement can only be called directly inside the coroutine. " +
+          "Nested classes and functions must declare a separate nested coroutine to " +
+          "yield values.")
+      case q"coroutines.this.`package`.call($co.apply(..$args))" =>
+        // no need to check further, the call macro will validate the coroutine type
+      case q"$co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
+        c.abort(
+          tree.pos,
+          "Coroutine blueprints can only be invoked directly inside the coroutine. " +
+          "Nested classes and functions should either use the call statement or " +
+          "declare another coroutine.")
+      case _ =>
+        super.traverse(tree)
+    }
   }
 
   def disallowCoroutinesIn(tree: Tree): Unit = {
@@ -145,6 +150,13 @@ trait TwoOperandAssignmentTransform[C <: Context] {
         }
       """
       (List(nmatch), q"$localvarname")
+    case q"(..$params) => $body" =>
+      // function
+      NestedContextValidator.traverse(tree)
+      (Nil, tree)
+    case q"{ case ..$cases }" =>
+      NestedContextValidator.traverse(tree)
+      (Nil, tree)
     case q"while ($cond) $body" =>
       // while
       // TODO
