@@ -49,9 +49,9 @@ trait TwoOperandAssignmentTransform[C <: Context] {
     case _ =>
   }
 
-  def validateTypeTree(tpt: Tree): Unit = {
-    for (t <- tpt) t match {
-      case CoroutineOp(t) => c.abort(t.pos, "Types cannot contain coroutine ops.")
+  def disallowCoroutinesIn(tree: Tree): Unit = {
+    for (t <- tree) t match {
+      case CoroutineOp(t) => c.abort(t.pos, "Coroutine operations disallowed here.")
       case _ => // fine
     }
   }
@@ -74,7 +74,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       (rdecls ++ argdecls.flatten ++ List(localvartree), q"$localvarname")
     case q"$r[..$tpts]" if tpts.length > 0 =>
       // type application
-      for (tpt <- tpts) validateTypeTree(tpt)
+      for (tpt <- tpts) disallowCoroutinesIn(tpt)
       val (rdecls, rident) = tearExpression(r)
       (rdecls, q"$rident[..$tpts]")
     case q"$x(..$args) = $v" =>
@@ -93,7 +93,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       (edecls, q"throw $eident")
     case q"$x: $tpt" =>
       // ascription
-      validateTypeTree(tpt)
+      disallowCoroutinesIn(tpt)
       val (xdecls, xident) = tearExpression(x)
       (xdecls, q"xident: $tpt")
     case q"$x: @$annot" =>
@@ -124,6 +124,19 @@ trait TwoOperandAssignmentTransform[C <: Context] {
         """
       )
       (decls, q"$localvarname")
+    case q"$x match { case ..$cases }" =>
+      // pattern match
+      val ncases = for (q"$pat => $branch" <- cases) yield {
+        disallowCoroutinesIn(pat)
+        q"${transform(branch)}"
+      }
+      val (xdecls, xident) = tearExpression(x)
+      q"""
+        ..$xdecls
+        $x match {
+          case ..$ncases
+        }
+      """
     case Block(stats, expr) =>
       // block
       val localvarname = TermName(c.freshName())
@@ -157,9 +170,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       Block(stats.map(transform), transform(expr))
     case t =>
       val (decls, _) = tearExpression(t)
-      q"""
-        ..$decls
-      """
+      q"..$decls"
   }
 
   def transformToTwoOperandForm(args: List[Tree], body: Tree)(
