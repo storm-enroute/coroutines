@@ -159,13 +159,12 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       (Nil, tree)
     case q"while ($cond) $body" =>
       // while
-      // TODO
       val (xdecls, xident) = tearExpression(cond)
       val localvarname = TermName(c.freshName())
-      val nwhile = if (xdecls != q"") q"""
+      val nwhile = if (xdecls != Nil) q"""
         ..$xdecls
         var $localvarname = $xident
-        while ($cond) {
+        while ($localvarname) {
           ${transform(body)}
           ..$xdecls
           localvarname = $xident
@@ -174,6 +173,23 @@ trait TwoOperandAssignmentTransform[C <: Context] {
         while ($cond) {
           ${transform(body)}
         }
+      """
+      (List(nwhile), q"()")
+    case q"do $body while ($cond)" =>
+      val (xdecls, xident) = tearExpression(cond)
+      val localvarname = TermName(c.freshName())
+      val nwhile = if (xdecls != Nil) q"""
+        ..$xdecls
+        var $localvarname = $xident
+        do {
+          ${transform(body)}
+          ..$xdecls
+          localvarname = $xident
+        } while ($localvarname)
+      """ else q"""
+        do {
+          ${transform(body)}
+        } while ($cond)
       """
       (List(nwhile), q"()")
     case Block(stats, expr) =>
