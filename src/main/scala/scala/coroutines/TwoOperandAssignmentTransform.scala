@@ -126,17 +126,44 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       (decls, q"$localvarname")
     case q"$x match { case ..$cases }" =>
       // pattern match
-      val ncases = for (q"$pat => $branch" <- cases) yield {
+      val localvarname = TermName(c.freshName())
+      val ncases = for (cq"$pat => $branch" <- cases) yield {
         disallowCoroutinesIn(pat)
-        q"${transform(branch)}"
+        val (branchdecls, branchident) = tearExpression(branch)
+        cq"""
+          $pat =>
+            ..$branchdecls
+            $localvarname = $branchident
+        """
       }
       val (xdecls, xident) = tearExpression(x)
-      q"""
+      val nmatch = q"""
+        var $localvarname = null.asInstanceOf[$tree.tpe]
         ..$xdecls
         $x match {
           case ..$ncases
         }
       """
+      (List(nmatch), q"$localvarname")
+    case q"while ($cond) $body" =>
+      // while
+      // TODO
+      val (xdecls, xident) = tearExpression(cond)
+      val localvarname = TermName(c.freshName())
+      val nwhile = if (xdecls != q"") q"""
+        ..$xdecls
+        var $localvarname = $xident
+        while ($cond) {
+          ${transform(body)}
+          ..$xdecls
+          localvarname = $xident
+        }
+      """ else q"""
+        while ($cond) {
+          ${transform(body)}
+        }
+      """
+      (List(nwhile), q"()")
     case Block(stats, expr) =>
       // block
       val localvarname = TermName(c.freshName())
