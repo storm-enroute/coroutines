@@ -37,6 +37,8 @@ trait ControlFlowGraph[C <: Context] {
 
     def code: Tree = tree
 
+    def value: Tree = tree
+
     def isEmptyAtReturn = false
 
     final def dfs: Seq[Node] = {
@@ -97,7 +99,7 @@ trait ControlFlowGraph[C <: Context] {
       n: Node, subgraph: SubCfg
     )(implicit t: Table): Tree = {
       val cparam = t.names.coroutineParam
-      val untypedtree = t.untyper.untypecheck(n.code)
+      val untypedtree = t.untyper.untypecheck(n.value)
       q"""
         pop($cparam)
         if (scala.coroutines.common.Stack.isEmpty($cparam.costack)) {
@@ -303,8 +305,7 @@ trait ControlFlowGraph[C <: Context] {
       def copyWithoutSuccessors = YieldTo(tree, chain, uid)
     }
 
-    case class Statement(tree: Tree, chain: Chain, uid: Long)
-    extends Node {
+    abstract class AnyStatement extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
@@ -322,7 +323,17 @@ trait ControlFlowGraph[C <: Context] {
           z.append(termtree)
         } else sys.error(s"Multiple successors for <$tree>.")
       }
+    }
+
+    case class Statement(tree: Tree, chain: Chain, uid: Long)
+    extends AnyStatement {
       def copyWithoutSuccessors = Statement(tree, chain, uid)
+    }
+
+    case class Val(tree: Tree, chain: Chain, uid: Long)
+    extends AnyStatement {
+      override def value = q"()"
+      def copyWithoutSuccessors = Val(tree, chain, uid)
     }
   }
 
@@ -362,7 +373,7 @@ trait ControlFlowGraph[C <: Context] {
           (n, n)
         case ValDecl(t) =>
           ch.addVar(t, false)
-          val n = Node.Statement(t, ch, table.newNodeUid())
+          val n = Node.Val(t, ch, table.newNodeUid())
           (n, n)
         case q"return $_" =>
           c.abort(t.pos, "Return statements not allowed inside coroutines.")

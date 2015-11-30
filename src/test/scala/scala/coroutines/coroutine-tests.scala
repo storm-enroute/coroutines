@@ -333,11 +333,11 @@ class ToaTransformationTest extends FunSuite with Matchers {
   }
 
   test("") {
-    //coroutine { () =>
-    //  //val x = (1, 1)
-    //  val t = (2, 3)
-    //  val (y, z) = t
-    //}
+    coroutine { () =>
+     //val x = (1, 1)
+     val t = (2, 3)
+     val (y, z) = t
+    }
   }
 
 }
