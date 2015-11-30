@@ -69,7 +69,6 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       // application
       val (rdecls, rident) = tearExpression(r)
       val (argdecls, argidents) = args.map(tearExpression).unzip
-      println(argdecls)
       val localvarname = TermName(c.freshName())
       val localvartree = q"val $localvarname = $rident.$method(..$argidents)"
       (rdecls ++ argdecls.flatten ++ List(localvartree), q"$localvarname")
@@ -105,6 +104,26 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       // tuples
       val (xsdecls, xsidents) = xs.map(tearExpression).unzip
       (xsdecls.flatten, q"(..$xsidents)")
+    case q"if ($cond) $thenbranch else $elsebranch" =>
+      // if
+      val (conddecls, condident) = tearExpression(cond)
+      val (thendecls, thenident) = tearExpression(thenbranch)
+      val (elsedecls, elseident) = tearExpression(elsebranch)
+      val localvarname = TermName(c.freshName())
+      val decls = List(
+        q"var $localvarname = null.asInstanceOf[${tree.tpe}]",
+        q"""
+          ..$conddecls
+          if ($condident) {
+            ..$thendecls
+            $localvarname = $thenident
+          } else {
+            ..$elsedecls
+            $localvarname = $elseident
+          }
+        """
+      )
+      (decls, q"$localvarname")
     case Block(stats, expr) =>
       // block
       val localvarname = TermName(c.freshName())
@@ -134,27 +153,13 @@ trait TwoOperandAssignmentTransform[C <: Context] {
   private def transform(tree: Tree)(
     implicit table: Table
   ): Tree = tree match {
-    case q"coroutines.this.`package`.coroutine[$_]($_)" =>
-      // no need to check further, this is checked in a different expansion
-      tree
-    case q"(..$params) => $body" =>
-      validateNestedContext(body)
-      tree
-    // TODO: handle partial functions
-    // case q"{ case ..$cs }" =>
-    //   validateNestedContext(???)
-    //   println(cs)
-    //   tree
-    case q"if ($cond) $thenbranch else $elsebranch" =>
-      val (decls, ncond) = tearExpression(cond)
-      q"""
-        ..$decls
-        if ($ncond) ${transform(thenbranch)} else ${transform(elsebranch)}
-      """
     case Block(stats, expr) =>
       Block(stats.map(transform), transform(expr))
     case t =>
-      t
+      val (decls, _) = tearExpression(t)
+      q"""
+        ..$decls
+      """
   }
 
   def transformToTwoOperandForm(args: List[Tree], body: Tree)(

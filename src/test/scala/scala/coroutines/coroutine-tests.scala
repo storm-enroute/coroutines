@@ -293,7 +293,7 @@ class CoroutineTest extends FunSuite with Matchers {
 
 
 class ToaTransformationTest extends FunSuite with Matchers {
-  test("if statements with applications should be transformed to TOA form") {
+  test("if statements with applications") {
     val rube = coroutine { () =>
       if (0 < { math.abs(-1); math.max(1, 2) }) 2 else 1
     }
@@ -301,7 +301,7 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c() == 2)
   }
 
-  test("if statements with selections should be transformed to TOA form") {
+  test("if statements with selections") {
     val rube = coroutine { () =>
       if (0 < { math.abs(math.Pi) }) 2 else 1
     }
@@ -309,7 +309,7 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c() == 2)
   }
 
-  test("if statements with updates should be transformed to TOA form") {
+  test("if statements with updates") {
     val rube = coroutine { () =>
       val xs = new Array[Int](2)
       if (0 < { xs(0) = 1; xs(0) }) 2 else 1
@@ -318,12 +318,18 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c() == 2)
   }
 
-  test("if statements with complex tuples should be transformed to TOA form") {
+  test("if statements with block in tuple") {
     val rube = coroutine { () =>
       if (0 < ({ math.abs(1); math.abs(3) + 2 }, 2)._1) 2 else 1
     }
     val c = call(rube())
     assert(c() == 2)
+  }
+
+  test("if statement with another if statement in condition") {
+    val rube = coroutine { () =>
+      if (0 < (if (math.abs(-1) > 5) 1 else 2)) 2 else 1
+    }
   }
 
   //fdsg
