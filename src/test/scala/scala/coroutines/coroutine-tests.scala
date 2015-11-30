@@ -332,5 +332,12 @@ class ToaTransformationTest extends FunSuite with Matchers {
     }
   }
 
-  //fdsg
+  test("") {
+    //coroutine { () =>
+    //  //val x = (1, 1)
+    //  val t = (2, 3)
+    //  val (y, z) = t
+    //}
+  }
+
 }

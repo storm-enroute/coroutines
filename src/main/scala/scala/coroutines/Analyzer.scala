@@ -190,6 +190,8 @@ trait Analyzer[C <: Context] {
         Some(t)
       case q"$co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
         Some(t)
+      case _ =>
+        None
     }
   }
 

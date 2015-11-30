@@ -32,23 +32,23 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       case q"coroutines.this.`package`.yieldval[$_]($_)" =>
         c.abort(
           tree.pos,
-          "The yieldval statement can only be called directly inside the coroutine. " +
-          "Nested classes and functions must declare a separate nested coroutine to " +
-          "yield values.")
+          "The yieldval statement only be invoked directly inside the coroutine. " +
+          "Nested classes, functions or for-comprehensions, should either use the " +
+          "call statement or declare another coroutine.")
       case q"coroutines.this.`package`.yieldto[$_]($_)" =>
         c.abort(
           tree.pos,
-          "The yieldto statement can only be called directly inside the coroutine. " +
-          "Nested classes and functions must declare a separate nested coroutine to " +
-          "yield values.")
+          "The yieldto statement only be invoked directly inside the coroutine. " +
+          "Nested classes, functions or for-comprehensions, should either use the " +
+          "call statement or declare another coroutine.")
       case q"coroutines.this.`package`.call($co.apply(..$args))" =>
         // no need to check further, the call macro will validate the coroutine type
       case q"$co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
         c.abort(
           tree.pos,
           "Coroutine blueprints can only be invoked directly inside the coroutine. " +
-          "Nested classes and functions should either use the call statement or " +
-          "declare another coroutine.")
+          "Nested classes, functions or for-comprehensions, should either use the " +
+          "call statement or declare another coroutine.")
       case _ =>
         super.traverse(tree)
     }
@@ -56,7 +56,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
 
   def disallowCoroutinesIn(tree: Tree): Unit = {
     for (t <- tree) t match {
-      case CoroutineOp(t) => c.abort(t.pos, "Coroutine operations disallowed here.")
+      case CoroutineOp(t) => c.abort(t.pos, "Coroutines disallowed in:\n$tree.")
       case _ => // fine
     }
   }
@@ -143,8 +143,10 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       }
       val (xdecls, xident) = tearExpression(x)
       val nmatch = q"""
-        var $localvarname = null.asInstanceOf[$tree.tpe]
+        var $localvarname = null.asInstanceOf[${tree.tpe.widen}]
+
         ..$xdecls
+
         $x match {
           case ..$ncases
         }
@@ -161,38 +163,43 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       // while
       val (xdecls, xident) = tearExpression(cond)
       val localvarname = TermName(c.freshName())
-      val nwhile = if (xdecls != Nil) q"""
-        ..$xdecls
-        var $localvarname = $xident
-        while ($localvarname) {
-          ${transform(body)}
-          ..$xdecls
-          localvarname = $xident
-        }
-      """ else q"""
+      val decls = if (xdecls != Nil) {
+        xdecls ++ List(
+          q"var $localvarname = $xident",
+          q"""
+            while ($localvarname) {
+              ${transform(body)}
+
+              ..$xdecls
+              localvarname = $xident
+            }
+          """)
+      } else List(q"""
         while ($cond) {
           ${transform(body)}
         }
-      """
-      (List(nwhile), q"()")
+      """)
+      (decls, q"()")
     case q"do $body while ($cond)" =>
       // do-while
       val (xdecls, xident) = tearExpression(cond)
       val localvarname = TermName(c.freshName())
-      val nwhile = if (xdecls != Nil) q"""
-        ..$xdecls
-        var $localvarname = $xident
-        do {
-          ${transform(body)}
-          ..$xdecls
-          localvarname = $xident
-        } while ($localvarname)
-      """ else q"""
+      val decls = if (xdecls != Nil) xdecls ++ List(
+        q"var $localvarname = $xident",
+        q"""
+          do {
+            ${transform(body)}
+
+            ..$xdecls
+            localvarname = $xident
+          } while ($localvarname)
+        """
+      ) else List(q"""
         do {
           ${transform(body)}
         } while ($cond)
-      """
-      (List(nwhile), q"()")
+      """)
+      (decls, q"()")
     case q"for (..$enums) $body" =>
       // for loop
       for (e <- enums) NestedContextValidator.traverse(e)
@@ -203,23 +210,28 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       for (e <- enums) NestedContextValidator.traverse(e)
       NestedContextValidator.traverse(body)
       (Nil, tree)
+    case q"new { ..$edefs } with ..$bases { $self => ..$stats }" =>
+      // new
+      NestedContextValidator.traverse(tree)
+      (Nil, tree)
     case Block(stats, expr) =>
       // block
       val localvarname = TermName(c.freshName())
-      val toastats = stats.map(transform)
-      val toaexpr = transform(q"$localvarname = $expr")
-      val decls = List(
-        q"""
-          var $localvarname = null.asInstanceOf[${expr.tpe}]
-        """,
-        q"""
-          {
-            ..$toastats
-            $toaexpr
-          }
-        """
-      )
+      val (statdecls, statidents) = stats.map(tearExpression).unzip
+      val (exprdecls, exprident) = tearExpression(q"$localvarname = $expr")
+      val decls =
+        List(q"var $localvarname = null.asInstanceOf[${expr.tpe.widen}]") ++
+        statdecls.flatten ++
+        exprdecls
       (decls, q"$localvarname")
+    case tpt: TypeTree =>
+      // type trees
+      disallowCoroutinesIn(tpt)
+      (Nil, tree)
+    case q"$mods val $v: $tpt = $rhs" =>
+      val (rhsdecls, rhsident) = tearExpression(rhs)
+      val decls = rhsdecls ++ List(q"$mods val $v: $tpt = $rhsident")
+      (decls, q"")
     case _ =>
       // empty
       // literal
@@ -233,7 +245,13 @@ trait TwoOperandAssignmentTransform[C <: Context] {
     implicit table: Table
   ): Tree = tree match {
     case Block(stats, expr) =>
-      Block(stats.map(transform), transform(expr))
+      val (statdecls, statidents) = stats.map(tearExpression).unzip
+      val (exprdecls, exprident) = tearExpression(expr)
+      q"""
+        ..${statdecls.flatten}
+
+        ..$exprdecls
+      """
     case t =>
       val (decls, _) = tearExpression(t)
       q"..$decls"
