@@ -173,14 +173,17 @@ with ThreeAddressFormTransformation[C] {
     (varpushes, varpops)
   }
 
-  def synthesize(lambda: Tree): Tree = {
-    implicit val table = new Table(lambda)
+  def synthesize(rawlambda: Tree): Tree = {
+    // transform to two operand assignment form
+    val taflambda = transformToThreeAddressForm(rawlambda)
+    val typedtaflambda = c.typecheck(taflambda)
+    println(typedtaflambda)
+    println(typedtaflambda.tpe)
+
+    implicit val table = new Table(rawlambda)
     
     // ensure that argument is a function literal
-    val (args, body) = lambda match {
-      case q"(..$args) => $body" => (args, body)
-      case _ => c.abort(lambda.pos, "The coroutine takes a single function literal.")
-    }
+    val q"(..$args) => $body" = typedtaflambda
     val argidents = for (arg <- args) yield {
       val q"$_ val $argname: $_ = $_" = arg
       q"$argname"
@@ -191,14 +194,6 @@ with ThreeAddressFormTransformation[C] {
       val q"$_ val $name: $tpt = $_" = arg
       (name, tpt)
     }).unzip
-
-    // transform to two operand assignment form
-    val toabody = transformToThreeAddressForm(body)
-    println("----------------------------")
-    println("toa = " + toabody)
-    println("tpe = " + toabody.tpe)
-    val typedtoabody = c.typecheck(toabody)
-    println(typedtoabody.tpe)
 
     // infer coroutine return type
     val rettpt = inferReturnType(body)

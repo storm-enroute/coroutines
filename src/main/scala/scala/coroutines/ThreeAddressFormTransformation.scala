@@ -62,16 +62,12 @@ trait ThreeAddressFormTransformation[C <: Context] {
     }
   }
 
-  private def tearExpression(tree: Tree)(
-    implicit table: Table
-  ): (List[Tree], Tree) = tree match {
+  private def tearExpression(tree: Tree): (List[Tree], Tree) = tree match {
     case q"$r.`package`" =>
       // package selection
-      println("package selection: " + tree)
       (Nil, tree)
     case q"$r.$member" =>
       // selection
-      println("selection: " + tree)
       val (rdecls, rident) = tearExpression(r)
       val localvarname = TermName(c.freshName())
       val localvartree = q"val $localvarname = $rident.$member"
@@ -80,7 +76,6 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // application
       // TODO: translate boolean && and || to if statements, then regenerate, to adher
       // to the short-circuit evaluation rules
-      println("application: " + tree)
       val (rdecls, rident) = tearExpression(r)
       val (argdecls, argidents) = args.map(tearExpression).unzip
       val localvarname = TermName(c.freshName())
@@ -279,9 +274,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
   }
 
-  private def transform(tree: Tree)(
-    implicit table: Table
-  ): Tree = tree match {
+  private def transform(tree: Tree): Tree = tree match {
     case Block(stats, expr) =>
       val (statdecls, statidents) = stats.map(tearExpression).unzip
       val (exprdecls, exprident) = tearExpression(expr)
@@ -295,8 +288,14 @@ trait ThreeAddressFormTransformation[C <: Context] {
       q"..$decls"
   }
 
-  def transformToThreeAddressForm(body: Tree)(implicit table: Table): Tree = {
+  def transformToThreeAddressForm(lambda: Tree): Tree = {
+    // separate to arguments and body
+    val (args, body) = lambda match {
+      case q"(..$args) => $body" => (args, body)
+      case _ => c.abort(lambda.pos, "The coroutine takes a single function literal.")
+    }
+
     // recursive transform of the body code
-    transform(body)
+    q"(..$args) => ${transform(body)}"
   }
 }

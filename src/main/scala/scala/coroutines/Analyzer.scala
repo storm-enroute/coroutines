@@ -45,8 +45,9 @@ trait Analyzer[C <: Context] {
         else table.vars.filter(_._2.isValType)
       sametpvars.size - 1 - sametpvars.toList.indexWhere(_._2.uid == uid)
     }
-    def isRefType = tpe <:< typeOf[AnyRef]
-    def isValType = tpe <:< typeOf[AnyVal]
+    def isUnitType = tpe =:= typeOf[Unit]
+    def isRefType = tpe <:< typeOf[AnyRef] || tpe =:= typeOf[Unit]
+    def isValType = tpe <:< typeOf[AnyVal] && !(tpe =:= typeOf[Unit])
     val defaultValue: Tree = {
       if (isRefType) q"null"
       else if (tpe =:= typeOf[Boolean]) q"false"
@@ -59,12 +60,14 @@ trait Analyzer[C <: Context] {
       else if (tpe =:= typeOf[Double]) q"0.0"
       else sys.error(s"Unknown type: $tpe")
     }
-    def encodeLong(t: Tree): Tree = {
+    private def encodeLong(t: Tree): Tree = {
       if (tpe =:= typeOf[Boolean]) q"if ($t) 1L else 0L"
       else if (tpe =:= typeOf[Int]) q"$t.toLong"
+      else if (tpe =:= typeOf[Long]) q"$t"
+      else if (tpe =:= typeOf[Double]) q"java.lang.Double.doubleToRawLongBits($t)"
       else sys.error(s"Cannot encode type $tpe as Long.")
     }
-    def decodeLong(t: Tree): Tree = {
+    private def decodeLong(t: Tree): Tree = {
       if (tpe =:= typeOf[Int]) q"($t & 0xffffffff).toInt"
       else sys.error(s"Cannot decode type $tpe from Long.")
     }
@@ -88,9 +91,16 @@ trait Analyzer[C <: Context] {
     def popTree = q"""
       scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
     """
-    def setTree(x: Tree): Tree = q"""
-      scala.coroutines.common.Stack.set[$stacktpe](c.$stackname, $stackpos, $x)
-    """
+    def setTree(x: Tree): Tree = {
+      val encoded = {
+        if (isUnitType) q"$x.asInstanceOf[AnyRef]"
+        else if (isRefType) x
+        else encodeLong(x)
+      }
+      q"""
+        scala.coroutines.common.Stack.set[$stacktpe](c.$stackname, $stackpos, $encoded)
+      """
+    }
     def getTree(coroutine: Tree): Tree = {
       val t = q"""
         scala.coroutines.common.Stack.get[$stacktpe]($coroutine.$stackname, $stackpos)

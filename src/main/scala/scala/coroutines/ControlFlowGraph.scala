@@ -82,10 +82,7 @@ trait ControlFlowGraph[C <: Context] {
         (sym, info) <- chain.allvars
         if subgraph.mustStoreVar(sym)
       } yield {
-        val stack = info.stackname
-        val pos = info.stackpos
-        val encodedval = info.encodeLong(q"${info.name}")
-        q"scala.coroutines.common.Stack.set($cparam.$stack, $pos, $encodedval)"
+        info.setTree(q"${info.name}")
       }
       // update pc state
       val pc = subgraph.exitSubgraphs(this).uid
@@ -368,11 +365,15 @@ trait ControlFlowGraph[C <: Context] {
         case ValDecl(t @ q"$_ val $_ = $c.apply($_)") if isCoroutineBlueprint(c.tpe) =>
           ch.addVar(t, false)
           val n = Node.ValCoroutineCall(t, ch, table.newNodeUid())
-          (n, n)
+          val u = Node.Statement(q"()", ch, table.newNodeUid())
+          n.successors += u
+          (n, u)
         case ValDecl(t @ q"$_ var $_ = $c.apply($_)") if isCoroutineBlueprint(c.tpe) =>
           ch.addVar(t, false)
           val n = Node.ValCoroutineCall(t, ch, table.newNodeUid())
-          (n, n)
+          val u = Node.Statement(q"()", ch, table.newNodeUid())
+          n.successors += u
+          (n, u)
         case ValDecl(t) =>
           ch.addVar(t, false)
           val n = Node.Val(t, ch, table.newNodeUid())
