@@ -101,7 +101,7 @@ trait Analyzer[C <: Context] {
     override def toString = s"VarInfo($uid, $sym)"
   }
 
-  class Table(val lambda: Tree) {
+  class Table(private val lambda: Tree) {
     private var varCount = 0
     private var nodeCount = 0L
     private var subgraphCount = 0L

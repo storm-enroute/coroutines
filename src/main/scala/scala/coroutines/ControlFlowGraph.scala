@@ -354,7 +354,9 @@ trait ControlFlowGraph[C <: Context] {
     }
   }
 
-  def genControlFlowGraph(tpt: Tree)(implicit table: Table): Cfg = {
+  def genControlFlowGraph(args: List[Tree], body: Tree, tpt: Tree)(
+    implicit table: Table
+  ): Cfg = {
     def traverse(t: Tree, ch: Chain): (Node, Node) = {
       t match {
         case q"coroutines.this.`package`.yieldval[$_]($_)" =>
@@ -421,12 +423,7 @@ trait ControlFlowGraph[C <: Context] {
       }
     }
 
-    val lambda = table.lambda
-    val (args, body) = lambda match {
-      case q"(..$args) => $body" => (args, body)
-      case _ => c.abort(lambda.pos, "The coroutine takes a single function literal.")
-    }
-
+    // add arguments to symbol table
     for (t <- args) {
       val q"$_ val $name: $_ = $_" = t
       table.topChain.addVar(t, true)

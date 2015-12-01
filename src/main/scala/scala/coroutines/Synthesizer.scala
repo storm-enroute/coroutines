@@ -186,21 +186,25 @@ with TwoOperandAssignmentTransform[C] {
       q"$argname"
     }
 
-    // transform to two operand assignment form
-    val toabody = transformToTwoOperandForm(body)
-    println("toa = " + toabody)
-
     // extract argument names and types
     val (argnames, argtpts) = (for (arg <- args) yield {
       val q"$_ val $name: $tpt = $_" = arg
       (name, tpt)
     }).unzip
 
+    // transform to two operand assignment form
+    val toabody = transformToTwoOperandForm(body)
+    println("----------------------------")
+    println("toa = " + toabody)
+    println("tpe = " + toabody.tpe)
+    val typedtoabody = c.typecheck(toabody)
+    println(typedtoabody.tpe)
+
     // infer coroutine return type
     val rettpt = inferReturnType(body)
 
     // generate control flow graph
-    val cfg = genControlFlowGraph(rettpt)
+    val cfg = genControlFlowGraph(args, body, rettpt)
 
     // generate entry points from yields and coroutine applications
     val entrypoints = genEntryPoints(cfg, rettpt)

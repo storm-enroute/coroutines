@@ -62,8 +62,13 @@ trait TwoOperandAssignmentTransform[C <: Context] {
   private def tearExpression(tree: Tree)(
     implicit table: Table
   ): (List[Tree], Tree) = tree match {
+    case q"$r.`package`" =>
+      // package selection
+      println("package selection: " + tree)
+      (Nil, tree)
     case q"$r.$member" =>
       // selection
+      println("selection: " + tree)
       val (rdecls, rident) = tearExpression(r)
       val localvarname = TermName(c.freshName())
       val localvartree = q"val $localvarname = $rident.$member"
@@ -72,6 +77,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       // application
       // TODO: translate boolean && and || to if statements, then regenerate, to adher
       // to the short-circuit evaluation rules
+      println("application: " + tree)
       val (rdecls, rident) = tearExpression(r)
       val (argdecls, argidents) = args.map(tearExpression).unzip
       val localvarname = TermName(c.freshName())
@@ -82,8 +88,12 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
       val (rdecls, rident) = tearExpression(r)
       (rdecls, q"$rident[..$tpts]")
-    case q"$x(..$args) = $v" =>
+    case q"$x = $v" =>
       // assignment
+      val (xdecls, xident) = tearExpression(x)
+      val (vdecls, vident) = tearExpression(v)
+      (xdecls ++ vdecls ++ List(q"$xident = $vident"), q"()")
+    case q"$x(..$args) = $v" =>
       // update
       val (xdecls, xident) = tearExpression(x)
       val (argdecls, argidents) = args.map(tearExpression).unzip
@@ -142,16 +152,15 @@ trait TwoOperandAssignmentTransform[C <: Context] {
         """
       }
       val (xdecls, xident) = tearExpression(x)
-      val nmatch = q"""
-        var $localvarname = null.asInstanceOf[${tree.tpe.widen}]
-
-        ..$xdecls
-
-        $x match {
-          case ..$ncases
-        }
-      """
-      (List(nmatch), q"$localvarname")
+      val decls =
+        List(q"var $localvarname = null.asInstanceOf[${tree.tpe.widen}]") ++
+        xdecls ++
+        List(q"""
+          $x match {
+            case ..$ncases
+          }
+        """)
+      (decls, q"$localvarname")
     case q"(..$params) => $body" =>
       // function
       NestedContextValidator.traverse(tree)
@@ -171,7 +180,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
               ${transform(body)}
 
               ..$xdecls
-              localvarname = $xident
+              $localvarname = $xident
             }
           """)
       } else List(q"""
@@ -191,7 +200,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
             ${transform(body)}
 
             ..$xdecls
-            localvarname = $xident
+            $localvarname = $xident
           } while ($localvarname)
         """
       ) else List(q"""
