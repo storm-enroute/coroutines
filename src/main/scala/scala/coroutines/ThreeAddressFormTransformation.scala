@@ -9,14 +9,17 @@ import scala.reflect.macros.whitebox.Context
 
 
 
-/** Transforms the coroutine body into a two operand assignment form with restricted
- *  control flow that contains only try-catch statements, while loops, do-while loops,
- *  if-statements, value and variable declarations, nested blocks and function calls.
+/** Transforms the coroutine body into three address form with restricted control flow
+ *  that contains only try-catch statements, while loops, do-while loops, if-statements,
+ *  value and variable declarations, pattern matches, nested blocks and function calls.
  *
  *  Newly synthesized variables get mangled fresh names, and existing variable names are
  *  preserved.
+ *
+ *  Coroutine operations usages are checked for correctness, and nested contexts, such
+ *  as function and class declarations, are checked, but not transformed.
  */
-trait TwoOperandAssignmentTransform[C <: Context] {
+trait ThreeAddressFormTransformation[C <: Context] {
   self: Analyzer[C] =>
 
   val c: C
@@ -255,22 +258,15 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       // type
       NestedContextValidator.traverse(tree)
       (Nil, tree)
-    case q"""
-      $_ class $_[..$_] $_(...$_)
-      extends { ..$_ } with ..$_ { $_ => ..$_ }
-    """ =>
+    case q"$_ class $_[..$_] $_(...$_) extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
       // class
       NestedContextValidator.traverse(tree)
       (Nil, tree)
-    case q"""
-      $_ trait $_[..$_] extends { ..$_ } with ..$_ { $_ => ..$_ }
-    """ =>
+    case q"$_ trait $_[..$_] extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
       // trait
       NestedContextValidator.traverse(tree)
       (Nil, tree)
-    case q"""
-      $_ object $_ extends { ..$_ } with ..$_ { $_ => ..$_ }
-    """ =>
+    case q"$_ object $_ extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
       // object
       NestedContextValidator.traverse(tree)
       (Nil, tree)
@@ -299,7 +295,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       q"..$decls"
   }
 
-  def transformToTwoOperandForm(body: Tree)(implicit table: Table): Tree = {
+  def transformToThreeAddressForm(body: Tree)(implicit table: Table): Tree = {
     // recursive transform of the body code
     transform(body)
   }

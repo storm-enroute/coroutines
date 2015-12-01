@@ -15,7 +15,7 @@ import scala.reflect.macros.whitebox.Context
 private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C]
 with ControlFlowGraph[C]
-with TwoOperandAssignmentTransform[C] {
+with ThreeAddressFormTransformation[C] {
   import c.universe._
 
   private def genEntryPoint(
@@ -193,7 +193,7 @@ with TwoOperandAssignmentTransform[C] {
     }).unzip
 
     // transform to two operand assignment form
-    val toabody = transformToTwoOperandForm(body)
+    val toabody = transformToThreeAddressForm(body)
     println("----------------------------")
     println("toa = " + toabody)
     println("tpe = " + toabody.tpe)
