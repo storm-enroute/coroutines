@@ -15,8 +15,6 @@ import scala.reflect.macros.whitebox.Context
  *
  *  Newly synthesized variables get mangled fresh names, and existing variable names are
  *  preserved.
- *
- *  Two operand transform also populates the `Table` object with local variable info.
  */
 trait TwoOperandAssignmentTransform[C <: Context] {
   self: Analyzer[C] =>
@@ -292,11 +290,7 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       q"..$decls"
   }
 
-  def transformToTwoOperandForm(args: List[Tree], body: Tree)(
-    implicit table: Table
-  ): Tree = {
-    // TODO save arguments to table
-
+  def transformToTwoOperandForm(body: Tree)(implicit table: Table): Tree = {
     // recursive transform of the body code
     transform(body)
   }

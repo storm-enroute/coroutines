@@ -187,7 +187,7 @@ with TwoOperandAssignmentTransform[C] {
     }
 
     // transform to two operand assignment form
-    val toabody = transformToTwoOperandForm(args, body)
+    val toabody = transformToTwoOperandForm(body)
     println("toa = " + toabody)
 
     // extract argument names and types
