@@ -334,9 +334,8 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c() == 2)
   }
 
-  test("value declaration should contain ") {
+  test("value declaration should be the last statement") {
     val unit = coroutine { () =>
-     //val x = (1, 1)
      val t = (2, 3)
      val (y, z) = t
     }
@@ -346,4 +345,11 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(!c.isAlive)
   }
 
+  test("coroutine should be callable outside value declaration") {
+    var y = 0
+    val setY = coroutine { (x: Int) => y = x }
+    val setTo5 = coroutine { () =>
+      setY(5)
+    }
+  }
 }
