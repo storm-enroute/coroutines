@@ -72,6 +72,8 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       (rdecls ++ List(localvartree), q"$localvarname")
     case q"$r.$method(..$args)" =>
       // application
+      // TODO: translate boolean && and || to if statements, then regenerate, to adher
+      // to the short-circuit evaluation rules
       val (rdecls, rident) = tearExpression(r)
       val (argdecls, argidents) = args.map(tearExpression).unzip
       val localvarname = TermName(c.freshName())
