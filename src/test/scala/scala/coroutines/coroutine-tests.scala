@@ -330,14 +330,20 @@ class ToaTransformationTest extends FunSuite with Matchers {
     val rube = coroutine { () =>
       if (0 < (if (math.abs(-1) > 5) 1 else 2)) 2 else 1
     }
+    val c = call(rube())
+    assert(c() == 2)
   }
 
-  test("") {
-    coroutine { () =>
+  test("value declaration should contain ") {
+    val unit = coroutine { () =>
      //val x = (1, 1)
      val t = (2, 3)
      val (y, z) = t
     }
+
+    val c = call(unit())
+    assert(c() == (()))
+    assert(!c.isAlive)
   }
 
 }

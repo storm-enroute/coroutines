@@ -229,9 +229,42 @@ trait TwoOperandAssignmentTransform[C <: Context] {
       disallowCoroutinesIn(tpt)
       (Nil, tree)
     case q"$mods val $v: $tpt = $rhs" =>
+      // val
       val (rhsdecls, rhsident) = tearExpression(rhs)
       val decls = rhsdecls ++ List(q"$mods val $v: $tpt = $rhsident")
       (decls, q"")
+    case q"$mods var $v: $tpt = $rhs" =>
+      // var
+      val (rhsdecls, rhsident) = tearExpression(rhs)
+      val decls = rhsdecls ++ List(q"$mods var $v: $tpt = $rhsident")
+      (decls, q"")
+    case q"$mods def $tname[..$tparams](...$paramss): $tpt = $expr" =>
+      // method
+      NestedContextValidator.traverse(tree)
+      (Nil, tree)
+    case q"$mods type $tpname[..$tparams] = $tpt" =>
+      // type
+      NestedContextValidator.traverse(tree)
+      (Nil, tree)
+    case q"""
+      $_ class $_[..$_] $_(...$_)
+      extends { ..$_ } with ..$_ { $_ => ..$_ }
+    """ =>
+      // class
+      NestedContextValidator.traverse(tree)
+      (Nil, tree)
+    case q"""
+      $_ trait $_[..$_] extends { ..$_ } with ..$_ { $_ => ..$_ }
+    """ =>
+      // trait
+      NestedContextValidator.traverse(tree)
+      (Nil, tree)
+    case q"""
+      $_ object $_ extends { ..$_ } with ..$_ { $_ => ..$_ }
+    """ =>
+      // object
+      NestedContextValidator.traverse(tree)
+      (Nil, tree)
     case _ =>
       // empty
       // literal
