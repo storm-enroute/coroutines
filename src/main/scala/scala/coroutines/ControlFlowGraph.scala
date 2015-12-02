@@ -74,10 +74,27 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     def extract(
+      current: Node,
       seen: mutable.Map[Node, Node],
       ctx: ExtractSubgraphContext,
       subgraph: SubCfg
-    )(implicit cc: CanCall, table: Table): Node = ???
+    )(implicit cc: CanCall, table: Table): Unit = {
+      // traverse successors
+      for (s <- this.successors) {
+        if (!seen.contains(s)) {
+          s.extractSubgraph(seen, ctx, subgraph)
+        }
+        current.successors += seen(s)
+      }
+    }
+
+    protected def addSuccessorsToNodeFront(ctx: ExtractSubgraphContext) {
+      // add successors to node front
+      for (s <- this.successors) if (!ctx.seenEntryPoints(s)) {
+        ctx.seenEntryPoints += s
+        ctx.nodefront.enqueue(s)
+      }
+    }
 
     def extractSubgraph(
       seen: mutable.Map[Node, Node],
@@ -102,47 +119,9 @@ trait ControlFlowGraph[C <: Context] {
         }
       }
 
-      def addToNodeFront() {
-        // add successors to node front
-        for (s <- this.successors) if (!ctx.seenEntryPoints(s)) {
-          ctx.seenEntryPoints += s
-          ctx.nodefront.enqueue(s)
-        }
-      }
+      import Permissions.canEmit
+      this.extract(current, seen, ctx, subgraph)
 
-      // check for termination condition
-      this.tree match {
-        case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
-          addToNodeFront()
-          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
-        case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
-          addToNodeFront()
-          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
-        case q"$_ val $_: $_ = coroutines.this.`package`.yieldto[$_]($_)" =>
-          addToNodeFront()
-          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
-        case q"$_ var $_: $_ = coroutines.this.`package`.yieldto[$_]($_)" =>
-          addToNodeFront()
-          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
-        case q"$_ val $_ = $co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
-          val coroutinetpe = coroutineTypeFor(ctx.rettpt.tpe)
-          if (!(co.tpe <:< coroutinetpe)) {
-            c.abort(co.pos,
-              s"Coroutine invocation site has invalid return type.\n" +
-              s"required: $coroutinetpe\n" +
-              s"found:    ${co.tpe} (with underlying type ${co.tpe.widen})")
-          }
-          addToNodeFront()
-          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
-        case _ =>
-          // traverse successors
-          for (s <- this.successors) {
-            if (!seen.contains(s)) {
-              s.extractSubgraph(seen, ctx, subgraph)
-            }
-            current.successors += seen(s)
-          }
-      }
       current
     }
 
@@ -247,6 +226,20 @@ trait ControlFlowGraph[C <: Context] {
           case None => z1
         }
       }
+      override def extract(
+        current: Node,
+        seen: mutable.Map[Node, Node],
+        ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit cc: CanCall, table: Table): Unit = {
+        // traverse successors
+        for (s <- this.successors) {
+          if (!seen.contains(s)) {
+            s.extractSubgraph(seen, ctx, subgraph)
+          }
+          current.successors += seen(s)
+        }
+      }
       def copyWithoutSuccessors(nch: Chain) = If(termuid, tree, nch, uid)
     }
 
@@ -267,6 +260,20 @@ trait ControlFlowGraph[C <: Context] {
           val termtree = genExit(this, subgraph)
           z.append(termtree)
         } else sys.error(s"Multiple successors for <$tree>.")
+      }
+      override def extract(
+        current: Node,
+        seen: mutable.Map[Node, Node],
+        ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit cc: CanCall, table: Table): Unit = {
+        // traverse successors
+        for (s <- this.successors) {
+          if (!seen.contains(s)) {
+            s.extractSubgraph(seen, ctx, subgraph)
+          }
+          current.successors += seen(s)
+        }
       }
       def copyWithoutSuccessors(nch: Chain) = IfTerm(nch, uid)
       override def isEmptyAtReturn = {
@@ -289,6 +296,20 @@ trait ControlFlowGraph[C <: Context] {
         val z1 = z.descend(trees => q"while ($untypedcond) ..$trees")
         successors(0).markEmit(z1, seen, subgraph)
       }
+      override def extract(
+        current: Node,
+        seen: mutable.Map[Node, Node],
+        ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit cc: CanCall, table: Table): Unit = {
+        // traverse successors
+        for (s <- this.successors) {
+          if (!seen.contains(s)) {
+            s.extractSubgraph(seen, ctx, subgraph)
+          }
+          current.successors += seen(s)
+        }
+      }
       def copyWithoutSuccessors(nch: Chain) = While(tree, nch, uid)
     }
 
@@ -309,6 +330,20 @@ trait ControlFlowGraph[C <: Context] {
           successors.last.markEmit(z2, seen, subgraph)
         } else sys.error(s"Number of successors for <$tree>: ${successors.length}")
       }
+      override def extract(
+        current: Node,
+        seen: mutable.Map[Node, Node],
+        ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit cc: CanCall, table: Table): Unit = {
+        // traverse successors
+        for (s <- this.successors) {
+          if (!seen.contains(s)) {
+            s.extractSubgraph(seen, ctx, subgraph)
+          }
+          current.successors += seen(s)
+        }
+      }
       def copyWithoutSuccessors(nch: Chain) = WhileTerm(nch, uid)
     }
 
@@ -323,6 +358,24 @@ trait ControlFlowGraph[C <: Context] {
         val q"$_ val $_: $_ = $co.apply(..$args)" = tree
         val termtree = genCoroutineCall(co, args, chain, subgraph)
         z.append(termtree)
+      }
+      override def extract(
+        current: Node,
+        seen: mutable.Map[Node, Node],
+        ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit cc: CanCall, table: Table): Unit = {
+        // traverse successors
+        val coroutinetpe = coroutineTypeFor(ctx.rettpt.tpe)
+        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
+        if (!(co.tpe <:< coroutinetpe)) {
+          c.abort(co.pos,
+            s"Coroutine invocation site has invalid return type.\n" +
+            s"required: $coroutinetpe\n" +
+            s"found:    ${co.tpe} (with underlying type ${co.tpe.widen})")
+        }
+        addSuccessorsToNodeFront(ctx)
+        ctx.exitPoints(subgraph)(current) = this.successors.head.uid
       }
       def copyWithoutSuccessors(nch: Chain) = ValCoroutineCall(tree, nch, uid)
       def genCoroutineCall(
@@ -358,6 +411,16 @@ trait ControlFlowGraph[C <: Context] {
         val z1 = z.append(termtree)
         z1
       }
+      override def extract(
+        current: Node,
+        seen: mutable.Map[Node, Node],
+        ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit cc: CanCall, table: Table): Unit = {
+        // traverse successors
+        addSuccessorsToNodeFront(ctx)
+        ctx.exitPoints(subgraph)(current) = this.successors.head.uid
+      }
       def copyWithoutSuccessors(nch: Chain) = YieldVal(tree, nch, uid)
     }
 
@@ -377,6 +440,16 @@ trait ControlFlowGraph[C <: Context] {
           return
         """
         z.append(termtree)
+      }
+      override def extract(
+        current: Node,
+        seen: mutable.Map[Node, Node],
+        ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit cc: CanCall, table: Table): Unit = {
+        // traverse successors
+        addSuccessorsToNodeFront(ctx)
+        ctx.exitPoints(subgraph)(current) = this.successors.head.uid
       }
       def copyWithoutSuccessors(nch: Chain) = YieldTo(tree, nch, uid)
     }

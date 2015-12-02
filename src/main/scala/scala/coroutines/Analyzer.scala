@@ -167,7 +167,7 @@ trait Analyzer[C <: Context] {
       val name = sym.name.toTermName
       val info = new VarInfo(table.newVarUid, valdef, sym.info, sym, name, isArg, table)
       vars(sym) = info
-      table.vars(sym) = info
+      if (!table.contains(sym)) table.vars(sym) = info
     }
     def copy: Chain = {
       val ch = new Chain(table, origtree, parent.copy)
