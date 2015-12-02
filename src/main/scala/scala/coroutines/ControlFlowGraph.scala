@@ -271,7 +271,10 @@ trait ControlFlowGraph[C <: Context] {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
       )(implicit ce: CanEmit, table: Table): Zipper = {
-        val q"coroutines.this.`package`.yieldval[$_]($x)" = tree
+        val x = tree match {
+          case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
+          case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
+        }
         val cparam = table.names.coroutineParam
         val savestate = genSaveState(chain, subgraph)
         val termtree = q"""
@@ -356,7 +359,12 @@ trait ControlFlowGraph[C <: Context] {
   ): Cfg = {
     def traverse(t: Tree, ch: Chain): (Node, Node) = {
       t match {
-        case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+        case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
+          ch.addVar(t, false)
+          val n = Node.YieldVal(t, ch, table.newNodeUid())
+          (n, n)
+        case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
+          ch.addVar(t, false)
           val n = Node.YieldVal(t, ch, table.newNodeUid())
           (n, n)
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
@@ -493,7 +501,10 @@ trait ControlFlowGraph[C <: Context] {
         addToNodeFront()
       }
       n.tree match {
-        case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+        case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
+          addToNodeFront()
+          exitPoints(subgraph)(current) = n.successors.head.uid
+        case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
           addToNodeFront()
           exitPoints(subgraph)(current) = n.successors.head.uid
         case q"coroutines.this.`package`.yieldto[$_]($_)" =>
