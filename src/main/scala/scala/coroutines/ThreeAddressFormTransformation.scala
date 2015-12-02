@@ -62,7 +62,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
     }
   }
 
-  private def tearExpression(tree: Tree)(
+  private def threeAddressForm(tree: Tree)(
     implicit typer: ByTreeTyper[c.type]
   ): (List[Tree], Tree) = tree match {
     case q"$r.`package`" =>
@@ -70,7 +70,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"$r.$member" =>
       // selection
-      val (rdecls, rident) = tearExpression(r)
+      val (rdecls, rident) = threeAddressForm(r)
       val localvarname = TermName(c.freshName())
       val localvartree = q"val $localvarname = $rident.$member"
       (rdecls ++ List(localvartree), q"$localvarname")
@@ -79,52 +79,52 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // TODO: translate boolean && and || to if statements, then regenerate, to adher
       // to the short-circuit evaluation rules
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
-      val (rdecls, rident) = tearExpression(r)
-      val (pdeclss, pidents) = paramss.map(_.map(tearExpression).unzip).unzip
+      val (rdecls, rident) = threeAddressForm(r)
+      val (pdeclss, pidents) = paramss.map(_.map(threeAddressForm).unzip).unzip
       val localvarname = TermName(c.freshName())
       val localvartree = q"val $localvarname = $rident.$method[..$tpts](...$pidents)"
       (rdecls ++ pdeclss.flatten.flatten ++ List(localvartree), q"$localvarname")
     case q"$r[..$tpts]" if tpts.length > 0 =>
       // type application
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
-      val (rdecls, rident) = tearExpression(r)
+      val (rdecls, rident) = threeAddressForm(r)
       (rdecls, q"$rident[..$tpts]")
     case q"$x = $v" =>
       // assignment
-      val (xdecls, xident) = tearExpression(x)
-      val (vdecls, vident) = tearExpression(v)
+      val (xdecls, xident) = threeAddressForm(x)
+      val (vdecls, vident) = threeAddressForm(v)
       (xdecls ++ vdecls ++ List(q"$xident = $vident"), q"()")
     case q"$x(..$args) = $v" =>
       // update
-      val (xdecls, xident) = tearExpression(x)
-      val (argdecls, argidents) = args.map(tearExpression).unzip
-      val (vdecls, vident) = tearExpression(v)
+      val (xdecls, xident) = threeAddressForm(x)
+      val (argdecls, argidents) = args.map(threeAddressForm).unzip
+      val (vdecls, vident) = threeAddressForm(v)
       (xdecls ++ argdecls.flatten ++ vdecls, q"$xident(..$argidents) = $vident")
     case q"return $_" =>
       // return
       c.abort(tree.pos, "The return statement is not allowed inside coroutines.")
     case q"throw $e" =>
       // throw
-      val (edecls, eident) = tearExpression(e)
+      val (edecls, eident) = threeAddressForm(e)
       (edecls, q"throw $eident")
     case q"$x: $tpt" =>
       // ascription
       disallowCoroutinesIn(tpt)
-      val (xdecls, xident) = tearExpression(x)
+      val (xdecls, xident) = threeAddressForm(x)
       (xdecls, q"xident: $tpt")
     case q"$x: @$annot" =>
       // annotation
-      val (xdecls, xident) = tearExpression(x)
+      val (xdecls, xident) = threeAddressForm(x)
       (xdecls, q"xident: $annot")
     case q"(..$xs)" if xs.length > 1 =>
       // tuples
-      val (xsdecls, xsidents) = xs.map(tearExpression).unzip
+      val (xsdecls, xsidents) = xs.map(threeAddressForm).unzip
       (xsdecls.flatten, q"(..$xsidents)")
     case q"if ($cond) $thenbranch else $elsebranch" =>
       // if
-      val (conddecls, condident) = tearExpression(cond)
-      val (thendecls, thenident) = tearExpression(thenbranch)
-      val (elsedecls, elseident) = tearExpression(elsebranch)
+      val (conddecls, condident) = threeAddressForm(cond)
+      val (thendecls, thenident) = threeAddressForm(thenbranch)
+      val (elsedecls, elseident) = threeAddressForm(elsebranch)
       val localvarname = TermName(c.freshName())
       val tpe = typer.typeOf(tree)
       val decls = List(
@@ -146,14 +146,14 @@ trait ThreeAddressFormTransformation[C <: Context] {
       val localvarname = TermName(c.freshName())
       val ncases = for (cq"$pat => $branch" <- cases) yield {
         disallowCoroutinesIn(pat)
-        val (branchdecls, branchident) = tearExpression(branch)
+        val (branchdecls, branchident) = threeAddressForm(branch)
         cq"""
           $pat =>
             ..$branchdecls
             $localvarname = $branchident
         """
       }
-      val (xdecls, xident) = tearExpression(x)
+      val (xdecls, xident) = threeAddressForm(x)
       val tpe = typer.typeOf(tree)
       val decls =
         List(q"var $localvarname = null.asInstanceOf[${tpe.widen}]") ++
@@ -173,7 +173,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"while ($cond) $body" =>
       // while
-      val (xdecls, xident) = tearExpression(cond)
+      val (xdecls, xident) = threeAddressForm(cond)
       val localvarname = TermName(c.freshName())
       val decls = if (xdecls != Nil) {
         xdecls ++ List(
@@ -194,7 +194,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (decls, q"()")
     case q"do $body while ($cond)" =>
       // do-while
-      val (xdecls, xident) = tearExpression(cond)
+      val (xdecls, xident) = threeAddressForm(cond)
       val localvarname = TermName(c.freshName())
       val decls = if (xdecls != Nil) xdecls ++ List(
         q"var $localvarname = $xident",
@@ -229,8 +229,8 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case Block(stats, expr) =>
       // block
       val localvarname = TermName(c.freshName())
-      val (statdecls, statidents) = stats.map(tearExpression).unzip
-      val (exprdecls, exprident) = tearExpression(q"$localvarname = $expr")
+      val (statdecls, statidents) = stats.map(threeAddressForm).unzip
+      val (exprdecls, exprident) = threeAddressForm(q"$localvarname = $expr")
       val tpe = typer.typeOf(expr)
       val decls =
         List(q"var $localvarname = null.asInstanceOf[${tpe.widen}]") ++
@@ -243,12 +243,12 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"$mods val $v: $tpt = $rhs" =>
       // val
-      val (rhsdecls, rhsident) = tearExpression(rhs)
+      val (rhsdecls, rhsident) = threeAddressForm(rhs)
       val decls = rhsdecls ++ List(q"$mods val $v: $tpt = $rhsident")
       (decls, q"")
     case q"$mods var $v: $tpt = $rhs" =>
       // var
-      val (rhsdecls, rhsident) = tearExpression(rhs)
+      val (rhsdecls, rhsident) = threeAddressForm(rhs)
       val decls = rhsdecls ++ List(q"$mods var $v: $tpt = $rhsident")
       (decls, q"")
     case q"$mods def $tname[..$tparams](...$paramss): $tpt = $expr" =>
@@ -284,8 +284,8 @@ trait ThreeAddressFormTransformation[C <: Context] {
     implicit typer: ByTreeTyper[c.type]
   ): Tree = tree match {
     case Block(stats, expr) =>
-      val (statdecls, statidents) = stats.map(tearExpression).unzip
-      val (exprdecls, exprident) = tearExpression(expr)
+      val (statdecls, statidents) = stats.map(threeAddressForm).unzip
+      val (exprdecls, exprident) = threeAddressForm(expr)
       q"""
         ..${statdecls.flatten}
 
@@ -294,7 +294,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
         $exprident
       """
     case t =>
-      val (decls, ident) = tearExpression(t)
+      val (decls, ident) = threeAddressForm(t)
       q"""
         ..$decls
 
