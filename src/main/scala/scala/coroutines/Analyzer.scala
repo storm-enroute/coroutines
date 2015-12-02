@@ -46,8 +46,12 @@ trait Analyzer[C <: Context] {
       sametpvars.size - 1 - sametpvars.toList.indexWhere(_._2.uid == uid)
     }
     def isUnitType = tpe =:= typeOf[Unit]
-    def isRefType = tpe <:< typeOf[AnyRef] || tpe =:= typeOf[Unit]
-    def isValType = tpe <:< typeOf[AnyVal] && !(tpe =:= typeOf[Unit])
+    def isRefType = {
+      tpe <:< typeOf[AnyRef] || tpe =:= typeOf[Unit] || tpe =:= typeOf[Any]
+    }
+    def isValType = {
+      tpe <:< typeOf[AnyVal] && !(tpe =:= typeOf[Unit]) && !(tpe =:= typeOf[Any])
+    }
     val defaultValue: Tree = {
       if (isRefType) q"null"
       else if (tpe =:= typeOf[Boolean]) q"false"
@@ -103,11 +107,14 @@ trait Analyzer[C <: Context] {
       """
     }
     def getTree(coroutine: Tree): Tree = {
-      val t = q"""
-        scala.coroutines.common.Stack.get[$stacktpe]($coroutine.$stackname, $stackpos)
-      """
-      if (isRefType) q"$t.asInstanceOf[$tpe]"
-      else decodeLong(t)
+      if (isUnitType) q"()"
+      else {
+        val t = q"""
+          scala.coroutines.common.Stack.get[$stacktpe]($coroutine.$stackname, $stackpos)
+        """
+        if (isRefType) q"$t.asInstanceOf[$tpe]"
+        else decodeLong(t)
+      }
     }
     override def toString = s"VarInfo($uid, $sym)"
   }
