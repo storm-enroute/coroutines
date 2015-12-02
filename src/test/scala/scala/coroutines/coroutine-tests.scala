@@ -61,30 +61,30 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(!c.isAlive)
   }
 
-  // test("should lub yieldvals and returns") {
-  //   val lists = coroutine { (x: Int) =>
-  //     yieldval(List(x))
-  //     List(x.toString)
-  //   }
-  //   val anotherLists: Coroutine.Blueprint[List[Any]] = lists
-  //   val c = call(lists(5))
-  //   assert(c() == List(5))
-  //   assert(c() == List("5"))
-  // }
+  test("should lub yieldvals and returns") {
+    val lists = coroutine { (x: Int) =>
+      yieldval(List(x))
+      List(x.toString)
+    }
+    val anotherLists: Coroutine.Blueprint[List[Any]] = lists
+    val c = call(lists(5))
+    assert(c() == List(5))
+    assert(c() == List("5"))
+  }
 
-  // test("should lub yieldtos and returns") {
-  //   val wrapString = coroutine { (x: String) =>
-  //     List(x.toString)
-  //   }
-  //   val f: Coroutine[List[String]] = call(wrapString("ok"))
-  //   val wrapInt = coroutine { (x: Int) =>
-  //     yieldto(f)
-  //     Vector(x)
-  //   }
-  //   val c = call(wrapInt(7))
-  //   assert(c() == List("ok"))
-  //   assert(c() == Vector(7))
-  // }
+  test("should lub yieldtos and returns") {
+    val wrapString = coroutine { (x: String) =>
+      List(x.toString)
+    }
+    val f: Coroutine[List[String]] = call(wrapString("ok"))
+    val wrapInt = coroutine { (x: Int) =>
+      yieldto(f)
+      Vector(x)
+    }
+    val c = call(wrapInt(7))
+    assert(c() == List("ok"))
+    assert(c() == Vector(7))
+  }
 
   // test("should declare body with if statement") {
   //   val xOrY = coroutine { (x: Int, y: Int) =>
