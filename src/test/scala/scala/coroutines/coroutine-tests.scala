@@ -29,18 +29,18 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c.tryGet() == Failure(CoroutineStoppedException()))
   }
 
-  test("should yield once") {
-    val plusMinus = coroutine { (x: Int) =>
-      yieldval(x)
-      -x
-    }
-    val c = call(plusMinus(5))
-    assert(c.isAlive)
-    assert(c() == 5)
-    assert(c.isAlive)
-    assert(c() == -5)
-    assert(!c.isAlive)
-  }
+  // test("should yield once") {
+  //   val plusMinus = coroutine { (x: Int) =>
+  //     yieldval(x)
+  //     -x
+  //   }
+  //   val c = call(plusMinus(5))
+  //   assert(c.isAlive)
+  //   assert(c() == 5)
+  //   assert(c.isAlive)
+  //   assert(c() == -5)
+  //   assert(!c.isAlive)
+  // }
 
   // test("should yield several times") {
   //   val sumAndDiffs = coroutine { (x: Int, y: Int) =>
