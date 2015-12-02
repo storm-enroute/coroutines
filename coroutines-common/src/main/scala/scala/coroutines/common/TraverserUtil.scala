@@ -93,10 +93,15 @@ class TraverserUtil[C <: Context](val c: C) {
           traverse(b0, b1)
           for ((c0, c1) <- cs0 zip cs1) traverse(c0, c1)
           traverse(f0, f1)
-        case (q"$a0(..$args0)", q"$a1(..$args1)") =>
+        case (q"$a0[..$tpts0](...$paramss0)", q"$a1[..$tpts1](...$paramss1)")
+          if tpts0.length > 0 || paramss0.length > 0 =>
           // application
+          println(t0)
           traverse(a0, a1)
-          for ((a0, a1) <- args0 zip args1) traverse(a0, a1)
+          for ((t0, t1) <- tpts0 zip tpts1) traverse(t0, t1)
+          for ((ps0, ps1) <- paramss0 zip paramss1; (p0, p1) <- ps0 zip ps1) {
+            traverse(p0, p1)
+          }
         case (q"$r0.$m0", q"$r1.$m1") =>
           // selection
           traverse(r0, r1)

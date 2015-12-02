@@ -180,7 +180,7 @@ with ThreeAddressFormTransformation[C] {
     println(typedtaflambda)
     println(typedtaflambda.tpe)
 
-    implicit val table = new Table(rawlambda)
+    implicit val table = new Table(typedtaflambda)
     
     // ensure that argument is a function literal
     val q"(..$args) => $body" = typedtaflambda
@@ -197,6 +197,7 @@ with ThreeAddressFormTransformation[C] {
 
     // infer coroutine return type
     val rettpt = inferReturnType(body)
+    println(s"inferred type: $rettpt")
 
     // generate control flow graph
     val cfg = genControlFlowGraph(args, body, rettpt)

@@ -72,15 +72,17 @@ trait ThreeAddressFormTransformation[C <: Context] {
       val localvarname = TermName(c.freshName())
       val localvartree = q"val $localvarname = $rident.$member"
       (rdecls ++ List(localvartree), q"$localvarname")
-    case q"$r.$method(..$args)" =>
+    case q"$r.$method[..$tpts](...$paramss)" if tpts.length > 0 || paramss.length > 0 =>
       // application
       // TODO: translate boolean && and || to if statements, then regenerate, to adher
       // to the short-circuit evaluation rules
+      println(s"application: $tree")
+      for (tpt <- tpts) disallowCoroutinesIn(tpt)
       val (rdecls, rident) = tearExpression(r)
-      val (argdecls, argidents) = args.map(tearExpression).unzip
+      val (pdeclss, pidents) = paramss.map(_.map(tearExpression).unzip).unzip
       val localvarname = TermName(c.freshName())
-      val localvartree = q"val $localvarname = $rident.$method(..$argidents)"
-      (rdecls ++ argdecls.flatten ++ List(localvartree), q"$localvarname")
+      val localvartree = q"val $localvarname = $rident.$method[..$tpts](...$pidents)"
+      (rdecls ++ pdeclss.flatten.flatten ++ List(localvartree), q"$localvarname")
     case q"$r[..$tpts]" if tpts.length > 0 =>
       // type application
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
@@ -271,21 +273,29 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // identifier
       // super selection
       // this selection
+      println("default: " + tree)
       (Nil, tree)
   }
 
   private def transform(tree: Tree): Tree = tree match {
     case Block(stats, expr) =>
       val (statdecls, statidents) = stats.map(tearExpression).unzip
+      println(tree + " -> " + statdecls)
       val (exprdecls, exprident) = tearExpression(expr)
       q"""
         ..${statdecls.flatten}
 
         ..$exprdecls
+
+        $exprident
       """
     case t =>
-      val (decls, _) = tearExpression(t)
-      q"..$decls"
+      val (decls, ident) = tearExpression(t)
+      q"""
+        ..$decls
+
+        $ident
+      """
   }
 
   def transformToThreeAddressForm(lambda: Tree): Tree = {

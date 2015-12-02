@@ -8,39 +8,39 @@ import scala.util.Failure
 
 
 class CoroutineTest extends FunSuite with Matchers {
-  // test("should not yield") {
-  //   val getOk = coroutine { () => "ok" }
-  //   val c = call(getOk())
-  //   assert(c.isAlive)
-  //   assert(c() == "ok")
-  //   assert(!c.isAlive)
-  // }
+  test("should not yield") {
+    val getOk = coroutine { () => "ok" }
+    val c = call(getOk())
+    assert(c.isAlive)
+    assert(c() == "ok")
+    assert(!c.isAlive)
+  }
 
-  // test("should throw when not alive") {
-  //   val gimmeFive = coroutine { () => 5 }
-  //   val c = call(gimmeFive())
-  //   assert(c.isAlive)
-  //   assert(c() == 5)
-  //   assert(!c.isAlive)
-  //   intercept[CoroutineStoppedException] {
-  //     c()
-  //   }
-  //   assert(c.get() == None)
-  //   assert(c.tryGet() == Failure(CoroutineStoppedException()))
-  // }
+  test("should throw when not alive") {
+    val gimmeFive = coroutine { () => 5 }
+    val c = call(gimmeFive())
+    assert(c.isAlive)
+    assert(c() == 5)
+    assert(!c.isAlive)
+    intercept[CoroutineStoppedException] {
+      c()
+    }
+    assert(c.get() == None)
+    assert(c.tryGet() == Failure(CoroutineStoppedException()))
+  }
 
-  // test("should yield once") {
-  //   val plusMinus = coroutine { (x: Int) =>
-  //     yieldval(x)
-  //     -x
-  //   }
-  //   val c = call(plusMinus(5))
-  //   assert(c.isAlive)
-  //   assert(c() == 5)
-  //   assert(c.isAlive)
-  //   assert(c() == -5)
-  //   assert(!c.isAlive)
-  // }
+  test("should yield once") {
+    val plusMinus = coroutine { (x: Int) =>
+      yieldval(x)
+      -x
+    }
+    val c = call(plusMinus(5))
+    assert(c.isAlive)
+    assert(c() == 5)
+    assert(c.isAlive)
+    assert(c() == -5)
+    assert(!c.isAlive)
+  }
 
   // test("should yield several times") {
   //   val sumAndDiffs = coroutine { (x: Int, y: Int) =>
@@ -189,7 +189,7 @@ class CoroutineTest extends FunSuite with Matchers {
   // }
 
   // test("coroutine should contain two assignments at the end of two branches") {
-  //   val c1 = coroutine { (x: Int) => 2 * x }
+  //   val c1 = coroutine { (n: Int) => 2 * n }
   //   val c2 = coroutine { (x: Int) =>
   //     var y = 0
   //     if (x > 0) {
