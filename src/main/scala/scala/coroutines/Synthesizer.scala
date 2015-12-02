@@ -175,9 +175,7 @@ with ThreeAddressFormTransformation[C] {
 
   def synthesize(rawlambda: Tree): Tree = {
     // transform to two operand assignment form
-    val untypedrawlambda = c.untypecheck(rawlambda)
-    val taflambda = transformToThreeAddressForm(untypedrawlambda)
-    val typedtaflambda = c.typecheck(taflambda)
+    val typedtaflambda = transformToThreeAddressForm(rawlambda)
     println(typedtaflambda)
     println(typedtaflambda.tpe)
 

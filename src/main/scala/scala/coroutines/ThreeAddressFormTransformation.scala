@@ -62,7 +62,9 @@ trait ThreeAddressFormTransformation[C <: Context] {
     }
   }
 
-  private def tearExpression(tree: Tree): (List[Tree], Tree) = tree match {
+  private def tearExpression(tree: Tree)(
+    implicit typer: ByTreeTyper[c.type]
+  ): (List[Tree], Tree) = tree match {
     case q"$r.`package`" =>
       // package selection
       (Nil, tree)
@@ -124,8 +126,9 @@ trait ThreeAddressFormTransformation[C <: Context] {
       val (thendecls, thenident) = tearExpression(thenbranch)
       val (elsedecls, elseident) = tearExpression(elsebranch)
       val localvarname = TermName(c.freshName())
+      val tpe = typer.typeOf(tree)
       val decls = List(
-        q"var $localvarname = null.asInstanceOf[${tree.tpe}]",
+        q"var $localvarname = null.asInstanceOf[$tpe]",
         q"""
           ..$conddecls
           if ($condident) {
@@ -151,8 +154,9 @@ trait ThreeAddressFormTransformation[C <: Context] {
         """
       }
       val (xdecls, xident) = tearExpression(x)
+      val tpe = typer.typeOf(tree)
       val decls =
-        List(q"var $localvarname = null.asInstanceOf[${tree.tpe.widen}]") ++
+        List(q"var $localvarname = null.asInstanceOf[${tpe.widen}]") ++
         xdecls ++
         List(q"""
           $x match {
@@ -227,8 +231,9 @@ trait ThreeAddressFormTransformation[C <: Context] {
       val localvarname = TermName(c.freshName())
       val (statdecls, statidents) = stats.map(tearExpression).unzip
       val (exprdecls, exprident) = tearExpression(q"$localvarname = $expr")
+      val tpe = typer.typeOf(expr)
       val decls =
-        List(q"var $localvarname = null.asInstanceOf[${expr.tpe.widen}]") ++
+        List(q"var $localvarname = null.asInstanceOf[${tpe.widen}]") ++
         statdecls.flatten ++
         exprdecls
       (decls, q"$localvarname")
@@ -275,7 +280,9 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
   }
 
-  private def transform(tree: Tree): Tree = tree match {
+  private def transform(tree: Tree)(
+    implicit typer: ByTreeTyper[c.type]
+  ): Tree = tree match {
     case Block(stats, expr) =>
       val (statdecls, statidents) = stats.map(tearExpression).unzip
       val (exprdecls, exprident) = tearExpression(expr)
@@ -295,14 +302,20 @@ trait ThreeAddressFormTransformation[C <: Context] {
       """
   }
 
-  def transformToThreeAddressForm(lambda: Tree): Tree = {
+  def transformToThreeAddressForm(rawlambda: Tree): Tree = {
+    //val untypedrawlambda = c.untypecheck(rawlambda)
+    val typer = new ByTreeTyper[c.type](c)(rawlambda)
+    val untypedrawlambda = typer.untypedTree
+
     // separate to arguments and body
-    val (args, body) = lambda match {
+    val (args, body) = untypedrawlambda match {
       case q"(..$args) => $body" => (args, body)
-      case _ => c.abort(lambda.pos, "The coroutine takes a single function literal.")
+      case t => c.abort(t.pos, "The coroutine takes a single function literal.")
     }
 
     // recursive transform of the body code
-    q"(..$args) => ${transform(body)}"
+    val transformedBody = transform(body)(typer)
+    val untypedtaflambda = q"(..$args) => $transformedBody"
+    c.typecheck(untypedtaflambda)
   }
 }
