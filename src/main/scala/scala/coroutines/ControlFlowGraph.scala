@@ -18,10 +18,10 @@ trait ControlFlowGraph[C <: Context] {
 
   import c.universe._
 
-  private sealed trait CanEmit
+  private sealed trait CanCall
 
   private object Permissions {
-    implicit object canEmit extends CanEmit
+    implicit object canEmit extends CanCall
   }
 
   abstract class Node {
@@ -59,6 +59,10 @@ trait ControlFlowGraph[C <: Context] {
       finalzipper
     }
 
+    def emit(
+      z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
+    )(implicit cc: CanCall, t: Table): Zipper
+
     final def markEmit(
       z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
     )(implicit t: Table): Zipper = {
@@ -69,16 +73,15 @@ trait ControlFlowGraph[C <: Context] {
       } else z
     }
 
-    def emit(
-      z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-    )(implicit ce: CanEmit, t: Table): Zipper
+    def extract(
+      seen: mutable.Map[Node, Node],
+      ctx: ExtractSubgraphContext,
+      subgraph: SubCfg
+    )(implicit cc: CanCall, table: Table): Node = ???
 
     def extractSubgraph(
       seen: mutable.Map[Node, Node],
-      seenEntryPoints: mutable.Set[Node],
-      nodefront: mutable.Queue[Node],
-      exitPoints: mutable.Map[SubCfg, mutable.Map[Node, Long]],
-      rettpt: Tree,
+      ctx: ExtractSubgraphContext,
       subgraph: SubCfg
     )(implicit table: Table): Node = {
       // duplicate and mark current node as seen
@@ -99,46 +102,43 @@ trait ControlFlowGraph[C <: Context] {
         }
       }
 
-      // check for termination condition
       def addToNodeFront() {
         // add successors to node front
-        for (s <- this.successors) if (!seenEntryPoints(s)) {
-          seenEntryPoints += s
-          nodefront.enqueue(s)
+        for (s <- this.successors) if (!ctx.seenEntryPoints(s)) {
+          ctx.seenEntryPoints += s
+          ctx.nodefront.enqueue(s)
         }
       }
-      def addCoroutineInvocationToNodeFront(co: Tree) {
-        val coroutinetpe = coroutineTypeFor(rettpt.tpe)
-        if (!(co.tpe <:< coroutinetpe)) {
-          c.abort(co.pos,
-            s"Coroutine invocation site has invalid return type.\n" +
-            s"required: $coroutinetpe\n" +
-            s"found:    ${co.tpe} (with underlying type ${co.tpe.widen})")
-        }
-        addToNodeFront()
-      }
+
+      // check for termination condition
       this.tree match {
         case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
           addToNodeFront()
-          exitPoints(subgraph)(current) = this.successors.head.uid
+          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
         case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
           addToNodeFront()
-          exitPoints(subgraph)(current) = this.successors.head.uid
+          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
         case q"$_ val $_: $_ = coroutines.this.`package`.yieldto[$_]($_)" =>
           addToNodeFront()
-          exitPoints(subgraph)(current) = this.successors.head.uid
+          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
         case q"$_ var $_: $_ = coroutines.this.`package`.yieldto[$_]($_)" =>
           addToNodeFront()
-          exitPoints(subgraph)(current) = this.successors.head.uid
+          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
         case q"$_ val $_ = $co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
-          addCoroutineInvocationToNodeFront(co)
-          exitPoints(subgraph)(current) = this.successors.head.uid
+          val coroutinetpe = coroutineTypeFor(ctx.rettpt.tpe)
+          if (!(co.tpe <:< coroutinetpe)) {
+            c.abort(co.pos,
+              s"Coroutine invocation site has invalid return type.\n" +
+              s"required: $coroutinetpe\n" +
+              s"found:    ${co.tpe} (with underlying type ${co.tpe.widen})")
+          }
+          addToNodeFront()
+          ctx.exitPoints(subgraph)(current) = this.successors.head.uid
         case _ =>
           // traverse successors
           for (s <- this.successors) {
             if (!seen.contains(s)) {
-              s.extractSubgraph(
-                seen, seenEntryPoints, nodefront, exitPoints, rettpt, subgraph)
+              s.extractSubgraph(seen, ctx, subgraph)
             }
             current.successors += seen(s)
           }
@@ -228,7 +228,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit ce: CanEmit, table: Table): Zipper = {
+      )(implicit cc: CanCall, table: Table): Zipper = {
         val q"if ($cond) $_ else $_" = tree
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
         val newSeen = subgraph.all.get(termuid) match {
@@ -254,7 +254,7 @@ trait ControlFlowGraph[C <: Context] {
       val tree: Tree = q""
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit ce: CanEmit, table: Table): Zipper = {
+      )(implicit cc: CanCall, table: Table): Zipper = {
         if (successors.length == 1) {
           if (successors.head.isEmptyAtReturn) {
             val termtree = genExit(this, subgraph)
@@ -283,7 +283,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit ce: CanEmit, table: Table): Zipper = {
+      )(implicit cc: CanCall, table: Table): Zipper = {
         val q"while ($cond) $body" = tree
         val untypedcond = table.untyper.untypecheck(cond)
         val z1 = z.descend(trees => q"while ($untypedcond) ..$trees")
@@ -296,7 +296,7 @@ trait ControlFlowGraph[C <: Context] {
       val tree: Tree = q""
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit ce: CanEmit, table: Table): Zipper = {
+      )(implicit cc: CanCall, table: Table): Zipper = {
         if (successors.length == 1) {
           // do nothing
           val z1 = z.ascend
@@ -319,7 +319,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit ce: CanEmit, table: Table): Zipper = {
+      )(implicit cc: CanCall, table: Table): Zipper = {
         val q"$_ val $_: $_ = $co.apply(..$args)" = tree
         val termtree = genCoroutineCall(co, args, chain, subgraph)
         z.append(termtree)
@@ -343,7 +343,7 @@ trait ControlFlowGraph[C <: Context] {
     case class YieldVal(tree: Tree, chain: Chain, uid: Long) extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit ce: CanEmit, table: Table): Zipper = {
+      )(implicit cc: CanCall, table: Table): Zipper = {
         val x = tree match {
           case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
           case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
@@ -364,7 +364,7 @@ trait ControlFlowGraph[C <: Context] {
     case class YieldTo(tree: Tree, chain: Chain, uid: Long) extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit ce: CanEmit, table: Table): Zipper = {
+      )(implicit cc: CanCall, table: Table): Zipper = {
         val co = tree match {
           case q"$_ val $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
           case q"$_ var $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
@@ -384,7 +384,7 @@ trait ControlFlowGraph[C <: Context] {
     abstract class AnyStatement extends Node {
       def emit(
         z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit ce: CanEmit, table: Table): Zipper = {
+      )(implicit cc: CanCall, table: Table): Zipper = {
         // inside the control-flow-construct, normal statement
         if (successors.length == 1) {
           if (successors.head.isEmptyAtReturn) {
@@ -538,39 +538,42 @@ trait ControlFlowGraph[C <: Context] {
     cfg
   }
 
-  def extractSubgraphs(
-    start: Node, rettpt: Tree
-  )(implicit table: Table): Map[Node, SubCfg] = {
+  class ExtractSubgraphContext(val rettpt: Tree) {
     val subgraphs = mutable.LinkedHashMap[Node, SubCfg]()
     val exitPoints = mutable.Map[SubCfg, mutable.Map[Node, Long]]()
     val seenEntryPoints = mutable.Set[Node]()
     val nodefront = mutable.Queue[Node]()
-    seenEntryPoints += start
-    nodefront.enqueue(start)
+  }
+
+  def extractSubgraphs(start: Node, rettpt: Tree)(
+    implicit table: Table
+  ): Map[Node, SubCfg] = {
+    val ctx = new ExtractSubgraphContext(rettpt)
+    ctx.seenEntryPoints += start
+    ctx.nodefront.enqueue(start)
 
     // as long as there are more nodes on the expansion front, extract them
-    while (nodefront.nonEmpty) {
+    while (ctx.nodefront.nonEmpty) {
       val subgraph = new SubCfg(table.newSubgraphUid())
-      val node = nodefront.dequeue()
-      exitPoints(subgraph) = mutable.Map[Node, Long]()
-      subgraph.start = node.extractSubgraph(
-        mutable.Map(), seenEntryPoints, nodefront, exitPoints, rettpt, subgraph)
+      val node = ctx.nodefront.dequeue()
+      ctx.exitPoints(subgraph) = mutable.Map[Node, Long]()
+      subgraph.start = node.extractSubgraph(mutable.Map(), ctx, subgraph)
       subgraph.all ++= subgraph.start.dfs.map(n => n.uid -> n)
-      subgraphs(node) = subgraph
+      ctx.subgraphs(node) = subgraph
     }
 
     // assign respective subgraph reference to each exit point node
-    val startPoints = subgraphs.map(s => s._2.start.uid -> s._2).toMap
-    for ((subgraph, exitMap) <- exitPoints; (node, nextUid) <- exitMap) {
+    val startPoints = ctx.subgraphs.map(s => s._2.start.uid -> s._2).toMap
+    for ((subgraph, exitMap) <- ctx.exitPoints; (node, nextUid) <- exitMap) {
       subgraph.exitSubgraphs(node) = startPoints(nextUid)
     }
 
-    println(subgraphs
+    println(ctx.subgraphs
       .map({ case (k, v) => 
         "[" + v.referencedVars.keys.mkString(", ") + "]\n" + v.start.prettyPrint + "\n"
       })
       .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
       .mkString("\n"))
-    subgraphs
+    ctx.subgraphs
   }
 }
