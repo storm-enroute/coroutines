@@ -169,6 +169,11 @@ trait Analyzer[C <: Context] {
       vars(sym) = info
       table.vars(sym) = info
     }
+    def copy: Chain = {
+      val ch = new Chain(table, origtree, parent.copy)
+      for (kv <- vars) ch.vars += kv
+      ch
+    }
     override def toString = {
       val s = s"[${vars.map(_._2.sym).mkString(", ")}] -> "
       if (parent != null) s + parent.toString else s
