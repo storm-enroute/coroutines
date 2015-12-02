@@ -80,7 +80,7 @@ trait ControlFlowGraph[C <: Context] {
       // store state for non-val variables in scope
       val stacksets = for {
         (sym, info) <- chain.allvars
-        if subgraph.mustStoreVar(sym)
+        if subgraph.mustStoreVar(sym, chain)
       } yield {
         info.setTree(q"${t.names.coroutineParam}", q"${info.name}")
       }
@@ -350,10 +350,17 @@ trait ControlFlowGraph[C <: Context] {
     val exitSubgraphs = mutable.LinkedHashMap[Node, SubCfg]()
     var start: Node = _
     val all = mutable.Map[Long, Node]()
+    // TODO: rename this method to something more meaningful
     def usesVar(sym: Symbol) = referencedVars.contains(sym)
     def declaresVar(sym: Symbol) = declaredVars.contains(sym)
-    def mustStoreVar(sym: Symbol) = {
-      usesVar(sym) && (sym.asTerm.isVar || declaresVar(sym))
+    def mustStoreVar(sym: Symbol, ch: Chain) = {
+      val isInScope = ch.contains(sym)
+      val wasUsed = usesVar(sym)
+      // TODO: fix the 'assign' part here
+      val declaredOrAssigned = sym.asTerm.isVar || declaresVar(sym)
+      println(sym, isInScope, wasUsed, declaredOrAssigned)
+      println(ch)
+      isInScope && wasUsed && declaredOrAssigned
     }
   }
 

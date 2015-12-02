@@ -72,7 +72,9 @@ trait Analyzer[C <: Context] {
       else sys.error(s"Cannot encode type $tpe as Long.")
     }
     private def decodeLong(t: Tree): Tree = {
-      if (tpe =:= typeOf[Int]) q"($t & 0xffffffff).toInt"
+      if (tpe =:= typeOf[Boolean]) q"($t != 0)"
+      else if (tpe =:= typeOf[Int]) q"($t & 0xffffffff).toInt"
+      else if (tpe =:= typeOf[Long]) q"$t"
       else sys.error(s"Cannot decode type $tpe from Long.")
     }
     val initialValue: Tree = {
@@ -157,6 +159,8 @@ trait Analyzer[C <: Context] {
     def allvars: Iterator[(Symbol, VarInfo)] = {
       vars.iterator ++ (if (parent != null) parent.allvars else Iterator.empty)
     }
+    def contains(sym: Symbol): Boolean =
+      vars.contains(sym) || (parent != null && parent.contains(sym))
     def newChain(subtree: Tree) = new Chain(table, subtree, this)
     def addVar(valdef: Tree, isArg: Boolean) {
       val sym = valdef.symbol

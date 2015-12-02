@@ -251,6 +251,7 @@ class CoroutineTest extends FunSuite with Matchers {
   //   }
   //   val c = call(numbers())
   //   for (i <- 0 to 10) assert(c() == i)
+  //   assert(c.isStopped)
   // }
 
   // test("coroutine should have a nested if statement") {
