@@ -106,7 +106,7 @@ with ThreeAddressFormTransformation[C] {
       val sub = cfg.subgraphs(n.successors.head)
       val pcvalue = sub.uid
       val info = table(n.tree.symbol)
-      val rvset = info.setTree(q"v")
+      val rvset = info.setTree(q"c", q"v")
       (pcvalue, q"$rvset")
     }
     val returnstores = cfg.start.dfs.collect {
@@ -158,7 +158,7 @@ with ThreeAddressFormTransformation[C] {
         scala.coroutines.common.Stack.bulkPush($stack, ${vars.size}, $stacksize)
       """)
       val args = vars.values.filter(_.isArg).toList
-      val argsets = for (a <- args) yield a.setTree(q"${a.name}")
+      val argsets = for (a <- args) yield a.setTree(q"c", q"${a.name}")
       bulkpushes ::: argsets
     }
     val varpushes = {
@@ -175,7 +175,8 @@ with ThreeAddressFormTransformation[C] {
 
   def synthesize(rawlambda: Tree): Tree = {
     // transform to two operand assignment form
-    val taflambda = transformToThreeAddressForm(rawlambda)
+    val untypedrawlambda = c.untypecheck(rawlambda)
+    val taflambda = transformToThreeAddressForm(untypedrawlambda)
     val typedtaflambda = c.typecheck(taflambda)
     println(typedtaflambda)
     println(typedtaflambda.tpe)

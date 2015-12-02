@@ -91,14 +91,15 @@ trait Analyzer[C <: Context] {
     def popTree = q"""
       scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
     """
-    def setTree(x: Tree): Tree = {
+    def setTree(coroutine: Tree, x: Tree): Tree = {
       val encoded = {
         if (isUnitType) q"$x.asInstanceOf[AnyRef]"
         else if (isRefType) x
         else encodeLong(x)
       }
       q"""
-        scala.coroutines.common.Stack.set[$stacktpe](c.$stackname, $stackpos, $encoded)
+        scala.coroutines.common.Stack.set[$stacktpe](
+          $coroutine.$stackname, $stackpos, $encoded)
       """
     }
     def getTree(coroutine: Tree): Tree = {

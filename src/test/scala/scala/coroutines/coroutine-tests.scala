@@ -42,24 +42,24 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(!c.isAlive)
   }
 
-  // test("should yield several times") {
-  //   val sumAndDiffs = coroutine { (x: Int, y: Int) =>
-  //     val sum = x + y
-  //     yieldval(sum)
-  //     val diff1 = x - y
-  //     yieldval(diff1)
-  //     val diff2 = y - x
-  //     diff2
-  //   }
-  //   val c = call(sumAndDiffs(1, 2))
-  //   assert(c.isAlive)
-  //   assert(c() == 3)
-  //   assert(c.isAlive)
-  //   assert(c() == -1)
-  //   assert(c.isAlive)
-  //   assert(c() == 1)
-  //   assert(!c.isAlive)
-  // }
+  test("should yield several times") {
+    val sumAndDiffs = coroutine { (x: Int, y: Int) =>
+      val sum = x + y
+      yieldval(sum)
+      val diff1 = x - y
+      yieldval(diff1)
+      val diff2 = y - x
+      diff2
+    }
+    val c = call(sumAndDiffs(1, 2))
+    assert(c.isAlive)
+    assert(c() == 3)
+    assert(c.isAlive)
+    assert(c() == -1)
+    assert(c.isAlive)
+    assert(c() == 1)
+    assert(!c.isAlive)
+  }
 
   // test("should lub yieldvals and returns") {
   //   val lists = coroutine { (x: Int) =>

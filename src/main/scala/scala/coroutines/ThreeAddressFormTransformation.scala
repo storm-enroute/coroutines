@@ -76,7 +76,6 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // application
       // TODO: translate boolean && and || to if statements, then regenerate, to adher
       // to the short-circuit evaluation rules
-      println(s"application: $tree")
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
       val (rdecls, rident) = tearExpression(r)
       val (pdeclss, pidents) = paramss.map(_.map(tearExpression).unzip).unzip
@@ -273,14 +272,12 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // identifier
       // super selection
       // this selection
-      println("default: " + tree)
       (Nil, tree)
   }
 
   private def transform(tree: Tree): Tree = tree match {
     case Block(stats, expr) =>
       val (statdecls, statidents) = stats.map(tearExpression).unzip
-      println(tree + " -> " + statdecls)
       val (exprdecls, exprident) = tearExpression(expr)
       q"""
         ..${statdecls.flatten}

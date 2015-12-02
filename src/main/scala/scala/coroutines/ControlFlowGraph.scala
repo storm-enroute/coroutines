@@ -82,7 +82,7 @@ trait ControlFlowGraph[C <: Context] {
         (sym, info) <- chain.allvars
         if subgraph.mustStoreVar(sym)
       } yield {
-        info.setTree(q"${info.name}")
+        info.setTree(q"${t.names.coroutineParam}", q"${info.name}")
       }
       // update pc state
       val pc = subgraph.exitSubgraphs(this).uid
