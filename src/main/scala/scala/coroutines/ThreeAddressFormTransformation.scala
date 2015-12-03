@@ -71,7 +71,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case q"$r.$member" =>
       // selection
       val (rdecls, rident) = threeAddressForm(r)
-      val localvarname = TermName(c.freshName())
+      val localvarname = TermName(c.freshName("x"))
       val localvartree = q"val $localvarname = $rident.$member"
       (rdecls ++ List(localvartree), q"$localvarname")
     case q"$r.$method[..$tpts](...$paramss)" if tpts.length > 0 || paramss.length > 0 =>
@@ -81,7 +81,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
       val (rdecls, rident) = threeAddressForm(r)
       val (pdeclss, pidents) = paramss.map(_.map(threeAddressForm).unzip).unzip
-      val localvarname = TermName(c.freshName())
+      val localvarname = TermName(c.freshName("x"))
       val localvartree = q"val $localvarname = $rident.$method[..$tpts](...$pidents)"
       (rdecls ++ pdeclss.flatten.flatten ++ List(localvartree), q"$localvarname")
     case q"$r[..$tpts]" if tpts.length > 0 =>
@@ -125,7 +125,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       val (conddecls, condident) = threeAddressForm(cond)
       val (thendecls, thenident) = threeAddressForm(thenbranch)
       val (elsedecls, elseident) = threeAddressForm(elsebranch)
-      val localvarname = TermName(c.freshName())
+      val localvarname = TermName(c.freshName("x"))
       val tpe = typer.typeOf(tree)
       val decls = List(
         q"var $localvarname = null.asInstanceOf[$tpe]",
@@ -143,7 +143,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (decls, q"$localvarname")
     case q"$x match { case ..$cases }" =>
       // pattern match
-      val localvarname = TermName(c.freshName())
+      val localvarname = TermName(c.freshName("x"))
       val ncases = for (cq"$pat => $branch" <- cases) yield {
         disallowCoroutinesIn(pat)
         val (branchdecls, branchident) = threeAddressForm(branch)
@@ -174,7 +174,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case q"while ($cond) $body" =>
       // while
       val (xdecls, xident) = threeAddressForm(cond)
-      val localvarname = TermName(c.freshName())
+      val localvarname = TermName(c.freshName("x"))
       val decls = if (xdecls != Nil) {
         xdecls ++ List(
           q"var $localvarname = $xident",
@@ -195,7 +195,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case q"do $body while ($cond)" =>
       // do-while
       val (xdecls, xident) = threeAddressForm(cond)
-      val localvarname = TermName(c.freshName())
+      val localvarname = TermName(c.freshName("x"))
       val decls = if (xdecls != Nil) xdecls ++ List(
         q"var $localvarname = $xident",
         q"""
@@ -228,7 +228,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case Block(stats, expr) =>
       // block
-      val localvarname = TermName(c.freshName())
+      val localvarname = TermName(c.freshName("x"))
       val (statdecls, statidents) = stats.map(threeAddressForm).unzip
       val (exprdecls, exprident) = threeAddressForm(q"$localvarname = $expr")
       val tpe = typer.typeOf(expr)

@@ -126,7 +126,7 @@ trait Analyzer[C <: Context] {
     private var nodeCount = 0L
     private var subgraphCount = 0L
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    val topChain = new Chain(this, lambda, null)
+    val topChain = new Chain(this, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
     def initialStackSize: Int = 4
     object names {
@@ -154,28 +154,33 @@ trait Analyzer[C <: Context] {
     def valvars = vars.filter(_._2.isValType)
   }
 
-  class Chain(val table: Table, val origtree: Tree, val parent: Chain) {
+  class Chain(val table: Table, val parent: Chain) {
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
     def allvars: Iterator[(Symbol, VarInfo)] = {
       vars.iterator ++ (if (parent != null) parent.allvars else Iterator.empty)
     }
     def contains(sym: Symbol): Boolean =
       vars.contains(sym) || (parent != null && parent.contains(sym))
-    def newChain(subtree: Tree) = new Chain(table, subtree, this)
+    def newChain = new Chain(table, this)
     def addVar(valdef: Tree, isArg: Boolean) {
       val sym = valdef.symbol
       val name = sym.name.toTermName
-      val info = new VarInfo(table.newVarUid, valdef, sym.info, sym, name, isArg, table)
+      val info = table.vars.get(sym) match {
+        case Some(info) =>
+          info
+        case None =>
+          new VarInfo(table.newVarUid, valdef, sym.info, sym, name, isArg, table)
+      }
+      table.vars(sym) = info
       vars(sym) = info
-      if (!table.contains(sym)) table.vars(sym) = info
     }
     def copy: Chain = {
-      val ch = new Chain(table, origtree, parent.copy)
+      val ch = new Chain(table, if (parent != null) parent.copy else null)
       for (kv <- vars) ch.vars += kv
       ch
     }
     override def toString = {
-      val s = s"[${vars.map(_._2.sym).mkString(", ")}] -> "
+      val s = s"[${vars.map(_._1.name).mkString(", ")}] -> "
       if (parent != null) s + parent.toString else s
     }
   }

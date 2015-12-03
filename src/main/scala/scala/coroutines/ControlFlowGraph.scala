@@ -41,6 +41,8 @@ trait ControlFlowGraph[C <: Context] {
 
     def isEmptyAtReturn = false
 
+    def className: String = getClass.getName.dropWhile(_ != '$')
+
     final def dfs: Seq[Node] = {
       val seen = mutable.LinkedHashSet[Node]()
       def traverse(n: Node) {
@@ -75,6 +77,7 @@ trait ControlFlowGraph[C <: Context] {
 
     def extract(
       current: Node,
+      currchain: Chain,
       seen: mutable.Map[Node, Node],
       ctx: ExtractSubgraphContext,
       subgraph: SubCfg
@@ -82,7 +85,7 @@ trait ControlFlowGraph[C <: Context] {
       // traverse successors
       for (s <- this.successors) {
         if (!seen.contains(s)) {
-          s.extractSubgraph(seen, ctx, subgraph)
+          s.extractSubgraph(currchain, seen, ctx, subgraph)
         }
         current.successors += seen(s)
       }
@@ -97,13 +100,17 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     def extractSubgraph(
+      currchain: Chain,
       seen: mutable.Map[Node, Node],
       ctx: ExtractSubgraphContext,
       subgraph: SubCfg
     )(implicit table: Table): Node = {
       // duplicate and mark current node as seen
-      val current = this.copyWithoutSuccessors(this.chain)
+      val current = this.copyWithoutSuccessors(currchain)
       seen(this) = current
+      println(className + ", " + tree.toString.take(20))
+      println(this.chain)
+      println(currchain)
 
       // detect referenced and declared stack variables
       for (t <- this.code) {
@@ -120,7 +127,7 @@ trait ControlFlowGraph[C <: Context] {
       }
 
       import Permissions.canEmit
-      this.extract(current, seen, ctx, subgraph)
+      this.extract(current, currchain, seen, ctx, subgraph)
 
       current
     }
@@ -144,9 +151,7 @@ trait ControlFlowGraph[C <: Context] {
       pcstackset :: stacksets.toList
     }
 
-    protected def genExit(
-      n: Node, subgraph: SubCfg
-    )(implicit t: Table): Tree = {
+    protected def genExit(n: Node, subgraph: SubCfg)(implicit t: Table): Tree = {
       val cparam = t.names.coroutineParam
       val untypedtree = t.untyper.untypecheck(n.value)
       q"""
@@ -173,7 +178,7 @@ trait ControlFlowGraph[C <: Context] {
         }
         seen(n) = count
         val treerepr = shorten(n.tree.toString)
-        val name = n.getClass.getName.dropWhile(_ != '$')
+        val name = className
         val hc = System.identityHashCode(n)
         text.append(
           s"$prefix|-> $count: $name(uid = ${n.uid}, $hc) <$treerepr>\n")
@@ -228,6 +233,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       override def extract(
         current: Node,
+        currchain: Chain,
         seen: mutable.Map[Node, Node],
         ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -235,7 +241,7 @@ trait ControlFlowGraph[C <: Context] {
         // traverse successors
         for (s <- this.successors) {
           if (!seen.contains(s)) {
-            s.extractSubgraph(seen, ctx, subgraph)
+            s.extractSubgraph(currchain.newChain, seen, ctx, subgraph)
           }
           current.successors += seen(s)
         }
@@ -263,6 +269,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       override def extract(
         current: Node,
+        currchain: Chain,
         seen: mutable.Map[Node, Node],
         ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -270,7 +277,7 @@ trait ControlFlowGraph[C <: Context] {
         // traverse successors
         for (s <- this.successors) {
           if (!seen.contains(s)) {
-            s.extractSubgraph(seen, ctx, subgraph)
+            s.extractSubgraph(currchain.parent, seen, ctx, subgraph)
           }
           current.successors += seen(s)
         }
@@ -298,6 +305,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       override def extract(
         current: Node,
+        currchain: Chain,
         seen: mutable.Map[Node, Node],
         ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -305,7 +313,7 @@ trait ControlFlowGraph[C <: Context] {
         // traverse successors
         for (s <- this.successors) {
           if (!seen.contains(s)) {
-            s.extractSubgraph(seen, ctx, subgraph)
+            s.extractSubgraph(currchain.newChain, seen, ctx, subgraph)
           }
           current.successors += seen(s)
         }
@@ -332,14 +340,14 @@ trait ControlFlowGraph[C <: Context] {
       }
       override def extract(
         current: Node,
+        currchain: Chain,
         seen: mutable.Map[Node, Node],
         ctx: ExtractSubgraphContext,
         subgraph: SubCfg
       )(implicit cc: CanCall, table: Table): Unit = {
-        // traverse successors
         for (s <- this.successors) {
           if (!seen.contains(s)) {
-            s.extractSubgraph(seen, ctx, subgraph)
+            s.extractSubgraph(currchain.parent, seen, ctx, subgraph)
           }
           current.successors += seen(s)
         }
@@ -361,6 +369,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       override def extract(
         current: Node,
+        currchain: Chain,
         seen: mutable.Map[Node, Node],
         ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -413,6 +422,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       override def extract(
         current: Node,
+        currchain: Chain,
         seen: mutable.Map[Node, Node],
         ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -443,6 +453,7 @@ trait ControlFlowGraph[C <: Context] {
       }
       override def extract(
         current: Node,
+        currchain: Chain,
         seen: mutable.Map[Node, Node],
         ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -482,6 +493,21 @@ trait ControlFlowGraph[C <: Context] {
     case class Val(tree: Tree, chain: Chain, uid: Long)
     extends AnyStatement {
       override def value = q"()"
+      override def extract(
+        current: Node,
+        currchain: Chain,
+        seen: mutable.Map[Node, Node],
+        ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit cc: CanCall, table: Table): Unit = {
+        currchain.addVar(tree, false)
+        for (s <- this.successors) {
+          if (!seen.contains(s)) {
+            s.extractSubgraph(currchain, seen, ctx, subgraph)
+          }
+          current.successors += seen(s)
+        }
+      }
       def copyWithoutSuccessors(nch: Chain) = Val(tree, nch, uid)
     }
   }
@@ -503,8 +529,6 @@ trait ControlFlowGraph[C <: Context] {
       val wasUsed = referencesVar(sym)
       // TODO: fix the 'assign' part here - make it more precise
       val declaredOrAssigned = sym.asTerm.isVar || declaresVar(sym)
-      println(sym, isInScope, wasUsed, declaredOrAssigned)
-      println(ch)
       isInScope && wasUsed && declaredOrAssigned
     }
   }
@@ -552,7 +576,7 @@ trait ControlFlowGraph[C <: Context] {
           val termnode = Node.IfTerm(ch, table.newNodeUid())
           val ifnode = Node.If(termnode.uid, t, ch, table.newNodeUid())
           def addBranch(branch: Tree) {
-            val nestedchain = ch.newChain(t)
+            val nestedchain = ch.newChain
             val (childhead, childlast) = traverse(branch, nestedchain)
             ifnode.successors += childhead
             if (childlast.tree.tpe =:= typeOf[Unit]) {
@@ -569,14 +593,14 @@ trait ControlFlowGraph[C <: Context] {
         case q"while ($cond) $body" =>
           val termnode = Node.WhileTerm(ch, table.newNodeUid())
           val whilenode = Node.While(t, ch, table.newNodeUid())
-          val nestedchain = ch.newChain(t)
+          val nestedchain = ch.newChain
           val (childhead, childlast) = traverse(body, nestedchain)
           whilenode.successors += childhead
           childlast.successors += termnode
           termnode.successors += whilenode
           (whilenode, termnode)
         case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
-          val nestedchain = ch.newChain(t)
+          val nestedchain = ch.newChain
           val (first, childlast) = traverse(stats.head, nestedchain)
           var current = childlast
           val lentail = stats.tail.length
@@ -630,7 +654,8 @@ trait ControlFlowGraph[C <: Context] {
       val subgraph = new SubCfg(table.newSubgraphUid())
       val node = ctx.nodefront.dequeue()
       ctx.exitPoints(subgraph) = mutable.Map[Node, Long]()
-      subgraph.start = node.extractSubgraph(mutable.Map(), ctx, subgraph)
+      subgraph.start = node.extractSubgraph(
+        node.chain.copy, mutable.Map(), ctx, subgraph)
       subgraph.all ++= subgraph.start.dfs.map(n => n.uid -> n)
       ctx.subgraphs(node) = subgraph
     }

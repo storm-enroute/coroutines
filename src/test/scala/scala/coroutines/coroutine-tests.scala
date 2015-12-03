@@ -240,19 +240,19 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == 10)
   }
 
-  test("coroutine should contains a while loop with a yieldval") {
-    val numbers = coroutine { () =>
-      var i = 0
-      while (i < 10) {
-        yieldval(i)
-        i += 1
-      }
-      i
-    }
-    val c = call(numbers())
-    for (i <- 0 to 10) assert(c() == i)
-    assert(c.isStopped)
-  }
+  // test("coroutine should contains a while loop with a yieldval") {
+  //   val numbers = coroutine { () =>
+  //     var i = 0
+  //     while (i < 10) {
+  //       yieldval(i)
+  //       i += 1
+  //     }
+  //     i
+  //   }
+  //   val c = call(numbers())
+  //   for (i <- 0 to 10) assert(c() == i)
+  //   assert(c.isStopped)
+  // }
 
   // test("coroutine should have a nested if statement") {
   //   val numbers = coroutine { () =>
