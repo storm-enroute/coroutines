@@ -26,7 +26,7 @@ with ThreeAddressFormTransformation[C] {
         if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
         else findStart(chain.parent).descend(trees => q"..$trees")
       }
-      for ((sym, info) <- chain.vars) {
+      for ((sym, info) <- chain.decls) {
         if (subgraph.referencesVar(sym) && !subgraph.declaresVar(sym)) {
           val cparam = table.names.coroutineParam
           val stack = info.stackname

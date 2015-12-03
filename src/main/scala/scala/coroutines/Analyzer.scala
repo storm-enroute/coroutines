@@ -33,12 +33,12 @@ trait Analyzer[C <: Context] {
   class VarInfo(
     val uid: Int,
     val origtree: Tree,
-    val tpe: Type,
     val sym: Symbol,
-    val name: TermName,
     val isArg: Boolean,
     val table: Table
   ) {
+    val tpe = sym.info
+    val name = sym.name.toTermName
     def stackpos = {
       val sametpvars =
         if (isRefType) table.vars.filter(_._2.isRefType)
@@ -126,7 +126,7 @@ trait Analyzer[C <: Context] {
     private var nodeCount = 0L
     private var subgraphCount = 0L
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    val topChain = new Chain(this, null)
+    val topChain = Chain(Nil, this, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
     def initialStackSize: Int = 4
     object names {
@@ -154,35 +154,26 @@ trait Analyzer[C <: Context] {
     def valvars = vars.filter(_._2.isValType)
   }
 
-  class Chain(val table: Table, val parent: Chain) {
-    val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    def allvars: Iterator[(Symbol, VarInfo)] = {
-      vars.iterator ++ (if (parent != null) parent.allvars else Iterator.empty)
+  case class Chain(decls: List[(Symbol, VarInfo)], table: Table, parent: Chain) {
+    def alldecls: List[(Symbol, VarInfo)] = {
+      decls ::: (if (parent != null) parent.alldecls else Nil)
     }
-    def contains(sym: Symbol): Boolean =
-      vars.contains(sym) || (parent != null && parent.contains(sym))
-    def newChain = new Chain(table, this)
-    def addVar(valdef: Tree, isArg: Boolean) {
+    def contains(s: Symbol): Boolean = {
+      decls.exists(_._1 == s) || parent.contains(s)
+    }
+    def withDecl(valdef: Tree, isArg: Boolean) = {
       val sym = valdef.symbol
-      val name = sym.name.toTermName
       val info = table.vars.get(sym) match {
         case Some(info) =>
           info
         case None =>
-          new VarInfo(table.newVarUid, valdef, sym.info, sym, name, isArg, table)
+          new VarInfo(table.newVarUid, valdef, sym, isArg, table)
       }
       table.vars(sym) = info
-      vars(sym) = info
+      Chain((sym, info) :: decls, table, parent)
     }
-    def copy: Chain = {
-      val ch = new Chain(table, if (parent != null) parent.copy else null)
-      for (kv <- vars) ch.vars += kv
-      ch
-    }
-    override def toString = {
-      val s = s"[${vars.map(_._1.name).mkString(", ")}] -> "
-      if (parent != null) s + parent.toString else s
-    }
+    def descend = Chain(Nil, table, this)
+    override def toString = s"[${alldecls.map(_._1.name).mkString(" -> ")}]"
   }
 
   object ValDecl {
