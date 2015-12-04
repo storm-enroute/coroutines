@@ -318,6 +318,10 @@ trait ControlFlowGraph[C <: Context] {
           z.append(termtree)
         } else sys.error(s"Multiple successors for <$tree>.")
       }
+      override def isEmptyAtReturn = {
+        if (successors.length == 0) true
+        else successors.head.isEmptyAtReturn
+      }
       def copyWithoutSuccessors = BlockTerm(chain, uid)
     }
 
