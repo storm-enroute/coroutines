@@ -154,7 +154,11 @@ trait Analyzer[C <: Context] {
     def valvars = vars.filter(_._2.isValType)
   }
 
-  class Block
+  class Block {
+    val decls = mutable.Map[Symbol, VarInfo]()
+    val occurrences = mutable.Map[Symbol, VarInfo]()
+    val assignments = mutable.Map[Symbol, VarInfo]()
+  }
 
   case class Chain(
     block: Block, decls: List[(Symbol, VarInfo)], table: Table, parent: Chain
@@ -163,9 +167,18 @@ trait Analyzer[C <: Context] {
       decls ::: (if (parent != null) parent.alldecls else Nil)
     }
     def contains(s: Symbol): Boolean = {
-      decls.exists(_._1 == s) || parent.contains(s)
+      decls.exists(_._1 == s) || (parent != null && parent.contains(s))
     }
-    def withDecl(valdef: Tree, isArg: Boolean) = {
+    def isAssignedInScope(s: Symbol): Boolean = {
+      block.assignments.contains(s) || (parent != null && parent.isAssignedInScope(s))
+    }
+    def isDeclaredInScope(s: Symbol): Boolean = {
+      block.decls.contains(s) || (parent != null && parent.isDeclaredInScope(s))
+    }
+    def isOccurringInScope(s: Symbol): Boolean = {
+      block.occurrences.contains(s) || (parent != null && parent.isOccurringInScope(s))
+    }
+    def withDecl(valdef: Tree, isArg: Boolean): Chain = {
       val sym = valdef.symbol
       val info = table.vars.get(sym) match {
         case Some(info) =>
@@ -177,6 +190,10 @@ trait Analyzer[C <: Context] {
       Chain(block, (sym, info) :: decls, table, parent)
     }
     def descend = Chain(new Block, Nil, table, this)
+    def copyWithoutBlocks: Chain = {
+      val nparent = if (parent == null) null else parent.copyWithoutBlocks
+      Chain(new Block, decls, table, nparent)
+    }
     override def equals(that: Any) = that match {
       case that: AnyRef => this eq that
       case _ => false

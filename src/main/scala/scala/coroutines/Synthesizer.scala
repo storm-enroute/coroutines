@@ -21,34 +21,7 @@ with ThreeAddressFormTransformation[C] {
   private def genEntryPoint(
     subgraph: SubCfg, rettpt: Tree
   )(implicit table: Table): Tree = {
-    println("---------- generating entry point ---------- " + subgraph.uid)
-    def findStart(chain: Chain): Zipper = {
-      var z = {
-        if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
-        else findStart(chain.parent).descend(trees => q"..$trees")
-      }
-      for ((sym, info) <- chain.decls) {
-        println("checking " + sym + ", " + info)
-        println(" references " + subgraph.referencesVar(sym))
-        println(" declares " + subgraph.declaresVar(sym))
-        if (subgraph.referencesVar(sym) && !subgraph.declaresVar(sym)) {
-          val cparam = table.names.coroutineParam
-          val stack = info.stackname
-          val pos = info.stackpos
-          val decodedget = info.getTree(q"$cparam")
-          val valdef = info.origtree match {
-            case q"$mods val $name: $tpt = $_" => q"$mods val $name: $tpt = $decodedget"
-            case q"$mods var $name: $tpt = $_" => q"$mods var $name: $tpt = $decodedget"
-          }
-          z = z.append(valdef)
-        }
-      }
-      z
-    }
-
-    val startPoint = findStart(subgraph.start.chain)
-    val bodyzipper = subgraph.start.emitCode(startPoint, subgraph)
-    val body = bodyzipper.result
+    val body = subgraph.emit()
     val defname = TermName(s"ep${subgraph.uid}")
     val defdef = q"""
       def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {
@@ -114,7 +87,7 @@ with ThreeAddressFormTransformation[C] {
       (pcvalue, q"$rvset")
     }
     val returnstores = cfg.start.dfs.collect {
-      case n @ Node.ValCoroutineCall(_, _, _) => genReturnValueStore(n)
+      case n @ Node.ApplyCoroutine(_, _, _) => genReturnValueStore(n)
     }
 
     val body = {

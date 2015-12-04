@@ -86,173 +86,173 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == Vector(7))
   }
 
-  test("should declare body with if statement") {
-    val xOrY = coroutine { (x: Int, y: Int) =>
-      if (x > 0) {
-        yieldval(x)
-      } else {
-        yieldval(y)
-      }
-    }
-    val c1 = call(xOrY(5, 2))
-    assert(c1() == 5)
-    assert(c1() == (()))
-    assert(c1.isStopped)
-    val c2 = call(xOrY(-2, 7))
-    assert(c2() == 7)
-    assert(c2() == (()))
-    assert(c1.isStopped)
-  }
+  // test("should declare body with if statement") {
+  //   val xOrY = coroutine { (x: Int, y: Int) =>
+  //     if (x > 0) {
+  //       yieldval(x)
+  //     } else {
+  //       yieldval(y)
+  //     }
+  //   }
+  //   val c1 = call(xOrY(5, 2))
+  //   assert(c1() == 5)
+  //   assert(c1() == (()))
+  //   assert(c1.isStopped)
+  //   val c2 = call(xOrY(-2, 7))
+  //   assert(c2() == 7)
+  //   assert(c2() == (()))
+  //   assert(c1.isStopped)
+  // }
 
-  test("should declare body with a coroutine call") {
-    val doubleInt = coroutine { (x: Int) => 2 * x }
-    val callOther = coroutine { (x: Int) =>
-      val y = doubleInt(x)
-      y
-    }
-    val c = call(callOther(5))
-    assert(c() == 10)
-    assert(!c.isAlive)
-  }
+  // test("should declare body with a coroutine call") {
+  //   val doubleInt = coroutine { (x: Int) => 2 * x }
+  //   val callOther = coroutine { (x: Int) =>
+  //     val y = doubleInt(x)
+  //     y
+  //   }
+  //   val c = call(callOther(5))
+  //   assert(c() == 10)
+  //   assert(!c.isAlive)
+  // }
 
-  test("should declare a value in a nested scope") {
-    val someValues = coroutine { (x: Int, y: Int) =>
-      if (x > 0) {
-        val z = -x
-        yieldval(z)
-        yieldval(-z)
-      } else {
-        yieldval(y)
-      }
-      x
-    }
-    val c1 = call(someValues(5, 7))
-    assert(c1() == -5)
-    assert(c1() == 5)
-    assert(c1() == 5)
-    val c2 = call(someValues(-5, 7))
-    assert(c2() == 7)
-    assert(c2() == -5)
-  }
+  // test("should declare a value in a nested scope") {
+  //   val someValues = coroutine { (x: Int, y: Int) =>
+  //     if (x > 0) {
+  //       val z = -x
+  //       yieldval(z)
+  //       yieldval(-z)
+  //     } else {
+  //       yieldval(y)
+  //     }
+  //     x
+  //   }
+  //   val c1 = call(someValues(5, 7))
+  //   assert(c1() == -5)
+  //   assert(c1() == 5)
+  //   assert(c1() == 5)
+  //   val c2 = call(someValues(-5, 7))
+  //   assert(c2() == 7)
+  //   assert(c2() == -5)
+  // }
 
-  test("should declare a variable in a nested scope") {
-    val someValues = coroutine { (x: Int, y: Int) =>
-      if (x > 0) {
-        var z = -x
-        yieldval(z)
-        z = -z
-        yieldval(z)
-      } else {
-        yieldval(x)
-      }
-      y
-    }
-    val c1 = call(someValues(6, 11))
-    assert(c1() == -6)
-    assert(c1() == 6)
-    assert(c1() == 11)
-    val c2 = call(someValues(-6, 11))
-    assert(c2() == -6)
-    assert(c2() == 11)
-  }
+  // test("should declare a variable in a nested scope") {
+  //   val someValues = coroutine { (x: Int, y: Int) =>
+  //     if (x > 0) {
+  //       var z = -x
+  //       yieldval(z)
+  //       z = -z
+  //       yieldval(z)
+  //     } else {
+  //       yieldval(x)
+  //     }
+  //     y
+  //   }
+  //   val c1 = call(someValues(6, 11))
+  //   assert(c1() == -6)
+  //   assert(c1() == 6)
+  //   assert(c1() == 11)
+  //   val c2 = call(someValues(-6, 11))
+  //   assert(c2() == -6)
+  //   assert(c2() == 11)
+  // }
 
-  test("coroutine should be called") {
-    val emitTwice = coroutine { (x: Int) =>
-      yieldval(x)
-      x
-    }
-    val c = call(emitTwice(7))
-    assert(c() == 7)
-    assert(c() == 7)
-  }
+  // test("coroutine should be called") {
+  //   val emitTwice = coroutine { (x: Int) =>
+  //     yieldval(x)
+  //     x
+  //   }
+  //   val c = call(emitTwice(7))
+  //   assert(c() == 7)
+  //   assert(c() == 7)
+  // }
 
-  test("coroutine should contain an if statement and no yields") {
-    val abs = coroutine { (x: Int) =>
-      if (x > 0) x
-      else -x
-    }
-    val c1 = call(abs(-5))
-    assert(c1() == 5)
-    val c2 = call(abs(5))
-    assert(c2() == 5)
-  }
+  // test("coroutine should contain an if statement and no yields") {
+  //   val abs = coroutine { (x: Int) =>
+  //     if (x > 0) x
+  //     else -x
+  //   }
+  //   val c1 = call(abs(-5))
+  //   assert(c1() == 5)
+  //   val c2 = call(abs(5))
+  //   assert(c2() == 5)
+  // }
 
-  test("coroutine should contain two applications at the end of two branches") {
-    val c1 = coroutine { (x: Int) => x }
-    val c2 = coroutine { (x: Int) =>
-      if (x > 0) {
-        val y = c1(x)
-      } else {
-        val z = c1(-x)
-      }
-      x
-    }
-    val c = call(c2(5))
-    assert(c() == 5)
-    assert(c.isStopped)
-  }
+  // test("coroutine should contain two applications at the end of two branches") {
+  //   val c1 = coroutine { (x: Int) => x }
+  //   val c2 = coroutine { (x: Int) =>
+  //     if (x > 0) {
+  //       val y = c1(x)
+  //     } else {
+  //       val z = c1(-x)
+  //     }
+  //     x
+  //   }
+  //   val c = call(c2(5))
+  //   assert(c() == 5)
+  //   assert(c.isStopped)
+  // }
 
-  test("coroutine should contain two assignments at the end of two branches") {
-    val c1 = coroutine { (n: Int) => 2 * n }
-    val c2 = coroutine { (x: Int) =>
-      var y = 0
-      if (x > 0) {
-        val z = c1(x)
-        y = z
-      } else {
-        val z = c1(-x)
-        y = z
-      }
-      y
-    }
-    val c = call(c2(5))
-    assert(c() == 10)
-  }
+  // test("coroutine should contain two assignments at the end of two branches") {
+  //   val c1 = coroutine { (n: Int) => 2 * n }
+  //   val c2 = coroutine { (x: Int) =>
+  //     var y = 0
+  //     if (x > 0) {
+  //       val z = c1(x)
+  //       y = z
+  //     } else {
+  //       val z = c1(-x)
+  //       y = z
+  //     }
+  //     y
+  //   }
+  //   val c = call(c2(5))
+  //   assert(c() == 10)
+  // }
 
-  test("coroutine should have an integer argument and a string local variable") {
-    val stringify = coroutine { (x: Int) =>
-      val s = x.toString
-      s
-    }
-    val c = call(stringify(11))
-    assert(c() == "11")
-  }
+  // test("coroutine should have an integer argument and a string local variable") {
+  //   val stringify = coroutine { (x: Int) =>
+  //     val s = x.toString
+  //     s
+  //   }
+  //   val c = call(stringify(11))
+  //   assert(c() == "11")
+  // }
 
-  test("coroutine should assign") {
-    val assign = coroutine { (x: Int) =>
-      var y = 0
-      y = x + 1
-      y
-    }
-    val c = call(assign(5))
-    assert(c() == 6)
-  }
+  // test("coroutine should assign") {
+  //   val assign = coroutine { (x: Int) =>
+  //     var y = 0
+  //     y = x + 1
+  //     y
+  //   }
+  //   val c = call(assign(5))
+  //   assert(c() == 6)
+  // }
 
-  test("coroutine should contain a while loop") {
-    val number = coroutine { () =>
-      var i = 0
-      while (i < 10) {
-        i += 1
-      }
-      i
-    }
-    val c = call(number())
-    assert(c() == 10)
-  }
+  // test("coroutine should contain a while loop") {
+  //   val number = coroutine { () =>
+  //     var i = 0
+  //     while (i < 10) {
+  //       i += 1
+  //     }
+  //     i
+  //   }
+  //   val c = call(number())
+  //   assert(c() == 10)
+  // }
 
-  test("coroutine should contains a while loop with a yieldval") {
-    val numbers = coroutine { () =>
-      var i = 0
-      while (i < 10) {
-        yieldval(i)
-        i += 1
-      }
-      i
-    }
-    val c = call(numbers())
-    for (i <- 0 to 10) assert(c() == i)
-    assert(c.isStopped)
-  }
+  // test("coroutine should contains a while loop with a yieldval") {
+  //   val numbers = coroutine { () =>
+  //     var i = 0
+  //     while (i < 10) {
+  //       yieldval(i)
+  //       i += 1
+  //     }
+  //     i
+  //   }
+  //   val c = call(numbers())
+  //   for (i <- 0 to 10) assert(c() == i)
+  //   assert(c.isStopped)
+  // }
 
   // test("coroutine should have a nested if statement") {
   //   val numbers = coroutine { () =>
