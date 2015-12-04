@@ -482,6 +482,8 @@ trait ControlFlowGraph[C <: Context] {
       val wasUsed = referencesVar(sym)
       // TODO: fix the 'assign' part here - make it more precise
       val declaredOrAssigned = sym.asTerm.isVar || declaresVar(sym)
+      println(" ---------> " + sym)
+      println(isInScope, wasUsed, declaredOrAssigned)
       isInScope && wasUsed && declaredOrAssigned
     }
   }

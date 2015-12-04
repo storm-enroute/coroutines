@@ -126,7 +126,7 @@ trait Analyzer[C <: Context] {
     private var nodeCount = 0L
     private var subgraphCount = 0L
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    val topChain = Chain(Nil, this, null)
+    val topChain = Chain(new Block, Nil, this, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
     def initialStackSize: Int = 4
     object names {
@@ -154,7 +154,11 @@ trait Analyzer[C <: Context] {
     def valvars = vars.filter(_._2.isValType)
   }
 
-  case class Chain(decls: List[(Symbol, VarInfo)], table: Table, parent: Chain) {
+  class Block
+
+  case class Chain(
+    block: Block, decls: List[(Symbol, VarInfo)], table: Table, parent: Chain
+  ) {
     def alldecls: List[(Symbol, VarInfo)] = {
       decls ::: (if (parent != null) parent.alldecls else Nil)
     }
@@ -170,9 +174,9 @@ trait Analyzer[C <: Context] {
           new VarInfo(table.newVarUid, valdef, sym, isArg, table)
       }
       table.vars(sym) = info
-      Chain((sym, info) :: decls, table, parent)
+      Chain(block, (sym, info) :: decls, table, parent)
     }
-    def descend = Chain(Nil, table, this)
+    def descend = Chain(new Block, Nil, table, this)
     override def equals(that: Any) = that match {
       case that: AnyRef => this eq that
       case _ => false
