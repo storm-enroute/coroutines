@@ -203,9 +203,9 @@ trait ControlFlowGraph[C <: Context] {
         val q"if ($cond) $_ else $_" = tree
         cond
       }
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         val q"if ($cond) $_ else $_" = tree
         val newZipper = Zipper(null, Nil, trees => q"..$trees")
         val newSeen = subgraph.all.get(enduid) match {
@@ -229,9 +229,9 @@ trait ControlFlowGraph[C <: Context] {
 
     case class IfEnd(chain: Chain, uid: Long) extends Node {
       val tree: Tree = q""
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         if (successors.length == 1) {
           if (successors.head.isEmptyAtReturn) {
             val exittree = genExit(this, subgraph)
@@ -257,9 +257,9 @@ trait ControlFlowGraph[C <: Context] {
         val q"while ($cond) $_" = tree
         cond
       }
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         val q"while ($cond) $body" = tree
         val untypedcond = table.untyper.untypecheck(cond)
         val z1 = z.descend(trees => q"while ($untypedcond) ..$trees")
@@ -270,9 +270,9 @@ trait ControlFlowGraph[C <: Context] {
 
     case class WhileEnd(chain: Chain, uid: Long) extends Node {
       val tree: Tree = q""
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         if (successors.length == 1) {
           // do nothing
           val z1 = z.ascend
@@ -290,9 +290,9 @@ trait ControlFlowGraph[C <: Context] {
 
     case class Block(tree: Tree, chain: Chain, uid: Long) extends Node {
       override def code = q""
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         val q"{ ..$stats }" = tree
         val z1 = z.descend(trees => q"{ ..$trees }")
         successors.head.markEmit(z1, seen, subgraph)
@@ -302,15 +302,16 @@ trait ControlFlowGraph[C <: Context] {
 
     case class BlockEnd(chain: Chain, uid: Long) extends Node {
       val tree: Tree = q""
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         if (successors.length == 1) {
           if (successors.head.isEmptyAtReturn) {
             val exittree = genExit(this, subgraph)
             z.append(exittree)
           } else {
-            successors.head.markEmit(z, seen, subgraph)
+            val z1 = z.ascend
+            successors.head.markEmit(z1, seen, subgraph)
           }
         } else if (successors.length == 0) {
           // do nothing
@@ -330,9 +331,9 @@ trait ControlFlowGraph[C <: Context] {
         val q"$_ val $_: $_ = $co.apply(..$_)" = tree
         co
       }
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         val q"$_ val $_: $_ = $co.apply(..$args)" = tree
         val exittree = genCoroutineCall(co, args, chain, subgraph)
         z.append(exittree)
@@ -370,9 +371,9 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     case class YieldVal(tree: Tree, chain: Chain, uid: Long) extends Node {
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         val x = tree match {
           case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
           case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
@@ -399,9 +400,9 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     case class YieldTo(tree: Tree, chain: Chain, uid: Long) extends Node {
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         val co = tree match {
           case q"$_ val $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
           case q"$_ var $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
@@ -427,9 +428,9 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     abstract class Statement extends Node {
-      def emit(
-        z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg
-      )(implicit cc: CanCall, table: Table): Zipper = {
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = {
         // inside the control-flow-construct, normal statement
         if (successors.length == 1) {
           if (successors.head.isEmptyAtReturn) {
