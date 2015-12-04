@@ -16,18 +16,18 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(!c.isAlive)
   }
 
-  // test("should throw when not alive") {
-  //   val gimmeFive = coroutine { () => 5 }
-  //   val c = call(gimmeFive())
-  //   assert(c.isAlive)
-  //   assert(c() == 5)
-  //   assert(!c.isAlive)
-  //   intercept[CoroutineStoppedException] {
-  //     c()
-  //   }
-  //   assert(c.get() == None)
-  //   assert(c.tryGet() == Failure(CoroutineStoppedException()))
-  // }
+  test("should throw when not alive") {
+    val gimmeFive = coroutine { () => 5 }
+    val c = call(gimmeFive())
+    assert(c.isAlive)
+    assert(c() == 5)
+    assert(!c.isAlive)
+    intercept[CoroutineStoppedException] {
+      c()
+    }
+    assert(c.get() == None)
+    assert(c.tryGet() == Failure(CoroutineStoppedException()))
+  }
 
   // test("should yield once") {
   //   val plusMinus = coroutine { (x: Int) =>
