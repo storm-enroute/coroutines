@@ -173,6 +173,11 @@ trait Analyzer[C <: Context] {
       Chain((sym, info) :: decls, table, parent)
     }
     def descend = Chain(Nil, table, this)
+    override def equals(that: Any) = that match {
+      case that: AnyRef => this eq that
+      case _ => false
+    }
+    override def hashCode = System.identityHashCode(this)
     override def toString = {
       val s = s"[${decls.map(_._1.name).mkString(", ")}] -> "
       if (parent != null) s + parent.toString else s
