@@ -173,7 +173,10 @@ trait Analyzer[C <: Context] {
       Chain((sym, info) :: decls, table, parent)
     }
     def descend = Chain(Nil, table, this)
-    override def toString = s"[${alldecls.map(_._1.name).mkString(" -> ")}]"
+    override def toString = {
+      val s = s"[${decls.map(_._1.name).mkString(", ")}] -> "
+      if (parent != null) s + parent.toString else s
+    }
   }
 
   object ValDecl {

@@ -21,12 +21,16 @@ with ThreeAddressFormTransformation[C] {
   private def genEntryPoint(
     subgraph: SubCfg, rettpt: Tree
   )(implicit table: Table): Tree = {
+    println("---------- generating entry point ---------- " + subgraph.uid)
     def findStart(chain: Chain): Zipper = {
       var z = {
         if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
         else findStart(chain.parent).descend(trees => q"..$trees")
       }
       for ((sym, info) <- chain.decls) {
+        println("checking " + sym + ", " + info)
+        println(" references " + subgraph.referencesVar(sym))
+        println(" declares " + subgraph.declaresVar(sym))
         if (subgraph.referencesVar(sym) && !subgraph.declaresVar(sym)) {
           val cparam = table.names.coroutineParam
           val stack = info.stackname

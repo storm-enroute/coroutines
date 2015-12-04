@@ -96,7 +96,6 @@ class TraverserUtil[C <: Context](val c: C) {
         case (q"$a0[..$tpts0](...$paramss0)", q"$a1[..$tpts1](...$paramss1)")
           if tpts0.length > 0 || paramss0.length > 0 =>
           // application
-          println(t0)
           traverse(a0, a1)
           for ((t0, t1) <- tpts0 zip tpts1) traverse(t0, t1)
           for ((ps0, ps1) <- paramss0 zip paramss1; (p0, p1) <- ps0 zip ps1) {
