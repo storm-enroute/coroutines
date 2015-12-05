@@ -298,13 +298,13 @@ class CoroutineTest extends FunSuite with Matchers {
 
 
 class ToaTransformationTest extends FunSuite with Matchers {
-  // test("if statements with applications") {
-  //   val rube = coroutine { () =>
-  //     if (0 < { math.abs(-1); math.max(1, 2) }) 2 else 1
-  //   }
-  //   val c = call(rube())
-  //   assert(c() == 2)
-  // }
+  test("if statements with applications") {
+    val rube = coroutine { () =>
+      if (0 < { math.abs(-1); math.max(1, 2) }) 2 else 1
+    }
+    val c = call(rube())
+    assert(c() == 2)
+  }
 
   // test("if statements with selections") {
   //   val rube = coroutine { () =>

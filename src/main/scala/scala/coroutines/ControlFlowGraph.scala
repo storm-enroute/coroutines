@@ -786,10 +786,9 @@ trait ControlFlowGraph[C <: Context] {
             val (childhead, childlast) = traverse(branch, nestedchain)
             ifnode.successors += childhead
             if (childlast.tree.tpe =:= typeOf[Unit]) {
-              val endnode =
-                Node.DefaultStatement(q"()", nestedchain, table.newNodeUid())
-              childlast.successors += endnode
-              endnode.successors += endnode
+              val unode = Node.DefaultStatement(q"()", nestedchain, table.newNodeUid())
+              childlast.successors += unode
+              unode.successors += endnode
             } else {
               childlast.successors += endnode
             }
