@@ -439,6 +439,14 @@ trait ControlFlowGraph[C <: Context] {
         val q"$_ val $_: $_ = $co.apply(..$_)" = tree
         co
       }
+      override def code: Tree = {
+        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
+        q"""
+          $co
+
+          ..$args
+        """
+      }
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
       ): Zipper = {
@@ -489,6 +497,12 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     case class YieldVal(tree: Tree, chain: Chain, uid: Long) extends Node {
+      override def code = {
+        tree match {
+          case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
+          case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
+        }
+      }
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
       ): Zipper = {
@@ -523,6 +537,12 @@ trait ControlFlowGraph[C <: Context] {
     }
 
     case class YieldTo(tree: Tree, chain: Chain, uid: Long) extends Node {
+      override def code = {
+        tree match {
+          case q"$_ val $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
+          case q"$_ var $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
+        }
+      }
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
       ): Zipper = {
@@ -645,40 +665,44 @@ trait ControlFlowGraph[C <: Context] {
     val exitSubgraphs = mutable.LinkedHashMap[Node, SubCfg]()
     var start: Node = _
     val all = mutable.Map[Long, Node]()
-    // val referencedVars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    // val declaredVars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    // def referencesVar(sym: Symbol) = referencedVars.contains(sym)
-    // def declaresVar(sym: Symbol) = declaredVars.contains(sym)
-    // def mustStoreVar(sym: Symbol, ch: Chain) = {
-    //   val isInScope = ch.contains(sym)
-    //   val wasUsed = referencesVar(sym)
-    //   // TODO: fix the 'assign' part here - make it more precise
-    //   val declaredOrAssigned = sym.asTerm.isVar || declaresVar(sym)
-    //   println(" ---------> " + sym)
-    //   println(isInScope, wasUsed, declaredOrAssigned)
-    //   isInScope && wasUsed && declaredOrAssigned
-    // }
+    val childBlocks = mutable.Map[Block, List[Block]]()
+
+    def initializeBlocks() {
+      val cs = start.dfs.map(_.chain).toSet
+      childBlocks ++= cs.filter(_.parent != null).toList.groupBy(_.parent).map {
+        case (c, children) => (c.block, children.map(_.block))
+      }
+      for (c <- cs) if (!childBlocks.contains(c.block)) childBlocks += c.block -> List()
+    }
+
+    def isOccurringInDescendants(s: Symbol, b: Block): Boolean = {
+      b.occurrences.contains(s) || childBlocks(b).exists(isOccurringInDescendants(s, _))
+    }
 
     def mustStoreVar(sym: Symbol, chain: Chain): Boolean = {
       val isVisible = chain.contains(sym)
-      val isAssigned = chain.isAssignedInScope(sym)
-      val isDeclared = chain.isDeclaredInScope(sym)
+      val isAssigned = chain.isAssignedInAncestors(sym)
+      val isDeclared = chain.isDeclaredInAncestors(sym)
       isVisible && (isAssigned || isDeclared)
     }
 
     def mustLoadVar(sym: Symbol, chain: Chain): Boolean = {
       val isVisible = chain.contains(sym)
-      val isOccurring = chain.isOccurringInScope(sym)
+      val isOccurring = isOccurringInDescendants(sym, chain.block)
+      println("load? " + sym)
+      println(isVisible, isOccurring)
       isVisible && isOccurring
     }
 
     def emit()(implicit table: Table): Tree = {
+      println("------------------------")
+      println("chain: " + start.chain.verboseString)
       def findStart(chain: Chain): Zipper = {
         var z = {
           if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
           else findStart(chain.parent).descend(trees => q"..$trees")
         }
-        for ((sym, info) <- chain.alldecls) {
+        for ((sym, info) <- chain.decls) {
           if (mustLoadVar(sym, chain)) {
             val cparam = table.names.coroutineParam
             val stack = info.stackname
@@ -842,6 +866,7 @@ trait ControlFlowGraph[C <: Context] {
       subgraph.start = node.extract(
         node.chain.copyWithoutBlocks, mutable.Map(), ctx, subgraph)
       subgraph.all ++= subgraph.start.dfs.map(n => n.uid -> n)
+      subgraph.initializeBlocks()
       ctx.subgraphs(node) = subgraph
     }
 

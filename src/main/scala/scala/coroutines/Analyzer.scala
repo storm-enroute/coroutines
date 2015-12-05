@@ -169,14 +169,23 @@ trait Analyzer[C <: Context] {
     def contains(s: Symbol): Boolean = {
       decls.exists(_._1 == s) || (parent != null && parent.contains(s))
     }
-    def isAssignedInScope(s: Symbol): Boolean = {
-      block.assignments.contains(s) || (parent != null && parent.isAssignedInScope(s))
+    def isAssigned(s: Symbol): Boolean = {
+      block.assignments.contains(s)
     }
-    def isDeclaredInScope(s: Symbol): Boolean = {
-      block.decls.contains(s) || (parent != null && parent.isDeclaredInScope(s))
+    def isAssignedInAncestors(s: Symbol): Boolean = {
+      isAssigned(s) || (parent != null && parent.isAssignedInAncestors(s))
     }
-    def isOccurringInScope(s: Symbol): Boolean = {
-      block.occurrences.contains(s) || (parent != null && parent.isOccurringInScope(s))
+    def isDeclared(s: Symbol): Boolean = {
+      block.decls.contains(s)
+    }
+    def isDeclaredInAncestors(s: Symbol): Boolean = {
+      isDeclared(s) || (parent != null && parent.isDeclaredInAncestors(s))
+    }
+    def isOccurring(s: Symbol): Boolean = {
+      block.occurrences.contains(s)
+    }
+    def isOccurringInAncestors(s: Symbol): Boolean = {
+      isOccurring(s) || (parent != null && parent.isOccurringInAncestors(s))
     }
     def withDecl(valdef: Tree, isArg: Boolean): Chain = {
       val sym = valdef.symbol
@@ -202,6 +211,14 @@ trait Analyzer[C <: Context] {
     override def toString = {
       val s = s"[${decls.map(_._1.name).mkString(", ")}] -> "
       if (parent != null) s + parent.toString else s
+    }
+    def verboseString: String = {
+      val b =
+        s"decl = ${block.decls.map(_._1.name).mkString(", ")}, " +
+        s"occ = ${block.occurrences.map(_._1.name).mkString(", ")}, " +
+        s"ass = ${block.assignments.map(_._1.name).mkString(", ")}"
+      val s = s"[${decls.map(_._1.name).mkString(", ")}, <$b>] -> "
+      if (parent != null) s + parent.verboseString else s
     }
   }
 

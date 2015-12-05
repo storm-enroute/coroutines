@@ -86,23 +86,23 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == Vector(7))
   }
 
-  // test("should declare body with if statement") {
-  //   val xOrY = coroutine { (x: Int, y: Int) =>
-  //     if (x > 0) {
-  //       yieldval(x)
-  //     } else {
-  //       yieldval(y)
-  //     }
-  //   }
-  //   val c1 = call(xOrY(5, 2))
-  //   assert(c1() == 5)
-  //   assert(c1() == (()))
-  //   assert(c1.isStopped)
-  //   val c2 = call(xOrY(-2, 7))
-  //   assert(c2() == 7)
-  //   assert(c2() == (()))
-  //   assert(c1.isStopped)
-  // }
+  test("should declare body with if statement") {
+    val xOrY = coroutine { (x: Int, y: Int) =>
+      if (x > 0) {
+        yieldval(x)
+      } else {
+        yieldval(y)
+      }
+    }
+    val c1 = call(xOrY(5, 2))
+    assert(c1() == 5)
+    assert(c1() == (()))
+    assert(c1.isStopped)
+    val c2 = call(xOrY(-2, 7))
+    assert(c2() == 7)
+    assert(c2() == (()))
+    assert(c1.isStopped)
+  }
 
   // test("should declare body with a coroutine call") {
   //   val doubleInt = coroutine { (x: Int) => 2 * x }
