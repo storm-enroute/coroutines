@@ -429,20 +429,20 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(y == -5)
   }
 
-  // test("coroutine should yield in while loop with complex condition") {
-  //   val rube = coroutine { (x: Int) =>
-  //     var i = 0
-  //     while (i < x && x < math.abs(-15)) {
-  //       yieldval(i)
-  //       i += 1
-  //     }
-  //     i
-  //   }
-  //   val c1 = call(rube(10))
-  //   for (i <- 0 to 10) assert(c1() == i)
-  //   assert(c1.isStopped)
-  //   val c2 = call(rube(20))
-  //   assert(c2() == 0)
-  //   println(c2.isStopped)
-  // }
+  test("coroutine should yield in while loop with complex condition") {
+    val rube = coroutine { (x: Int) =>
+      var i = 0
+      while (i < x && x < math.abs(-15)) {
+        yieldval(i)
+        i += 1
+      }
+      i
+    }
+    val c1 = call(rube(10))
+    for (i <- 0 to 10) assert(c1() == i)
+    assert(c1.isStopped)
+    val c2 = call(rube(20))
+    assert(c2() == 0)
+    println(c2.isStopped)
+  }
 }

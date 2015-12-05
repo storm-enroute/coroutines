@@ -173,7 +173,6 @@ with ThreeAddressFormTransformation[C] {
 
     // infer coroutine return type
     val rettpt = inferReturnType(body)
-    println(s"inferred type: $rettpt")
 
     // generate control flow graph
     val cfg = genControlFlowGraph(args, body, rettpt)
@@ -251,7 +250,6 @@ with ThreeAddressFormTransformation[C] {
       import scala.coroutines.Permission.canCall
       $receiver.call(..$args)
     """
-    println(t)
     t
   }
 }
