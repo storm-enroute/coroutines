@@ -104,16 +104,16 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c1.isStopped)
   }
 
-  // test("should declare body with a coroutine call") {
-  //   val doubleInt = coroutine { (x: Int) => 2 * x }
-  //   val callOther = coroutine { (x: Int) =>
-  //     val y = doubleInt(x)
-  //     y
-  //   }
-  //   val c = call(callOther(5))
-  //   assert(c() == 10)
-  //   assert(!c.isAlive)
-  // }
+  test("should declare body with a coroutine call") {
+    val doubleInt = coroutine { (x: Int) => 2 * x }
+    val callOther = coroutine { (x: Int) =>
+      val y = doubleInt(x)
+      y
+    }
+    val c = call(callOther(5))
+    assert(c() == 10)
+    assert(!c.isAlive)
+  }
 
   // test("should declare a value in a nested scope") {
   //   val someValues = coroutine { (x: Int, y: Int) =>

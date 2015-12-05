@@ -456,7 +456,6 @@ trait ControlFlowGraph[C <: Context] {
       }
       override def updateBlock()(implicit table: Table) {
         super.updateBlock()
-        chain.block.decls(tree.symbol) = table(tree.symbol)
       }
       def extract(
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
