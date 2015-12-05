@@ -254,46 +254,46 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c.isStopped)
   }
 
-  // test("coroutine should have a nested if statement") {
-  //   val numbers = coroutine { () =>
-  //     var z = 1
-  //     var i = 1
-  //     while (i < 5) {
-  //       if (z > 0) {
-  //         yieldval(z * i)
-  //         z = -1
-  //       } else {
-  //         yieldval(z * i)
-  //         z = 1
-  //         i += 1
-  //       }
-  //     }
-  //   }
-  //   val c = call(numbers())
-  //   for (i <- 1 until 5) {
-  //     assert(c() == i)
-  //     assert(c() == -i)
-  //   }
-  // }
+  test("coroutine should have a nested if statement") {
+    val numbers = coroutine { () =>
+      var z = 1
+      var i = 1
+      while (i < 5) {
+        if (z > 0) {
+          yieldval(z * i)
+          z = -1
+        } else {
+          yieldval(z * i)
+          z = 1
+          i += 1
+        }
+      }
+    }
+    val c = call(numbers())
+    for (i <- 1 until 5) {
+      assert(c() == i)
+      assert(c() == -i)
+    }
+  }
 
-  // test("an anonymous coroutine should be applied") {
-  //   coroutine { (x: Int) => x }
-  // }
+  test("an anonymous coroutine should be applied") {
+    coroutine { (x: Int) => x }
+  }
 
-  // test("if statement should be properly regenerated") {
-  //   val addOne = coroutine { (x: Int) =>
-  //     if (x > 0) {
-  //       x
-  //     } else {
-  //       -x
-  //     }
-  //     x + 1
-  //   }
-  //   val c1 = call(addOne(1))
-  //   assert(c1() == 2)
-  //   val c2 = call(addOne(-1))
-  //   assert(c2() == 0)
-  // }
+  test("if statement should be properly regenerated") {
+    val addOne = coroutine { (x: Int) =>
+      if (x > 0) {
+        x
+      } else {
+        -x
+      }
+      x + 1
+    }
+    val c1 = call(addOne(1))
+    assert(c1() == 2)
+    val c2 = call(addOne(-1))
+    assert(c2() == 0)
+  }
 }
 
 
