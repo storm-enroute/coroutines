@@ -599,7 +599,7 @@ trait ControlFlowGraph[C <: Context] {
       override def updateBlock()(implicit table: Table) {
         super.updateBlock()
         tree match {
-          case q"$x = $v" => chain.block.decls(x.symbol) = table(x.symbol)
+          case q"$x = $v" => chain.block.assignments(x.symbol) = table(x.symbol)
           case _ =>
         }
       }
@@ -678,25 +678,28 @@ trait ControlFlowGraph[C <: Context] {
       b.occurrences.contains(s) || childBlocks(b).exists(isOccurringInDescendants(s, _))
     }
 
+    def isAssignedInDescendants(s: Symbol, b: Block): Boolean = {
+      b.assignments.contains(s) || childBlocks(b).exists(isAssignedInDescendants(s, _))
+    }
+
+    def declarationBlockFrom(s: Symbol, chain: Chain): Block = {
+      chain.ancestors.find(_.decls.toMap.contains(s)).get.block
+    }
+
     def mustStoreVar(sym: Symbol, chain: Chain): Boolean = {
       val isVisible = chain.contains(sym)
-      val isAssigned = chain.isAssignedInAncestors(sym)
+      val isAssigned = isAssignedInDescendants(sym, declarationBlockFrom(sym, chain))
       val isDeclared = chain.isDeclaredInAncestors(sym)
       isVisible && (isAssigned || isDeclared)
     }
 
     def mustLoadVar(sym: Symbol, chain: Chain): Boolean = {
       val isVisible = chain.contains(sym)
-      println(chain)
       val isOccurring = isOccurringInDescendants(sym, chain.block)
-      println("load? " + sym)
-      println(isVisible, isOccurring)
       isVisible && isOccurring
     }
 
     def emit()(implicit table: Table): Tree = {
-      println("------------------------")
-      println("chain: " + start.chain.verboseString)
       def findStart(chain: Chain): Zipper = {
         var z = {
           if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")

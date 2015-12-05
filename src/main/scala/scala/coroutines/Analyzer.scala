@@ -222,7 +222,7 @@ trait Analyzer[C <: Context] {
     }
     def verboseString: String = {
       val b = block.toString
-      val s = s"[${decls.map(_._1.name).mkString(", ")}, <$b>] -> "
+      val s = s"[${decls.map(_._1.name).mkString(", ")} | <$b>] -> "
       if (parent != null) s + parent.verboseString else s
     }
   }
