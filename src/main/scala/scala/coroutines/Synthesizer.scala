@@ -37,7 +37,7 @@ with ThreeAddressFormTransformation[C] {
     val entrypoints = for ((orignode, subgraph) <- cfg.subgraphs) yield {
       (subgraph.uid, genEntryPoint(subgraph, rettpt))
     }
-    entrypoints.toMap
+    mutable.LinkedHashMap() ++= entrypoints.toSeq.sortBy(_._1)
   }
 
   private def genEnterMethod(

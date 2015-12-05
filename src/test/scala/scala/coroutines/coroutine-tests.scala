@@ -254,6 +254,20 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c.isStopped)
   }
 
+  // test("coroutine should correctly skip the while loop") {
+  //   val earlyFinish = coroutine { (x: Int) =>
+  //     var i = 1
+  //     while (i < x) {
+  //       yieldval(i) 
+  //       i += 1
+  //     }
+  //     i
+  //   }
+  //   val c = call(earlyFinish(0))
+  //   assert(c() == 1)
+  //   assert(c.isStopped)
+  // }
+
   test("coroutine should have a nested if statement") {
     val numbers = coroutine { () =>
       var z = 1
@@ -322,12 +336,36 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c() == 2)
   }
 
+  test("if statements with applications and yield") {
+    val rube = coroutine { () =>
+      val x = if (0 < { math.abs(-1); math.max(1, 2) }) 2 else 1
+      yieldval(x)
+      -x
+    }
+    val c = call(rube())
+    assert(c() == 2)
+    assert(c() == -2)
+    assert(c.isStopped)
+  }
+
   test("if statements with selections") {
     val rube = coroutine { () =>
       if (0 < { math.abs(math.Pi) }) 2 else 1
     }
     val c = call(rube())
     assert(c() == 2)
+  }
+
+  test("if statements with selections and yield") {
+    val rube = coroutine { () =>
+      val x = if (0 < { math.abs(math.Pi) }) 2 else 1
+      yieldval(x)
+      -x
+    }
+    val c = call(rube())
+    assert(c() == 2)
+    assert(c() == -2)
+    assert(c.isStopped)
   }
 
   test("if statements with updates") {
@@ -376,4 +414,35 @@ class ToaTransformationTest extends FunSuite with Matchers {
     c()
     assert(y == 5)
   }
+
+  test("coroutine should be callable outside value declaration and yield") {
+    var y = 0
+    val setY = coroutine { (x: Int) => y = x }
+    val setTo5 = coroutine { () =>
+      yieldval(setY(5))
+      setY(-5)
+    }
+    val c = call(setTo5())
+    c()
+    assert(y == 5)
+    c()
+    assert(y == -5)
+  }
+
+  // test("coroutine should yield in while loop with complex condition") {
+  //   val rube = coroutine { (x: Int) =>
+  //     var i = 0
+  //     while (i < x && x < math.abs(-15)) {
+  //       yieldval(i)
+  //       i += 1
+  //     }
+  //     i
+  //   }
+  //   val c1 = call(rube(10))
+  //   for (i <- 0 to 10) assert(c1() == i)
+  //   assert(c1.isStopped)
+  //   val c2 = call(rube(20))
+  //   assert(c2() == 0)
+  //   println(c2.isStopped)
+  // }
 }
