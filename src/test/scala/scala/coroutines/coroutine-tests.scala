@@ -297,8 +297,15 @@ class CoroutineTest extends FunSuite with Matchers {
 
   test("if statement with unit last statement should be properly generated") {
     val addOne = coroutine { () =>
-      val x = 1
-      if (0 < x) 2 else 1
+      var x = 5
+      if (0 < x) {
+        x = 2
+        ()
+      } else {
+        x = 1
+        ()
+      }
+      x
     }
     val c = call(addOne())
     assert(c() == 2)
@@ -315,38 +322,38 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c() == 2)
   }
 
-  // test("if statements with selections") {
-  //   val rube = coroutine { () =>
-  //     if (0 < { math.abs(math.Pi) }) 2 else 1
-  //   }
-  //   val c = call(rube())
-  //   assert(c() == 2)
-  // }
+  test("if statements with selections") {
+    val rube = coroutine { () =>
+      if (0 < { math.abs(math.Pi) }) 2 else 1
+    }
+    val c = call(rube())
+    assert(c() == 2)
+  }
 
-  // test("if statements with updates") {
-  //   val rube = coroutine { () =>
-  //     val xs = new Array[Int](2)
-  //     if (0 < { xs(0) = 1; xs(0) }) 2 else 1
-  //   }
-  //   val c = call(rube())
-  //   assert(c() == 2)
-  // }
+  test("if statements with updates") {
+    val rube = coroutine { () =>
+      val xs = new Array[Int](2)
+      if (0 < { xs(0) = 1; xs(0) }) 2 else 1
+    }
+    val c = call(rube())
+    assert(c() == 2)
+  }
 
-  // test("if statements with block in tuple") {
-  //   val rube = coroutine { () =>
-  //     if (0 < ({ math.abs(1); math.abs(3) + 2 }, 2)._1) 2 else 1
-  //   }
-  //   val c = call(rube())
-  //   assert(c() == 2)
-  // }
+  test("if statements with block in tuple") {
+    val rube = coroutine { () =>
+      if (0 < ({ math.abs(1); math.abs(3) + 2 }, 2)._1) 2 else 1
+    }
+    val c = call(rube())
+    assert(c() == 2)
+  }
 
-  // test("if statement with another if statement in condition") {
-  //   val rube = coroutine { () =>
-  //     if (0 < (if (math.abs(-1) > 5) 1 else 2)) 2 else 1
-  //   }
-  //   val c = call(rube())
-  //   assert(c() == 2)
-  // }
+  test("if statement with another if statement in condition") {
+    val rube = coroutine { () =>
+      if (0 < (if (math.abs(-1) > 5) 1 else 2)) 2 else 1
+    }
+    val c = call(rube())
+    assert(c() == 2)
+  }
 
   // test("value declaration should be the last statement") {
   //   val unit = coroutine { () =>
