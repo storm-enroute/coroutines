@@ -294,6 +294,15 @@ class CoroutineTest extends FunSuite with Matchers {
     val c2 = call(addOne(-1))
     assert(c2() == 0)
   }
+
+  test("if statement with unit last statement should be properly generated") {
+    val addOne = coroutine { () =>
+      val x = 1
+      if (0 < x) 2 else 1
+    }
+    val c = call(addOne())
+    assert(c() == 2)
+  }
 }
 
 
