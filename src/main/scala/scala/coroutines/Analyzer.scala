@@ -158,6 +158,11 @@ trait Analyzer[C <: Context] {
     val decls = mutable.Map[Symbol, VarInfo]()
     val occurrences = mutable.Map[Symbol, VarInfo]()
     val assignments = mutable.Map[Symbol, VarInfo]()
+    override def toString = {
+      s"decl = ${decls.map(_._1.name).mkString(", ")}, " +
+      s"occ = ${occurrences.map(_._1.name).mkString(", ")}, " +
+      s"ass = ${assignments.map(_._1.name).mkString(", ")}"
+    }
   }
 
   case class Chain(
@@ -168,6 +173,9 @@ trait Analyzer[C <: Context] {
     }
     def contains(s: Symbol): Boolean = {
       decls.exists(_._1 == s) || (parent != null && parent.contains(s))
+    }
+    def ancestors: List[Chain] = {
+      if (parent != null) this :: parent.ancestors else this :: Nil
     }
     def isAssigned(s: Symbol): Boolean = {
       block.assignments.contains(s)
@@ -213,10 +221,7 @@ trait Analyzer[C <: Context] {
       if (parent != null) s + parent.toString else s
     }
     def verboseString: String = {
-      val b =
-        s"decl = ${block.decls.map(_._1.name).mkString(", ")}, " +
-        s"occ = ${block.occurrences.map(_._1.name).mkString(", ")}, " +
-        s"ass = ${block.assignments.map(_._1.name).mkString(", ")}"
+      val b = block.toString
       val s = s"[${decls.map(_._1.name).mkString(", ")}, <$b>] -> "
       if (parent != null) s + parent.verboseString else s
     }

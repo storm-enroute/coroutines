@@ -667,7 +667,7 @@ trait ControlFlowGraph[C <: Context] {
     val childBlocks = mutable.Map[Block, List[Block]]()
 
     def initializeBlocks() {
-      val cs = start.dfs.map(_.chain).toSet
+      val cs = start.dfs.map(_.chain).map(_.ancestors).flatten.toSet
       childBlocks ++= cs.filter(_.parent != null).toList.groupBy(_.parent).map {
         case (c, children) => (c.block, children.map(_.block))
       }
@@ -687,6 +687,7 @@ trait ControlFlowGraph[C <: Context] {
 
     def mustLoadVar(sym: Symbol, chain: Chain): Boolean = {
       val isVisible = chain.contains(sym)
+      println(chain)
       val isOccurring = isOccurringInDescendants(sym, chain.block)
       println("load? " + sym)
       println(isVisible, isOccurring)
