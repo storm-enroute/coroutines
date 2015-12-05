@@ -599,7 +599,8 @@ trait ControlFlowGraph[C <: Context] {
       override def updateBlock()(implicit table: Table) {
         super.updateBlock()
         tree match {
-          case q"$x = $v" => chain.block.assignments(x.symbol) = table(x.symbol)
+          case q"$x = $v" if table.contains(x.symbol) =>
+            chain.block.assignments(x.symbol) = table(x.symbol)
           case _ =>
         }
       }
