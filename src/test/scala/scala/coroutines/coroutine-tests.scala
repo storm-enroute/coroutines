@@ -254,19 +254,19 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c.isStopped)
   }
 
-  // test("coroutine should correctly skip the while loop") {
-  //   val earlyFinish = coroutine { (x: Int) =>
-  //     var i = 1
-  //     while (i < x) {
-  //       yieldval(i) 
-  //       i += 1
-  //     }
-  //     i
-  //   }
-  //   val c = call(earlyFinish(0))
-  //   assert(c() == 1)
-  //   assert(c.isStopped)
-  // }
+  test("coroutine should correctly skip the while loop") {
+    val earlyFinish = coroutine { (x: Int) =>
+      var i = 1
+      while (i < x) {
+        yieldval(i) 
+        i += 1
+      }
+      i
+    }
+    val c = call(earlyFinish(0))
+    assert(c() == 1)
+    assert(c.isStopped)
+  }
 
   test("coroutine should have a nested if statement") {
     val numbers = coroutine { () =>
@@ -443,6 +443,6 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c1.isStopped)
     val c2 = call(rube(20))
     assert(c2() == 0)
-    println(c2.isStopped)
+    assert(c2.isStopped)
   }
 }

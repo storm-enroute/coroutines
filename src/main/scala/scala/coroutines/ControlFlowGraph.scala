@@ -274,8 +274,10 @@ trait ControlFlowGraph[C <: Context] {
         // successors.head.markEmit(z1, seen, subgraph)
         val endnode = successors.last
         val z1 = z.descend(trees => q"while ($untypedcond) ..$trees")
+        val newZipper = Zipper(null, Nil, trees => q"..$trees")
         val newSeen = mutable.Set(endnode)
-        val z2 = successors.head.markEmit(z1, newSeen, subgraph)
+        val newBody = successors.head.markEmit(newZipper, newSeen, subgraph).result
+        val z2 = z1.append(newBody)
         endnode.markEmit(z2, seen, subgraph)
       }
       def extract(
