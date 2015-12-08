@@ -9,12 +9,6 @@ build:
     - eval `ssh-agent -s`
     - |
       if [ ! -z $SSH_KEY_PASS ]; then
-        echo "exec cat" > ap-cat.sh
-        chmod a+x ap-cat.sh
-        export DISPLAY=1
-        echo $SSH_KEY_PASS | SSH_ASKPASS=./ap-cat.sh ssh-add ~/.ssh/id_rsa
-        rm ap-cat.sh
-        export SSH_KEY_PASS=""
         export DISPLAY=""
       fi
     - echo "pull request no. $DRONE_PULL_REQUEST"
