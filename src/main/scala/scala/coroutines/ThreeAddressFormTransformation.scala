@@ -173,17 +173,23 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"while ($cond) $body" =>
       // while
-      val (xdecls, xident) = threeAddressForm(cond)
-      val localvarname = TermName(c.freshName("x"))
-      val decls = if (xdecls != Nil) {
-        xdecls ++ List(
-          q"var $localvarname = $xident",
+      val (xdecls0, xident0) = threeAddressForm(cond)
+      // TODO: This is a temporary fix. It is very dangerous, since it makes the
+      // transformation take O(2^n) time in the depth of the tree.
+      //
+      // The correct solution is to duplicate the trees so that duplicate value decls in
+      // the two trees get fresh names.
+      val (xdecls1, xident1) = threeAddressForm(cond)
+      val localvarname0 = TermName(c.freshName("x"))
+      val decls = if (xdecls0 != Nil) {
+        xdecls0 ++ List(
+          q"var $localvarname0 = $xident0",
           q"""
-            while ($localvarname) {
+            while ($localvarname0) {
               ${transform(body)}
 
-              ..$xdecls
-              $localvarname = $xident
+              ..$xdecls1
+              $localvarname0 = $xident1
             }
           """)
       } else List(q"""
@@ -316,6 +322,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
     // recursive transform of the body code
     val transformedBody = transform(body)(typer)
     val untypedtaflambda = q"(..$args) => $transformedBody"
+    println(untypedtaflambda)
     c.typecheck(untypedtaflambda)
   }
 }

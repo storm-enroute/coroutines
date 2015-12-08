@@ -324,11 +324,22 @@ class CoroutineTest extends FunSuite with Matchers {
     val c = call(addOne())
     assert(c() == 2)
   }
+
+  test("coroutine should yield every second element") {
+    val rube = coroutine { (x: Int) =>
+      var i = 0
+      while (i < x) {
+        if (i % 2 == 0) yieldval(i)
+        i += 1
+      }
+      i += 1
+    }
+  }
 }
 
 
 class ToaTransformationTest extends FunSuite with Matchers {
-  test("if statements with applications") {
+  test("if state ments with applications") {
     val rube = coroutine { () =>
       if (0 < { math.abs(-1); math.max(1, 2) }) 2 else 1
     }
