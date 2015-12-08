@@ -8,9 +8,15 @@ build:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - eval `ssh-agent -s`
     - |
-      if [ ! -z $SSH_KEY_PASS ]; then
+      if [ -z $SSH_KEY_PASS ]; then
         export DISPLAY=""
-        echo "executed if!!"
+        echo "Setting up ssh-agent."
+        echo "exec cat" > ap-cat.sh
+        chmod a+x ap-cat.sh
+        export DISPLAY=1
+        echo $SSH_KEY_PASS | SSH_ASKPASS=./ap-cat.sh ssh-add ~/.ssh/id_rsa
+        rm ap-cat.sh
+        export SSH_KEY_PASS=""
       fi
     - echo "pull request no. $DRONE_PULL_REQUEST"
     - if [ "$DRONE_PULL_REQUEST" != "" ]; then (sbt test); else (sbt mecha-nightly); fi
