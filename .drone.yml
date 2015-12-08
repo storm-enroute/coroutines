@@ -7,7 +7,8 @@ build:
   commands:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - eval `ssh-agent -s`
-    - if [ ! -z $SSH_KEY_PASS ]; then
+    - |
+      if [ ! -z $SSH_KEY_PASS ]; then
         echo "exec cat" > ap-cat.sh
         chmod a+x ap-cat.sh
         export DISPLAY=1
