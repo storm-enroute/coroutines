@@ -1,11 +1,12 @@
 build:
   image: stormenroute/storm-enroute-build:0.4
   environment:
-    - SSH_KEY_PASS=$${SSH_KEY_PASS/[0-9]{,2}SSH_KEYPASS/}
-    - SONATYPE_USER=$${SONATYPE_USER/[0-9]{,2}SONATYPE_USER/}
-    - SONATYPE_PASS=$${SONATYPE_PASS/[0-9]{,2}SONATYPE_PASS/}
+    - TEST_SECRET=$$TEST_SECRET
+    - SSH_KEY_PASS=$$SSH_KEY_PASS
+    - SONATYPE_USER=$$SONATYPE_USER
+    - SONATYPE_PASS=$$SONATYPE_PASS
   commands:
-    - echo $${TEST_SECRET_NON="alt"}
+    - echo $TEST_SECRET
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - |
       if [ -n $SSH_KEY_PASS ]; then
