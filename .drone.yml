@@ -5,7 +5,7 @@ build:
     - SONATYPE_USER=$${SONATYPE_USER/[0-9]{,2}SONATYPE_USER/}
     - SONATYPE_PASS=$${SONATYPE_PASS/[0-9]{,2}SONATYPE_PASS/}
   commands:
-    - echo $${TEST_SECRET/abc/alternative}
+    - echo $${TEST_SECRET/[a-z]{,3}def/alternative}
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - |
       if [ -n $SSH_KEY_PASS ]; then
