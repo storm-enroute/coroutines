@@ -18,6 +18,7 @@ build:
         export SSH_KEY_PASS=""
         export DISPLAY=""
       else
+        echo "Resetting secrets."
         export SONATYPE_USER=""
         export SONATYPE_PASS=""
       fi
