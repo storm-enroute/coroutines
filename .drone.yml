@@ -6,7 +6,7 @@ build:
     - SONATYPE_USER=$$SONATYPE_USER
     - SONATYPE_PASS=$$SONATYPE_PASS
   commands:
-    - DEFINED+="SSH_KEY_PASS"
+    - export DEFINED=$DEFINED"$SSH_KEY_PASS"
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - |
       if [ "$SSH_KEY_PASS" != "$DEFINED" ]; then
