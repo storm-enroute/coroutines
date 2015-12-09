@@ -1,13 +1,15 @@
 build:
   image: stormenroute/storm-enroute-build:0.6
   environment:
+    - DEFINED=$$
     - SSH_KEY_PASS=$$SSH_KEY_PASS
     - SONATYPE_USER=$$SONATYPE_USER
     - SONATYPE_PASS=$$SONATYPE_PASS
   commands:
+    - DEFINED+="SSH_KEY_PASS"
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - |
-      if [ "$SSH_KEY_PASS" != '$$SSH_KEY_PASS' ]; then
+      if [ "$SSH_KEY_PASS" != "$DEFINED" ]; then
         eval `ssh-agent -s`
         echo "Setting up ssh-agent."
         echo "exec cat" > ap-cat.sh
