@@ -25,5 +25,12 @@ build:
         export SONATYPE_USER=""
         export SONATYPE_PASS=""
       fi
-    - echo "pull request no. $DRONE_PULL_REQUEST"
-    - if [ "$DRONE_PULL_REQUEST" = "" ]; then (sbt mecha-nightly); else (sbt test); fi
+    - echo "Pull request no. $DRONE_PULL_REQUEST"
+    - |
+      while read v; do
+        if [ "$DRONE_PULL_REQUEST" = "" ]; then
+          sbt "++ $v ; mecha-nightly"
+        else
+          sbt "++ $v ; test"
+        fi
+      done <cross.conf
