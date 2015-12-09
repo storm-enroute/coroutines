@@ -13,7 +13,7 @@ build:
         echo "exec cat" > ap-cat.sh
         chmod a+x ap-cat.sh
         export DISPLAY=1
-        echo $SSH_KEY_PASS | SSH_ASKPASS=./ap-cat.sh ssh-add ~/.ssh/id_rsa
+        echo "$SSH_KEY_PASS" | SSH_ASKPASS=./ap-cat.sh ssh-add ~/.ssh/id_rsa
         rm ap-cat.sh
         export SSH_KEY_PASS=""
         export DISPLAY=""
