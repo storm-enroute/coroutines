@@ -7,7 +7,11 @@ build:
   commands:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - |
-      if [ $DRONE_PULL_REQUEST == "" ]; then
+      if [ $DRONE_PULL_REQUEST != "" ]; then
+        echo "Resetting secrets."
+        export SONATYPE_USER=""
+        export SONATYPE_PASS=""
+      else
         eval `ssh-agent -s`
         echo "Setting up ssh-agent."
         echo "exec cat" > ap-cat.sh
@@ -18,9 +22,5 @@ build:
         export SSH_KEY_PASS=""
         export DISPLAY=""
       else
-        echo "Resetting secrets."
-        export SONATYPE_USER=""
-        export SONATYPE_PASS=""
-      fi
     - echo "pull request no. $DRONE_PULL_REQUEST"
     - if [ "$DRONE_PULL_REQUEST" != "" ]; then (sbt test); else (sbt mecha-nightly); fi
