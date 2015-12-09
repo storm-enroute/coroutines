@@ -21,6 +21,6 @@ build:
         rm ap-cat.sh
         export SSH_KEY_PASS=""
         export DISPLAY=""
-      else
+      fi
     - echo "pull request no. $DRONE_PULL_REQUEST"
     - if [ "$DRONE_PULL_REQUEST" != "" ]; then (sbt test); else (sbt mecha-nightly); fi
