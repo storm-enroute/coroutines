@@ -5,8 +5,8 @@ build:
     - SONATYPE_USER=$$SONATYPE_USER
     - SONATYPE_PASS=$$SONATYPE_PASS
   commands:
-    - ssh-keyscan github.com >> ~/.ssh/known_hosts
     - |
+      ssh-keyscan github.com >> ~/.ssh/known_hosts
       if [ $DRONE_PULL_REQUEST != "" ]; then
         echo "Resetting secrets."
         export SONATYPE_USER=""
@@ -22,5 +22,5 @@ build:
         export SSH_KEY_PASS=""
         export DISPLAY=""
       fi
-    - echo "pull request no. $DRONE_PULL_REQUEST"
-    - if [ "$DRONE_PULL_REQUEST" != "" ]; then (sbt test); else (sbt mecha-nightly); fi
+      echo "pull request no. $DRONE_PULL_REQUEST"
+      if [ "$DRONE_PULL_REQUEST" != "" ]; then (sbt test); else (sbt mecha-nightly); fi
