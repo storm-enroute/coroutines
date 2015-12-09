@@ -23,4 +23,4 @@ build:
         export DISPLAY=""
       fi
       echo "pull request no. $DRONE_PULL_REQUEST"
-      if [ "$DRONE_PULL_REQUEST" != "" ]; then (sbt test); else (sbt mecha-nightly); fi
+      
