@@ -658,14 +658,16 @@ trait ControlFlowGraph[C <: Context] {
       for (c <- cs) if (!childBlocks.contains(c.block)) childBlocks += c.block -> List()
     }
 
-    val isOccurringInDescendants: (Symbol, Block) => Boolean = cached {
+    val isOccurringInBlockDescendants: (Symbol, Block) => Boolean = cached {
       (s: Symbol, b: Block) =>
-      b.occurrences.contains(s) || childBlocks(b).exists(isOccurringInDescendants(s, _))
+      b.occurrences.contains(s) ||
+      childBlocks(b).exists(isOccurringInBlockDescendants(s, _))
     }
 
-    val isAssignedInDescendants: (Symbol, Block) => Boolean = cached {
+    val isAssignedInBlockDescendants: (Symbol, Block) => Boolean = cached {
       (s: Symbol, b: Block) =>
-      b.assignments.contains(s) || childBlocks(b).exists(isAssignedInDescendants(s, _))
+      b.assignments.contains(s) ||
+      childBlocks(b).exists(isAssignedInBlockDescendants(s, _))
     }
 
     val declarationBlockFrom: (Symbol, Chain) => Block = cached {
@@ -675,8 +677,9 @@ trait ControlFlowGraph[C <: Context] {
 
     val mustStoreVar: (Symbol, Chain) => Boolean = cached {
       (sym: Symbol, chain: Chain) =>
+      val block = declarationBlockFrom(sym, chain)
       val isVisible = chain.contains(sym)
-      val isAssigned = isAssignedInDescendants(sym, declarationBlockFrom(sym, chain))
+      val isAssigned = isAssignedInBlockDescendants(sym, block)
       val isDeclared = chain.isDeclaredInAncestors(sym)
       isVisible && (isAssigned || isDeclared)
     }
@@ -684,7 +687,7 @@ trait ControlFlowGraph[C <: Context] {
     val mustLoadVar: (Symbol, Chain) => Boolean = cached {
       (sym: Symbol, chain: Chain) =>
       val isVisible = chain.contains(sym)
-      val isOccurring = isOccurringInDescendants(sym, chain.block)
+      val isOccurring = isOccurringInBlockDescendants(sym, chain.block)
       isVisible && isOccurring
     }
 
