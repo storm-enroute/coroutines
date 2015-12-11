@@ -349,6 +349,32 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == -7)
     assert(c.isStopped)
   }
+
+  test("coroutine should yield even numbers and 117, or negative odd numbers") {
+    var rube = coroutine { () =>
+      var i = 0
+      while (i < 4) {
+        var z = i
+        if (i % 2 == 0) {
+          yieldval(z)
+          yieldval(117)
+        } else {
+          yieldval(-z)
+        }
+        i += 1
+      }
+      i
+    }
+    val c = call(rube())
+    assert(c() == 0)
+    assert(c() == 117)
+    assert(c() == -1)
+    assert(c() == 2)
+    assert(c() == 117)
+    assert(c() == -3)
+    assert(c() == 4)
+    assert(c.isStopped)
+  }
 }
 
 
