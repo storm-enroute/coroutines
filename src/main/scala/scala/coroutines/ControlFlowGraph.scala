@@ -4,6 +4,7 @@ package scala.coroutines
 
 import scala.collection._
 import scala.coroutines.common._
+import scala.coroutines.common.Cache._
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
 
@@ -657,26 +658,31 @@ trait ControlFlowGraph[C <: Context] {
       for (c <- cs) if (!childBlocks.contains(c.block)) childBlocks += c.block -> List()
     }
 
-    def isOccurringInDescendants(s: Symbol, b: Block): Boolean = {
+    val isOccurringInDescendants: (Symbol, Block) => Boolean = cached {
+      (s: Symbol, b: Block) =>
       b.occurrences.contains(s) || childBlocks(b).exists(isOccurringInDescendants(s, _))
     }
 
-    def isAssignedInDescendants(s: Symbol, b: Block): Boolean = {
+    val isAssignedInDescendants: (Symbol, Block) => Boolean = cached {
+      (s: Symbol, b: Block) =>
       b.assignments.contains(s) || childBlocks(b).exists(isAssignedInDescendants(s, _))
     }
 
-    def declarationBlockFrom(s: Symbol, chain: Chain): Block = {
+    val declarationBlockFrom: (Symbol, Chain) => Block = cached {
+      (s: Symbol, chain: Chain) =>
       chain.ancestors.find(_.decls.toMap.contains(s)).get.block
     }
 
-    def mustStoreVar(sym: Symbol, chain: Chain): Boolean = {
+    val mustStoreVar: (Symbol, Chain) => Boolean = cached {
+      (sym: Symbol, chain: Chain) =>
       val isVisible = chain.contains(sym)
       val isAssigned = isAssignedInDescendants(sym, declarationBlockFrom(sym, chain))
       val isDeclared = chain.isDeclaredInAncestors(sym)
       isVisible && (isAssigned || isDeclared)
     }
 
-    def mustLoadVar(sym: Symbol, chain: Chain): Boolean = {
+    val mustLoadVar: (Symbol, Chain) => Boolean = cached {
+      (sym: Symbol, chain: Chain) =>
       val isVisible = chain.contains(sym)
       val isOccurring = isOccurringInDescendants(sym, chain.block)
       isVisible && isOccurring
