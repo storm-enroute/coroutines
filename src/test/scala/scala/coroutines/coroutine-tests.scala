@@ -332,7 +332,7 @@ class CoroutineTest extends FunSuite with Matchers {
         if (i % 2 == 0) yieldval(i)
         i += 1
       }
-      i += 1
+      i
     }
   }
 }
@@ -451,6 +451,24 @@ class ToaTransformationTest extends FunSuite with Matchers {
     }
     val c1 = call(rube(10))
     for (i <- 0 to 10) assert(c1() == i)
+    assert(c1.isStopped)
+    val c2 = call(rube(20))
+    assert(c2() == 0)
+    assert(c2.isStopped)
+  }
+
+  test("coroutine should yield every second element or just zero") {
+    val rube = coroutine { (x: Int) =>
+      var i = 0
+      while (i < x && x < math.abs(-15)) {
+        if (i % 2 == 0) yieldval(i)
+        i += 1
+      }
+      i
+    }
+
+    val c1 = call(rube(10))
+    for (i <- 0 to 10; if i % 2 == 0) assert(c1() == i)
     assert(c1.isStopped)
     val c2 = call(rube(20))
     assert(c2() == 0)
