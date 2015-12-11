@@ -478,7 +478,7 @@ class ToaTransformationTest extends FunSuite with Matchers {
   test("coroutine should yield 1 or yield 10 elements, and then 117") {
     val rube = coroutine { (x: Int) =>
       var i = 1
-      if (x > 0) {
+      if (x > math.abs(0)) {
         while (i < x) {
           yieldval(i)
           i += 1
@@ -497,5 +497,17 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c2() == 1)
     assert(c2() == 117)
     assert(c2.isStopped)
+  }
+
+  test("yield absolute and original value") {
+    val rube = coroutine { (x: Int) =>
+      yieldval(math.abs(x))
+      x
+    }
+
+    val c = call(rube(-5))
+    assert(c() == 5)
+    assert(c() == -5)
+    assert(c.isStopped)
   }
 }
