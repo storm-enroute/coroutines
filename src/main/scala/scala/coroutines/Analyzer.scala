@@ -177,6 +177,11 @@ trait Analyzer[C <: Context] {
     def ancestors: List[Chain] = {
       if (parent != null) this :: parent.ancestors else this :: Nil
     }
+    def chainForDecl(s: Symbol): Option[Chain] = {
+      if (decls.exists(_._1 == s)) Some(this)
+      else if (parent != null) parent.chainForDecl(s)
+      else None
+    }
     def isAssigned(s: Symbol): Boolean = {
       block.assignments.contains(s)
     }

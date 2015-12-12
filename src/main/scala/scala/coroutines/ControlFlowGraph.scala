@@ -104,7 +104,7 @@ trait ControlFlowGraph[C <: Context] {
       // store state for non-val variables in scope
       val stacksets = for {
         (sym, info) <- chain.alldecls
-        if subgraph.mustStoreVar(sym, chain)
+        if subgraph.mustStoreVar(this, sym, chain)
       } yield {
         info.setTree(q"${t.names.coroutineParam}", q"${info.name}")
       }
@@ -670,13 +670,26 @@ trait ControlFlowGraph[C <: Context] {
       childBlocks(b).exists(isAssignedInBlockDescendants(s, _))
     }
 
+    val isLoadedInReachableSubgraphs: (Node, Symbol, Chain) => Boolean = cached {
+      (n: Node, s: Symbol, chain: Chain) =>
+      def traverse(sub: SubCfg, seen: mutable.Set[SubCfg]): Boolean =
+        if (seen(sub)) false else {
+          seen += sub
+          val startChain = sub.start.chain.chainForDecl(s)
+          if (mustLoadVar(s, sub.start.chain)) true
+          // TODO: finish this.
+          else sub.exitSubgraphs.filter(???).exists(t => traverse(t._2, seen))
+        }
+      traverse(exitSubgraphs(n), mutable.Set())
+    }
+
     val declarationBlockFrom: (Symbol, Chain) => Block = cached {
       (s: Symbol, chain: Chain) =>
       chain.ancestors.find(_.decls.toMap.contains(s)).get.block
     }
 
-    val mustStoreVar: (Symbol, Chain) => Boolean = cached {
-      (sym: Symbol, chain: Chain) =>
+    val mustStoreVar: (Node, Symbol, Chain) => Boolean = cached {
+      (n: Node, sym: Symbol, chain: Chain) =>
       val block = declarationBlockFrom(sym, chain)
       val isVisible = chain.contains(sym)
       val isAssigned = isAssignedInBlockDescendants(sym, block)

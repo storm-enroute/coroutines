@@ -32,4 +32,17 @@ object Cache {
       }
     }
   }
+
+  def cached[T1, T2, T3, S](f: (T1, T2, T3) => S): (T1, T2, T3) => S = {
+    val cache = mutable.Map[(T1, T2, T3), S]()
+    (t1, t2, t3) => {
+      cache.get((t1, t2, t3)) match {
+        case Some(s) => s
+        case None =>
+          val s = f(t1, t2, t3)
+          cache((t1, t2, t3)) = s
+          s
+      }
+    }
+  }
 }
