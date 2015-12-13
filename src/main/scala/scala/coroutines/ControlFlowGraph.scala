@@ -658,19 +658,19 @@ trait ControlFlowGraph[C <: Context] {
       for (c <- cs) if (!childBlocks.contains(c.block)) childBlocks(c.block) = Nil
     }
 
-    val isOccurringInBlockDescendants: (Symbol, Block) => Boolean = cached {
+    val isOccurringInBlockDescendants: Cache._2[Symbol, Block, Boolean] = cached {
       (s, b) =>
       b.occurrences.contains(s) ||
         childBlocks(b).exists(isOccurringInBlockDescendants(s, _))
     }
 
-    val isAssignedInBlockDescendants: (Symbol, Block) => Boolean = cached {
+    val isAssignedInBlockDescendants: Cache._2[Symbol, Block, Boolean] = cached {
       (s, b) =>
       b.assignments.contains(s) ||
         childBlocks(b).exists(isAssignedInBlockDescendants(s, _))
     }
 
-    val isLoadedInReachableSubgraphs: (Node, Symbol) => Boolean = cached {
+    val isLoadedInReachableSubgraphs: Cache._2[Node, Symbol, Boolean] = cached {
       (n, s) =>
       def isLoaded(sub: SubCfg, seen: mutable.Set[SubCfg]): Boolean = {
         if (seen(sub)) false else {
@@ -685,12 +685,12 @@ trait ControlFlowGraph[C <: Context] {
       isLoaded(exitSubgraphs(n), mutable.Set())
     }
 
-    val declarationBlockFrom: (Symbol, Chain) => Block = cached {
+    val declarationBlockFrom: Cache._2[Symbol, Chain, Block] = cached {
       (s, chain) =>
       chain.ancestors.find(_.decls.toMap.contains(s)).get.block
     }
 
-    val mustStoreVar: (Node, Symbol, Chain) => Boolean = cached {
+    val mustStoreVar: Cache._3[Node, Symbol, Chain, Boolean] = cached {
       (n, sym, chain) =>
       val block = declarationBlockFrom(sym, chain)
       val isVisible = chain.contains(sym)
@@ -700,7 +700,7 @@ trait ControlFlowGraph[C <: Context] {
       isVisible && (isAssigned || isDeclared) && isNeeded
     }
 
-    val mustLoadVar: (Symbol, Chain) => Boolean = cached {
+    val mustLoadVar: Cache._2[Symbol, Chain, Boolean] = cached {
       (sym, chain) =>
       val isVisible = chain.contains(sym)
       val isOccurring = isOccurringInBlockDescendants(sym, chain.block)
