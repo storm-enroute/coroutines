@@ -182,6 +182,9 @@ trait Analyzer[C <: Context] {
       else if (parent != null) parent.chainForDecl(s)
       else None
     }
+    def isDescendantOf(that: Chain): Boolean = {
+      this == that || (parent != null && parent.isDescendantOf(that))
+    }
     def isAssigned(s: Symbol): Boolean = {
       block.assignments.contains(s)
     }

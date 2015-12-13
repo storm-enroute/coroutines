@@ -655,50 +655,56 @@ trait ControlFlowGraph[C <: Context] {
       childBlocks ++= cs.filter(_.parent != null).toList.groupBy(_.parent).map {
         case (c, children) => (c.block, children.map(_.block))
       }
-      for (c <- cs) if (!childBlocks.contains(c.block)) childBlocks += c.block -> List()
+      for (c <- cs) if (!childBlocks.contains(c.block)) childBlocks(c.block) = Nil
     }
 
     val isOccurringInBlockDescendants: (Symbol, Block) => Boolean = cached {
-      (s: Symbol, b: Block) =>
+      (s, b) =>
       b.occurrences.contains(s) ||
-      childBlocks(b).exists(isOccurringInBlockDescendants(s, _))
+        childBlocks(b).exists(isOccurringInBlockDescendants(s, _))
     }
 
     val isAssignedInBlockDescendants: (Symbol, Block) => Boolean = cached {
-      (s: Symbol, b: Block) =>
+      (s, b) =>
       b.assignments.contains(s) ||
-      childBlocks(b).exists(isAssignedInBlockDescendants(s, _))
+        childBlocks(b).exists(isAssignedInBlockDescendants(s, _))
     }
 
-    val isLoadedInReachableSubgraphs: (Node, Symbol, Chain) => Boolean = cached {
-      (n: Node, s: Symbol, chain: Chain) =>
-      def traverse(sub: SubCfg, seen: mutable.Set[SubCfg]): Boolean =
+    val isLoadedInReachableSubgraphs: (Node, Symbol) => Boolean = cached {
+      (n, s) =>
+      def isLoaded(sub: SubCfg, seen: mutable.Set[SubCfg]): Boolean =
         if (seen(sub)) false else {
           seen += sub
-          val startChain = sub.start.chain.chainForDecl(s)
-          if (mustLoadVar(s, sub.start.chain)) true
-          // TODO: finish this.
-          else sub.exitSubgraphs.filter(???).exists(t => traverse(t._2, seen))
+          val startChain = sub.start.chain.chainForDecl(s).get
+          // println("-----------")
+          // println(n)
+          // println(sub.start.dfs.map(x => (x.getClass, x.chain.block, System.identityHashCode(x.chain.block))).mkString("\n"))
+          // println(sub.childBlocks.map(x => (x._1, System.identityHashCode(x))))
+          sub.mustLoadVar(s, sub.start.chain) ||
+            sub.exitSubgraphs
+              .filter(_._1.chain.isDescendantOf(startChain))
+              .exists(t => isLoaded(t._2, seen))
         }
-      traverse(exitSubgraphs(n), mutable.Set())
+      isLoaded(exitSubgraphs(n), mutable.Set())
     }
 
     val declarationBlockFrom: (Symbol, Chain) => Block = cached {
-      (s: Symbol, chain: Chain) =>
+      (s, chain) =>
       chain.ancestors.find(_.decls.toMap.contains(s)).get.block
     }
 
     val mustStoreVar: (Node, Symbol, Chain) => Boolean = cached {
-      (n: Node, sym: Symbol, chain: Chain) =>
+      (n, sym, chain) =>
       val block = declarationBlockFrom(sym, chain)
       val isVisible = chain.contains(sym)
       val isAssigned = isAssignedInBlockDescendants(sym, block)
       val isDeclared = chain.isDeclaredInAncestors(sym)
+      val isNeeded = isLoadedInReachableSubgraphs(n, sym)
       isVisible && (isAssigned || isDeclared)
     }
 
     val mustLoadVar: (Symbol, Chain) => Boolean = cached {
-      (sym: Symbol, chain: Chain) =>
+      (sym, chain) =>
       val isVisible = chain.contains(sym)
       val isOccurring = isOccurringInBlockDescendants(sym, chain.block)
       isVisible && isOccurring
