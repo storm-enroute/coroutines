@@ -672,19 +672,16 @@ trait ControlFlowGraph[C <: Context] {
 
     val isLoadedInReachableSubgraphs: (Node, Symbol) => Boolean = cached {
       (n, s) =>
-      def isLoaded(sub: SubCfg, seen: mutable.Set[SubCfg]): Boolean =
+      def isLoaded(sub: SubCfg, seen: mutable.Set[SubCfg]): Boolean = {
         if (seen(sub)) false else {
           seen += sub
           val startChain = sub.start.chain.chainForDecl(s).get
-          // println("-----------")
-          // println(n)
-          // println(sub.start.dfs.map(x => (x.getClass, x.chain.block, System.identityHashCode(x.chain.block))).mkString("\n"))
-          // println(sub.childBlocks.map(x => (x._1, System.identityHashCode(x))))
-          sub.mustLoadVar(s, sub.start.chain) ||
+          sub.mustLoadVar(s, startChain) ||
             sub.exitSubgraphs
               .filter(_._1.chain.isDescendantOf(startChain))
               .exists(t => isLoaded(t._2, seen))
         }
+      }
       isLoaded(exitSubgraphs(n), mutable.Set())
     }
 
@@ -700,7 +697,7 @@ trait ControlFlowGraph[C <: Context] {
       val isAssigned = isAssignedInBlockDescendants(sym, block)
       val isDeclared = chain.isDeclaredInAncestors(sym)
       val isNeeded = isLoadedInReachableSubgraphs(n, sym)
-      isVisible && (isAssigned || isDeclared)
+      isVisible && (isAssigned || isDeclared) && isNeeded
     }
 
     val mustLoadVar: (Symbol, Chain) => Boolean = cached {
