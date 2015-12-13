@@ -126,10 +126,12 @@ with ThreeAddressFormTransformation[C] {
     """
   }
 
-  def genVarPushesAndPops(
-    tpt: Tree
-  )(implicit table: Table): (List[Tree], List[Tree]) = {
-    def genVarPushes(vars: Map[Symbol, VarInfo], stack: Tree): List[Tree] = {
+  def genVarPushesAndPops(cfg: Cfg)(implicit table: Table): (List[Tree], List[Tree]) = {
+    val knownStorePoints = cfg.knownStorePoints
+    val storedValVars = table.valvars//.filter(kv => knownStorePoints.contains(kv._1))
+    val storedRefVars = table.refvars//.filter(kv => knownStorePoints.contains(kv._1))
+    def genVarPushes(allvars: Map[Symbol, VarInfo], stack: Tree): List[Tree] = {
+      val vars = allvars//.filter(kv => knownStorePoints.contains(kv._1))
       val stacksize = math.max(table.initialStackSize, vars.size)
       val bulkpushes = if (vars.size == 0) Nil else List(q"""
         scala.coroutines.common.Stack.bulkPush($stack, ${vars.size}, $stacksize)
@@ -139,13 +141,13 @@ with ThreeAddressFormTransformation[C] {
       bulkpushes ::: argsets
     }
     val varpushes = {
-      genVarPushes(table.refvars, q"c.refstack") ++
-      genVarPushes(table.valvars, q"c.valstack")
+      genVarPushes(storedRefVars, q"c.refstack") ++
+      genVarPushes(storedValVars, q"c.valstack")
     }
-    val varpops = (for ((sym, info) <- table.vars.toList if info.isRefType) yield {
+    val varpops = (for ((sym, info) <- storedRefVars.toList) yield {
       info.popTree
-    }) ++ (if (table.valvars.size == 0) Nil else List(
-      q"scala.coroutines.common.Stack.bulkPop(c.valstack, ${table.valvars.size})"
+    }) ++ (if (storedValVars.size == 0) Nil else List(
+      q"scala.coroutines.common.Stack.bulkPop(c.valstack, ${storedValVars.size})"
     ))
     (varpushes, varpops)
   }
@@ -187,7 +189,7 @@ with ThreeAddressFormTransformation[C] {
     val returnvaluemethod = genReturnValueMethod(cfg, rettpt)
 
     // generate variable pushes and pops for stack variables
-    val (varpushes, varpops) = genVarPushesAndPops(rettpt)
+    val (varpushes, varpops) = genVarPushesAndPops(cfg)
 
     // emit coroutine instantiation
     val coroutineTpe = TypeName(s"Arity${args.size}")

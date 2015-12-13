@@ -104,7 +104,7 @@ trait ControlFlowGraph[C <: Context] {
       // store state for non-val variables in scope
       val stacksets = for {
         (sym, info) <- chain.alldecls
-        if subgraph.mustStoreVar(this, sym, chain)
+        if subgraph.mustStoreVar(this, sym)
       } yield {
         info.setTree(q"${t.names.coroutineParam}", q"${info.name}")
       }
@@ -642,6 +642,21 @@ trait ControlFlowGraph[C <: Context] {
 
   class Cfg(val start: Node) {
     val subgraphs = mutable.Map[Node, SubCfg]()
+
+    def knownStorePoints: Map[Symbol, Seq[Node]] = {
+      val storePointsPerSubgraph = for ((_, sub) <- subgraphs) yield {
+        sub.mustStoreVar.cache.filter(_._2).groupBy(_._1._2).map {
+          case (sym, points) => (sym, points.map(_._1._1).toSeq)
+        }
+      }
+      storePointsPerSubgraph.foldLeft(mutable.Map[Symbol, Seq[Node]]()) {
+        (storePoints, subgraphStorePoints) =>
+        for ((s, points) <- subgraphStorePoints) {
+          storePoints(s) = storePoints.getOrElse(s, Nil) ++ points
+        }
+        storePoints
+      }
+    }
   }
 
   class SubCfg(val uid: Long) {
@@ -690,8 +705,9 @@ trait ControlFlowGraph[C <: Context] {
       chain.ancestors.find(_.decls.toMap.contains(s)).get.block
     }
 
-    val mustStoreVar: Cache._3[Node, Symbol, Chain, Boolean] = cached {
-      (n, sym, chain) =>
+    val mustStoreVar: Cache._2[Node, Symbol, Boolean] = cached {
+      (n, sym) =>
+      val chain = n.chain
       val block = declarationBlockFrom(sym, chain)
       val isVisible = chain.contains(sym)
       val isAssigned = isAssignedInBlockDescendants(sym, block)
