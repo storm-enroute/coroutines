@@ -425,6 +425,31 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c1() == 1)
     assert(c1.isStopped)
   }
+
+  test("coroutine should yield x, z, x, 117, or just x, 117") {
+    val rube = coroutine { (v: Int) =>
+      val x = v
+      yieldval(x)
+      if (x > 0) {
+        val z = 1
+        yieldval(z)
+        yieldval(x)
+      }
+      117
+    }
+
+    val c0 = call(rube(5))
+    assert(c0() == 5)
+    assert(c0() == 1)
+    assert(c0() == 5)
+    assert(c0() == 117)
+    assert(c0.isStopped)
+
+    val c1 = call(rube(-7))
+    assert(c1() == -7)
+    assert(c1() == 117)
+    assert(c1.isStopped)
+  }
 }
 
 
