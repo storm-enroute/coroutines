@@ -14,7 +14,7 @@ import scala.reflect.macros.whitebox.Context
  */
 private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C]
-with ControlFlowGraph[C]
+with CfgGenerator[C]
 with ThreeAddressFormTransformation[C] {
   import c.universe._
 
@@ -76,14 +76,12 @@ with ThreeAddressFormTransformation[C] {
     }
   }
 
-  private def genReturnValueMethod(
-    cfg: Cfg, tpt: Tree
-  )(implicit table: Table): Tree = {
+  private def genReturnValueMethod(cfg: Cfg, tpt: Tree)(implicit table: Table): Tree = {
     def genReturnValueStore(n: Node) = {
       val sub = cfg.subgraphs(n.successors.head)
       val pcvalue = sub.uid
       val info = table(n.tree.symbol)
-      val rvset = info.setTree(q"c", q"v")
+      val rvset = info.storeTree(q"c", q"v")
       (pcvalue, q"$rvset")
     }
     val returnstores = cfg.start.dfs.collect {
@@ -127,18 +125,18 @@ with ThreeAddressFormTransformation[C] {
   }
 
   def genVarPushesAndPops(cfg: Cfg)(implicit table: Table): (List[Tree], List[Tree]) = {
-    val knownStorePoints = cfg.knownStorePoints
-    val storedValVars = table.valvars//.filter(kv => knownStorePoints.contains(kv._1))
-    val storedRefVars = table.refvars//.filter(kv => knownStorePoints.contains(kv._1))
+    val stackVars = cfg.stackVars
+    val storedValVars = cfg.storedValVars
+    val storedRefVars = cfg.storedRefVars
     def genVarPushes(allvars: Map[Symbol, VarInfo], stack: Tree): List[Tree] = {
-      val vars = allvars//.filter(kv => knownStorePoints.contains(kv._1))
+      val vars = allvars.filter(kv => stackVars.contains(kv._1))
       val stacksize = math.max(table.initialStackSize, vars.size)
       val bulkpushes = if (vars.size == 0) Nil else List(q"""
         scala.coroutines.common.Stack.bulkPush($stack, ${vars.size}, $stacksize)
       """)
       val args = vars.values.filter(_.isArg).toList
-      val argsets = for (a <- args) yield a.setTree(q"c", q"${a.name}")
-      bulkpushes ::: argsets
+      val argstores = for (a <- args) yield a.storeTree(q"c", q"${a.name}")
+      bulkpushes ::: argstores
     }
     val varpushes = {
       genVarPushes(storedRefVars, q"c.refstack") ++

@@ -37,14 +37,14 @@ trait Analyzer[C <: Context] {
     val isArg: Boolean,
     val table: Table
   ) {
+    private var rawstackpos = -1
     val tpe = sym.info
     val name = sym.name.toTermName
     def stackpos = {
-      val sametpvars =
-        if (isRefType) table.vars.filter(_._2.isRefType)
-        else table.vars.filter(_._2.isValType)
-      sametpvars.size - 1 - sametpvars.toList.indexWhere(_._2.uid == uid)
+      assert(rawstackpos != -1, s"Variable '$sym' without computed stack position.")
+      rawstackpos
     }
+    def stackpos_=(v: Int) = rawstackpos = v
     def isUnitType = tpe =:= typeOf[Unit]
     def isRefType = {
       tpe <:< typeOf[AnyRef] || tpe =:= typeOf[Unit] || tpe =:= typeOf[Any]
@@ -97,7 +97,7 @@ trait Analyzer[C <: Context] {
     def popTree = q"""
       scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
     """
-    def setTree(coroutine: Tree, x: Tree): Tree = {
+    def storeTree(coroutine: Tree, x: Tree): Tree = {
       val encoded = {
         if (isUnitType) q"$x.asInstanceOf[AnyRef]"
         else if (isRefType) x
@@ -108,7 +108,7 @@ trait Analyzer[C <: Context] {
           $coroutine.$stackname, $stackpos, $encoded)
       """
     }
-    def getTree(coroutine: Tree): Tree = {
+    def loadTree(coroutine: Tree): Tree = {
       if (isUnitType) q"()"
       else {
         val t = q"""

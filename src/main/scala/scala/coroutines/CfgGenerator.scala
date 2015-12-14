@@ -12,7 +12,7 @@ import scala.reflect.macros.whitebox.Context
 
 /** Generates control flow graphs, and converts CFG nodes to ASTs.
  */
-trait ControlFlowGraph[C <: Context] {
+trait CfgGenerator[C <: Context] {
   self: Analyzer[C] =>
 
   val c: C
@@ -97,23 +97,26 @@ trait ControlFlowGraph[C <: Context] {
       }
     }
 
-    protected def genSaveState(
-      chain: Chain, subgraph: SubCfg
-    )(implicit t: Table): List[Tree] = {
-      val cparam = t.names.coroutineParam
-      // store state for non-val variables in scope
-      val stacksets = for {
+    def stackVars(subgraph: SubCfg): List[Symbol] = Nil
+
+    protected def storePointVarsInChain(subgraph: SubCfg): List[(Symbol, VarInfo)] =
+      for {
         (sym, info) <- chain.alldecls
         if subgraph.mustStoreVar(this, sym)
-      } yield {
-        info.setTree(q"${t.names.coroutineParam}", q"${info.name}")
+      } yield (sym, info)
+
+    protected def genSaveState(subgraph: SubCfg)(implicit t: Table): List[Tree] = {
+      val cparam = t.names.coroutineParam
+      // store state for non-val variables in scope
+      val stackstores = for ((sym, info) <- storePointVarsInChain(subgraph)) yield {
+        info.storeTree(q"${t.names.coroutineParam}", q"${info.name}")
       }
       // update pc state
       val pc = subgraph.exitSubgraphs(this).uid
       val pcstackset = q"""
         scala.coroutines.common.Stack.update($cparam.pcstack, $pc.toShort)
       """
-      pcstackset :: stacksets.toList
+      pcstackset :: stackstores.toList
     }
 
     protected def genExit(n: Node, subgraph: SubCfg)(implicit t: Table): Tree = {
@@ -434,7 +437,7 @@ trait ControlFlowGraph[C <: Context] {
         implicit cc: CanCall, table: Table
       ): Zipper = {
         val q"$_ val $_: $_ = $co.apply(..$args)" = tree
-        val exittree = genCoroutineCall(co, args, chain, subgraph)
+        val exittree = genCoroutineCall(co, args, subgraph)
         z.append(exittree)
       }
       override def updateBlock()(implicit table: Table) {
@@ -463,11 +466,13 @@ trait ControlFlowGraph[C <: Context] {
         nthis
       }
       def copyWithoutSuccessors(nch: Chain) = ApplyCoroutine(tree, nch, uid)
+      override def stackVars(sub: SubCfg) =
+        tree.symbol :: storePointVarsInChain(sub).map(_._1)
       def genCoroutineCall(
-        co: Tree, args: List[Tree], chain: Chain, subgraph: SubCfg
+        co: Tree, args: List[Tree], subgraph: SubCfg
       )(implicit table: Table): Tree = {
         val cparam = table.names.coroutineParam
-        val savestate = genSaveState(chain, subgraph)
+        val savestate = genSaveState(subgraph)
         val untypedArgs = for (a <- args) yield table.untyper.untypecheck(a)
         q"""
           import scala.coroutines.Permission.canCall
@@ -493,7 +498,7 @@ trait ControlFlowGraph[C <: Context] {
           case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
         }
         val cparam = table.names.coroutineParam
-        val savestate = genSaveState(chain, subgraph)
+        val savestate = genSaveState(subgraph)
         val exittree = q"""
           ..$savestate
           $cparam.result = ${table.untyper.untypecheck(x)}
@@ -502,6 +507,7 @@ trait ControlFlowGraph[C <: Context] {
         val z1 = z.append(exittree)
         z1
       }
+      override def stackVars(sub: SubCfg) = storePointVarsInChain(sub).map(_._1)
       def extract(
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -533,7 +539,7 @@ trait ControlFlowGraph[C <: Context] {
           case q"$_ var $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
         }
         val cparam = table.names.coroutineParam
-        val savestate = genSaveState(chain, subgraph)
+        val savestate = genSaveState(subgraph)
         val exittree = q"""
           ..$savestate
           $cparam.target = ${table.untyper.untypecheck(co)}
@@ -541,6 +547,7 @@ trait ControlFlowGraph[C <: Context] {
         """
         z.append(exittree)
       }
+      override def stackVars(sub: SubCfg) = storePointVarsInChain(sub).map(_._1)
       def extract(
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -640,23 +647,35 @@ trait ControlFlowGraph[C <: Context] {
     }
   }
 
-  class Cfg(val start: Node) {
-    val subgraphs = mutable.Map[Node, SubCfg]()
+  class Cfg(val start: Node, val subgraphs: Map[Node, SubCfg])(implicit table: Table) {
+    val stackVars = mutable.Set[Symbol]()
 
-    def knownStorePoints: Map[Symbol, Seq[Node]] = {
-      val storePointsPerSubgraph = for ((_, sub) <- subgraphs) yield {
-        sub.mustStoreVar.cache.filter(_._2).groupBy(_._1._2).map {
-          case (sym, points) => (sym, points.map(_._1._1).toSeq)
+    def storedValVars = table.valvars.filter(kv => stackVars.contains(kv._1))
+
+    def storedRefVars = table.refvars.filter(kv => stackVars.contains(kv._1))
+
+    def initializeStackPositions() {
+      // find all stack variables
+      stackVars ++= (for {
+        sub <- subgraphs.values
+        n <- sub.start.dfs
+        s <- n.stackVars(sub)
+      } yield s)
+      stackVars ++= table.vars.filter(_._2.isArg).keys
+
+      // stack positions
+      def compute(vars: Map[Symbol, VarInfo]) {
+        var poscount = 0
+        for ((sym, info) <- vars if stackVars.contains(sym) || info.isArg) {
+          info.stackpos = poscount
+          poscount += 1
         }
       }
-      storePointsPerSubgraph.foldLeft(mutable.Map[Symbol, Seq[Node]]()) {
-        (storePoints, subgraphStorePoints) =>
-        for ((s, points) <- subgraphStorePoints) {
-          storePoints(s) = storePoints.getOrElse(s, Nil) ++ points
-        }
-        storePoints
-      }
+
+      compute(table.refvars)
+      compute(table.valvars)
     }
+    initializeStackPositions()
   }
 
   class SubCfg(val uid: Long) {
@@ -733,8 +752,7 @@ trait ControlFlowGraph[C <: Context] {
           if (mustLoadVar(sym, chain)) {
             val cparam = table.names.coroutineParam
             val stack = info.stackname
-            val pos = info.stackpos
-            val decodedget = info.getTree(q"$cparam")
+            val decodedget = info.loadTree(q"$cparam")
             val valdef = info.origtree match {
               case q"$mods val $name: $tpt = $_" =>
                 q"$mods val $name: $tpt = $decodedget"
@@ -866,8 +884,8 @@ trait ControlFlowGraph[C <: Context] {
     val subgraphs = extractSubgraphs(head, tpt)
 
     // construct graph object
-    val cfg = new Cfg(head)
-    cfg.subgraphs ++= subgraphs
+    val cfg = new Cfg(head, subgraphs)
+
     cfg
   }
 
@@ -910,5 +928,5 @@ trait ControlFlowGraph[C <: Context] {
       .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
       .mkString("\n"))
     ctx.subgraphs
-  }
+  } 
 }

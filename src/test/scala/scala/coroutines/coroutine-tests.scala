@@ -608,7 +608,7 @@ class ToaTransformationTest extends FunSuite with Matchers {
     for (i <- 1 until 10) assert(c1() == i)
     assert(c1() == 117)
     assert(c1.isStopped)
-    val c2 = call(rube(-10))
+    val c2 =  call(rube(-10))
     assert(c2() == 1)
     assert(c2() == 117)
     assert(c2.isStopped)
