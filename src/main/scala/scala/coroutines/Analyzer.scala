@@ -216,9 +216,9 @@ trait Analyzer[C <: Context] {
   }
 
   class Block {
-    val decls = mutable.Map[Symbol, VarInfo]()
-    val occurrences = mutable.Map[Symbol, VarInfo]()
-    val assignments = mutable.Map[Symbol, VarInfo]()
+    val decls = mutable.LinkedHashMap[Symbol, VarInfo]()
+    val occurrences = mutable.LinkedHashMap[Symbol, VarInfo]()
+    val assignments = mutable.LinkedHashMap[Symbol, VarInfo]()
     override def toString = {
       s"decl = ${decls.map(_._1.name).mkString(", ")}, " +
       s"occ = ${occurrences.map(_._1.name).mkString(", ")}, " +

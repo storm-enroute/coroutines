@@ -102,6 +102,7 @@ trait CfgGenerator[C <: Context] {
     protected def storePointVarsInChain(subgraph: SubCfg): List[(Symbol, VarInfo)] =
       for {
         (sym, info) <- chain.alldecls
+        _ = println(sym, info)
         if subgraph.mustStoreVar(this, sym)
       } yield (sym, info)
 
@@ -658,6 +659,7 @@ trait CfgGenerator[C <: Context] {
       // find all stack variables
       stackVars ++= (for {
         sub <- subgraphs.values
+        _ = println("---------->  ", sub.uid)
         n <- sub.start.dfs
         s <- n.stackVars(sub)
       } yield s)
@@ -666,7 +668,7 @@ trait CfgGenerator[C <: Context] {
       // stack positions
       def compute(vars: Map[Symbol, VarInfo]) {
         var poscount = 0
-        for ((sym, info) <- vars if stackVars.contains(sym) || info.isArg) {
+        for ((sym, info) <- vars if stackVars.contains(sym)) {
           info.stackpos = (poscount, info.width)
           poscount += info.width
         }
@@ -681,19 +683,28 @@ trait CfgGenerator[C <: Context] {
   class SubCfg(val uid: Long) {
     val exitSubgraphs = mutable.LinkedHashMap[Node, SubCfg]()
     var start: Node = _
-    val all = mutable.Map[Long, Node]()
-    val childBlocks = mutable.Map[Block, List[Block]]()
+    val all = mutable.LinkedHashMap[Long, Node]()
+    val childBlocks = mutable.LinkedHashMap[Block, Set[Block]]()
 
     def initializeBlocks() {
-      val cs = start.dfs.map(_.chain).map(_.ancestors).flatten.toSet
-      childBlocks ++= cs.filter(_.parent != null).toList.groupBy(_.parent).map {
-        case (c, children) => (c.block, children.map(_.block))
-      }
-      for (c <- cs) if (!childBlocks.contains(c.block)) childBlocks(c.block) = Nil
+      val chains = start.dfs.map(_.chain).map(_.ancestors).flatten.toSet
+      childBlocks ++= chains
+        .filter(_.parent != null)
+        .groupBy(_.parent)
+        .groupBy(_._1.block)
+        .map { case (block, chainmaps) =>
+          (block, chainmaps.flatMap(_._2.map(_.block)).toSet)
+        }
+      for (c <- chains) if (!childBlocks.contains(c.block)) childBlocks(c.block) = Set()
+      println(uid)
+      println(childBlocks)
     }
 
-    val isOccurringInBlockDescendants: Cache._2[Symbol, Block, Boolean] = cached {
+    //val isOccurringInBlockDescendants: Cache._2[Symbol, Block, Boolean] = cached {
+    val isOccurringInBlockDescendants: Function2[Symbol, Block, Boolean] = {
       (s, b) =>
+      println(b.occurrences.contains(s))
+      println(b -> childBlocks(b))
       b.occurrences.contains(s) ||
         childBlocks(b).exists(isOccurringInBlockDescendants(s, _))
     }
@@ -739,6 +750,7 @@ trait CfgGenerator[C <: Context] {
       (sym, chain) =>
       val isVisible = chain.contains(sym)
       val isOccurring = isOccurringInBlockDescendants(sym, chain.block)
+      println("---> must load?", sym, isVisible, isOccurring)
       isVisible && isOccurring
     }
 
@@ -748,7 +760,10 @@ trait CfgGenerator[C <: Context] {
           if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
           else findStart(chain.parent).descend(trees => q"..$trees")
         }
+        println("--------------------")
+        println(this.uid, chain)
         for ((sym, info) <- chain.decls) {
+          println(sym)
           if (mustLoadVar(sym, chain)) {
             val cparam = table.names.coroutineParam
             val stack = info.stackname
@@ -892,8 +907,8 @@ trait CfgGenerator[C <: Context] {
 
   class ExtractSubgraphContext(val rettpt: Tree) {
     val subgraphs = mutable.LinkedHashMap[Node, SubCfg]()
-    val exitPoints = mutable.Map[SubCfg, mutable.Map[Node, Long]]()
-    val seenEntryPoints = mutable.Set[Node]()
+    val exitPoints = mutable.LinkedHashMap[SubCfg, mutable.LinkedHashMap[Node, Long]]()
+    val seenEntryPoints = mutable.LinkedHashSet[Node]()
     val nodefront = mutable.Queue[Node]()
   }
 
@@ -908,7 +923,7 @@ trait CfgGenerator[C <: Context] {
     while (ctx.nodefront.nonEmpty) {
       val subgraph = new SubCfg(table.newSubgraphUid())
       val node = ctx.nodefront.dequeue()
-      ctx.exitPoints(subgraph) = mutable.Map[Node, Long]()
+      ctx.exitPoints(subgraph) = mutable.LinkedHashMap[Node, Long]()
       subgraph.start = node.extract(
         node.chain.copyWithoutBlocks, mutable.Map(), ctx, subgraph)
       subgraph.all ++= subgraph.start.dfs.map(n => n.uid -> n)

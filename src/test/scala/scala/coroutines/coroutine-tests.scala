@@ -555,124 +555,142 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(y == -5)
   }
 
-  test("coroutine should yield in while loop with complex condition") {
-    val rube = coroutine { (x: Int) =>
-      var i = 0
-      while (i < x && x < math.abs(-15)) {
-        yieldval(i)
-        i += 1
-      }
-      i
-    }
-    val c1 = call(rube(10))
-    for (i <- 0 to 10) assert(c1() == i)
-    assert(c1.isStopped)
-    val c2 = call(rube(20))
-    assert(c2() == 0)
-    assert(c2.isStopped)
-  }
+  // test("coroutine should yield in while loop with complex condition") {
+  //   val rube = coroutine { (x: Int) =>
+  //     var i = 0
+  //     while (i < x && x < math.abs(-15)) {
+  //       yieldval(i)
+  //       i += 1
+  //     }
+  //     i
+  //   }
+  //   val c1 = call(rube(10))
+  //   for (i <- 0 to 10) assert(c1() == i)
+  //   assert(c1.isStopped)
+  //   val c2 = call(rube(20))
+  //   assert(c2() == 0)
+  //   assert(c2.isStopped)
+  // }
 
-  test("coroutine should yield every second element or just zero") {
-    val rube = coroutine { (x: Int) =>
-      var i = 0
-      while (i < x && x < math.abs(-15)) {
-        if (i % 2 == 0) yieldval(i)
-        i += 1
-      }
-      i
-    }
+  // test("coroutine should yield every second element or just zero") {
+  //   val rube = coroutine { (x: Int) =>
+  //     var i = 0
+  //     while (i < x && x < math.abs(-15)) {
+  //       if (i % 2 == 0) yieldval(i)
+  //       i += 1
+  //     }
+  //     i
+  //   }
 
-    val c1 = call(rube(10))
-    for (i <- 0 to 10; if i % 2 == 0) assert(c1() == i)
-    assert(c1.isStopped)
-    val c2 = call(rube(20))
-    assert(c2() == 0)
-    assert(c2.isStopped)
-  }
+  //   val c1 = call(rube(10))
+  //   for (i <- 0 to 10; if i % 2 == 0) assert(c1() == i)
+  //   assert(c1.isStopped)
+  //   val c2 = call(rube(20))
+  //   assert(c2() == 0)
+  //   assert(c2.isStopped)
+  // }
 
-  test("coroutine should yield 1 or yield 10 elements, and then 117") {
-    val rube = coroutine { (x: Int) =>
-      var i = 1
-      if (x > math.abs(0)) {
-        while (i < x) {
-          yieldval(i)
-          i += 1
-        }
-      } else {
-        yieldval(i)
-      }
-      117
-    }
+//   test("coroutine should yield 1 or yield 10 elements, and then 117") {
+//     val rube = coroutine { (x: Int) =>
+//       var i = 1
+//       if (x > math.abs(0)) {
+//         while (i < x) {
+//           yieldval(i)
+//           i += 1
+//         }
+//       } else {
+//         yieldval(i)
+//       }
+//       117
+//     }
 
-    val c1 = call(rube(10))
-    for (i <- 1 until 10) assert(c1() == i)
-    assert(c1() == 117)
-    assert(c1.isStopped)
-    val c2 =  call(rube(-10))
-    assert(c2() == 1)
-    assert(c2() == 117)
-    assert(c2.isStopped)
-  }
+//     val c1 = call(rube(10))
+//     for (i <- 1 until 10) assert(c1() == i)
+//     assert(c1() == 117)
+//     assert(c1.isStopped)
+//     val c2 =  call(rube(-10))
+//     assert(c2() == 1)
+//     assert(c2() == 117)
+//     assert(c2.isStopped)
+//   }
 
-  test("yield absolute and original value") {
-    val rube = coroutine { (x: Int) =>
-      yieldval(math.abs(x))
-      x
-    }
+//   test("yield absolute and original value") {
+//     val rube = coroutine { (x: Int) =>
+//       yieldval(math.abs(x))
+//       x
+//     }
 
-    val c = call(rube(-5))
-    assert(c() == 5)
-    assert(c() == -5)
-    assert(c.isStopped)
-  }
+//     val c = call(rube(-5))
+//     assert(c() == 5)
+//     assert(c() == -5)
+//     assert(c.isStopped)
+//   }
+
+//   test("short-circuiting should work for and") {
+//     var state = "untouched"
+//     val rube = coroutine { (x: Int) =>
+//       if (x < 0 && { state = "touched"; true }) x
+//       else -x
+//     }
+    
+//     val c0 = call(rube(5))
+//     assert(c0() == -5)
+//     assert(c0.isStopped)
+//     assert(state == "untouched")
+
+//     val c1 = call(rube(-5))
+//     assert(c1() == 5)
+//     assert(c1.isStopped)
+//     assert(state == "touched")
+//   }
 }
 
 
-class WideValueTypesTest extends FunSuite with Matchers {
-  test("should use a long stack variable") {
-    val rube = coroutine { (x: Long) =>
-      var y = x
-      y = x * 3
-      yieldval(-x)
-      yieldval(y)
-      x * 2
-    }
+// class WideValueTypesTest extends FunSuite with Matchers {
+//   test("should use a long stack variable") {
+//     val rube = coroutine { (x: Long) =>
+//       var y = x
+//       y = x * 3
+//       yieldval(-x)
+//       yieldval(y)
+//       x * 2
+//     }
 
-    val c = call(rube(15L))
-    assert(c() == -15L)
-    assert(c() == 45L)
-    assert(c() == 30L)
-  }
+//     val c = call(rube(15L))
+//     assert(c() == -15L)
+//     assert(c() == 45L)
+//     assert(c() == 30L)
+//   }
 
-  test("should use a double stack variable") {
-    val rube = coroutine { (x: Double) =>
-      var y = x
-      y = x * 4
-      yieldval(-x)
-      yieldval(y)
-      x * 2
-    }
+//   test("should use a double stack variable") {
+//     val rube = coroutine { (x: Double) =>
+//       var y = x
+//       y = x * 4
+//       yieldval(-x)
+//       yieldval(y)
+//       x * 2
+//     }
 
-    val c = call(rube(2.0))
-    assert(c() == -2.0)
-    assert(c() == 8.0)
-    assert(c() == 4.0)
-  }
+//     val c = call(rube(2.0))
+//     assert(c() == -2.0)
+//     assert(c() == 8.0)
+//     assert(c() == 4.0)
+//   }
 
-  test("should call a coroutine that returns a double value") {
-    val twice = coroutine { (x: Double) =>
-      x * 2
-    }
-    val rube = coroutine { (x: Double) =>
-      yieldval(x)
-      yieldval(twice(x))
-      x * 4
-    }
+//   test("should call a coroutine that returns a double value") {
+//     val twice = coroutine { (x: Double) =>
+//       x * 2
+//     }
+//     val rube = coroutine { (x: Double) =>
+//       yieldval(x)
+//       yieldval(twice(x))
+//       x * 4
+//     }
 
-    val c = call(rube(2.0))
-    assert(c() == 2.0)
-    assert(c() == 4.0)
-    assert(c() == 8.0)
-    assert(c.isStopped)
-  }
-}
+//     val c = call(rube(2.0))
+//     assert(c() == 2.0)
+//     assert(c() == 4.0)
+//     assert(c() == 8.0)
+//     assert(c.isStopped)
+//   }
+// }

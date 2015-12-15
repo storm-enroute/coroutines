@@ -74,6 +74,27 @@ trait ThreeAddressFormTransformation[C <: Context] {
       val localvarname = TermName(c.freshName("x"))
       val localvartree = q"val $localvarname = $rident.$member"
       (rdecls ++ List(localvartree), q"$localvarname")
+    case q"$r.&&($arg)"
+      if typer.typeOf(r) =:= typeOf[Boolean] && typer.typeOf(arg) =:= typeOf[Boolean] =>
+      // short-circuit boolean and
+      val (conddecls, condident) = threeAddressForm(r)
+      val (elsedecls, elseident) = threeAddressForm(arg)
+      val localvarname = TermName(c.freshName("x"))
+      val decls = List(
+        q"var $localvarname = null.asInstanceOf[Boolean]",
+        q""" 
+          ..$conddecls
+          if ($condident) {
+            $localvarname = true
+          } else {
+            ..$elsedecls
+            $localvarname = $elseident
+          }
+        """
+      )
+      (decls, q"$localvarname")
+    //case ??? =>
+      // short-circuit boolean or
     case q"$r.$method[..$tpts](...$paramss)" if tpts.length > 0 || paramss.length > 0 =>
       // application
       // TODO: translate boolean && and || to if statements, then regenerate, to adher
@@ -309,7 +330,6 @@ trait ThreeAddressFormTransformation[C <: Context] {
   }
 
   def transformToThreeAddressForm(rawlambda: Tree): Tree = {
-    //val untypedrawlambda = c.untypecheck(rawlambda)
     val typer = new ByTreeTyper[c.type](c)(rawlambda)
     val untypedrawlambda = typer.untypedTree
 
@@ -322,7 +342,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
     // recursive transform of the body code
     val transformedBody = transform(body)(typer)
     val untypedtaflambda = q"(..$args) => $transformedBody"
-    println(untypedtaflambda)
+    // println(untypedtaflambda)
     c.typecheck(untypedtaflambda)
   }
 }
