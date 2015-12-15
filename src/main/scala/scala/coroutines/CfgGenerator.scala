@@ -696,8 +696,7 @@ trait CfgGenerator[C <: Context] {
       for (c <- chains) if (!childBlocks.contains(c.block)) childBlocks(c.block) = Set()
     }
 
-    //val isOccurringInBlockDescendants: Cache._2[Symbol, Block, Boolean] = cached {
-    val isOccurringInBlockDescendants: Function2[Symbol, Block, Boolean] = {
+    val isOccurringInBlockDescendants: Cache._2[Symbol, Block, Boolean] = cached {
       (s, b) =>
       b.occurrences.contains(s) ||
         childBlocks(b).exists(isOccurringInBlockDescendants(s, _))
