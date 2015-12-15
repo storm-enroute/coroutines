@@ -93,8 +93,25 @@ trait ThreeAddressFormTransformation[C <: Context] {
         """
       )
       (decls, q"$localvarname")
-    //case ??? =>
+    case q"$r.||($arg)"
+      if typer.typeOf(r) =:= typeOf[Boolean] && typer.typeOf(arg) =:= typeOf[Boolean] =>
       // short-circuit boolean or
+      val (conddecls, condident) = threeAddressForm(r)
+      val (elsedecls, elseident) = threeAddressForm(arg)
+      val localvarname = TermName(c.freshName("x"))
+      val decls = List(
+        q"var $localvarname = null.asInstanceOf[Boolean]",
+        q""" 
+          ..$conddecls
+          if ($condident) {
+            $localvarname = true
+          } else {
+            ..$elsedecls
+            $localvarname = $elseident
+          }
+        """
+      )
+      (decls, q"$localvarname")
     case q"$r.$method[..$tpts](...$paramss)" if tpts.length > 0 || paramss.length > 0 =>
       // application
       // TODO: translate boolean && and || to if statements, then regenerate, to adher

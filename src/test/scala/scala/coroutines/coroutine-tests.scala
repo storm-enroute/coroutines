@@ -643,6 +643,24 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c1.isStopped)
     assert(state == "touched")
   }
+
+  test("short-circuiting should work for or") {
+    var state = "untouched"
+    val rube = coroutine { (x: Int) =>
+      if (x > 0 || { state = "touched"; false }) x
+      else -x
+    }
+    
+    val c0 = call(rube(5))
+    assert(c0() == 5)
+    assert(c0.isStopped)
+    assert(state == "untouched")
+
+    val c1 = call(rube(-5))
+    assert(c1() == 5)
+    assert(c1.isStopped)
+    assert(state == "touched")
+  }
 }
 
 
