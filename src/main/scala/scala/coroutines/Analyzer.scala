@@ -79,7 +79,7 @@ trait Analyzer[C <: Context] {
       val nme = TermName(c.freshName("v"))
       val enc =
         if (tpe =:= typeOf[Long]) q"$t"
-        else if (tpe =:= typeOf[Double]) q"java.lang.Double.doubleToRawLongBits($t)"
+        else if (tpe =:= typeOf[Double]) q"java.lang.Double.doubleToLongBits($t)"
         else sys.error(s"Cannot encode wide type $tpe.")
       (q"val $nme = $enc", q"$nme")
     }

@@ -658,4 +658,21 @@ class WideValueTypesTest extends FunSuite with Matchers {
     assert(c() == 8.0)
     assert(c() == 4.0)
   }
+
+  test("should call a coroutine that returns a double value") {
+    val twice = coroutine { (x: Double) =>
+      x * 2
+    }
+    val rube = coroutine { (x: Double) =>
+      yieldval(x)
+      yieldval(twice(x))
+      x * 4
+    }
+
+    val c = call(rube(2.0))
+    assert(c() == 2.0)
+    assert(c() == 4.0)
+    assert(c() == 8.0)
+    assert(c.isStopped)
+  }
 }

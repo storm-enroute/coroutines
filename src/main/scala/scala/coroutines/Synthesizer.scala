@@ -128,10 +128,11 @@ with ThreeAddressFormTransformation[C] {
     val stackVars = cfg.stackVars
     val storedValVars = cfg.storedValVars
     val storedRefVars = cfg.storedRefVars
+    def stackSize(vs: Map[Symbol, VarInfo]) = vs.map(_._2.stackpos._2).sum
     def genVarPushes(allvars: Map[Symbol, VarInfo], stack: Tree): List[Tree] = {
       val vars = allvars.filter(kv => stackVars.contains(kv._1))
-      val varsize = vars.map(_._2.stackpos._2).sum
-      val stacksize = math.max(table.initialStackSize, vars.size)
+      val varsize = stackSize(vars)
+      val stacksize = math.max(table.initialStackSize, varsize)
       val bulkpushes = if (vars.size == 0) Nil else List(q"""
         scala.coroutines.common.Stack.bulkPush($stack, $varsize, $stacksize)
       """)
@@ -146,7 +147,7 @@ with ThreeAddressFormTransformation[C] {
     val varpops = (for ((sym, info) <- storedRefVars.toList) yield {
       info.popTree
     }) ++ (if (storedValVars.size == 0) Nil else List(
-      q"scala.coroutines.common.Stack.bulkPop(c.valstack, ${storedValVars.size})"
+      q"scala.coroutines.common.Stack.bulkPop(c.valstack, ${stackSize(storedValVars)})"
     ))
     (varpushes, varpops)
   }
