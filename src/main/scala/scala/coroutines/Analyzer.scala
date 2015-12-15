@@ -37,14 +37,16 @@ trait Analyzer[C <: Context] {
     val isArg: Boolean,
     val table: Table
   ) {
-    private var rawstackpos = -1
+    private var rawstackpos: (Int, Int) = null
     val tpe = sym.info
     val name = sym.name.toTermName
-    def stackpos = {
-      assert(rawstackpos != -1, s"Variable '$sym' without computed stack position.")
+    def stackpos: (Int, Int) = {
+      assert(rawstackpos != null, s"Variable '$sym' without computed stack position.")
       rawstackpos
     }
-    def stackpos_=(v: Int) = rawstackpos = v
+    def isWide = tpe =:= typeOf[Double] || tpe =:= typeOf[Long]
+    def width: Int = if (isWide) 2 else 1
+    def stackpos_=(v: (Int, Int)) = rawstackpos = v
     def isUnitType = tpe =:= typeOf[Unit]
     def isRefType = {
       tpe <:< typeOf[AnyRef] || tpe =:= typeOf[Unit] || tpe =:= typeOf[Any]
@@ -64,58 +66,117 @@ trait Analyzer[C <: Context] {
       else if (tpe =:= typeOf[Double]) q"0.0"
       else sys.error(s"Unknown type: $tpe")
     }
-    private def encodeLong(t: Tree): Tree = {
-      if (tpe =:= typeOf[Boolean]) q"if ($t) 1L else 0L"
-      else if (tpe =:= typeOf[Int]) q"$t.toLong"
-      else if (tpe =:= typeOf[Long]) q"$t"
-      else if (tpe =:= typeOf[Double]) q"java.lang.Double.doubleToRawLongBits($t)"
-      else sys.error(s"Cannot encode type $tpe as Long.")
+    private def encodeInt(t: Tree): Tree = {
+      if (tpe =:= typeOf[Boolean]) q"if ($t) 1 else 0"
+      else if (tpe =:= typeOf[Byte]) q"$t.toInt"
+      else if (tpe =:= typeOf[Short]) q"$t.toInt"
+      else if (tpe =:= typeOf[Char]) q"$t.toInt"
+      else if (tpe =:= typeOf[Int]) q"$t"
+      else if (tpe =:= typeOf[Float]) q"java.lang.Float.floatToIntBits($t)"
+      else sys.error(s"Cannot encode type $tpe as Int.")
     }
-    private def decodeLong(t: Tree): Tree = {
+    private def encodeWide(t: Tree): (Tree, Tree) = {
+      val nme = TermName(c.freshName("v"))
+      val enc =
+        if (tpe =:= typeOf[Long]) q"$t"
+        else if (tpe =:= typeOf[Double]) q"java.lang.Double.doubleToRawLongBits($t)"
+        else sys.error(s"Cannot encode wide type $tpe.")
+      (q"val $nme = $enc", q"$nme")
+    }
+    private def decodeInt(t: Tree): Tree = {
       if (tpe =:= typeOf[Boolean]) q"($t != 0)"
-      else if (tpe =:= typeOf[Int]) q"($t & 0xffffffff).toInt"
-      else if (tpe =:= typeOf[Long]) q"$t"
+      else if (tpe =:= typeOf[Byte]) q"$t.toByte"
+      else if (tpe =:= typeOf[Short]) q"$t.toShort"
+      else if (tpe =:= typeOf[Char]) q"$t.toChar"
+      else if (tpe =:= typeOf[Int]) q"$t"
+      else if (tpe =:= typeOf[Float]) q"java.lang.Float.intBitsToFloat($t)"
       else sys.error(s"Cannot decode type $tpe from Long.")
+    }
+    private def decodeWide(t: Tree): Tree = {
+      if (tpe =:= typeOf[Long]) q"$t"
+      else if (tpe =:= typeOf[Double]) q"java.lang.Double.longBitsToDouble($t)"
+      else sys.error(s"Cannot decode wide type $tpe.")
     }
     val initialValue: Tree = {
       val t = if (isArg) q"$name" else defaultValue
-      if (isRefType) t
-      else encodeLong(t)
+      if (isRefType) t else t
     }
     val stackname = {
       if (isRefType) TermName("refstack")
       else TermName("valstack")
     }
     val stacktpe = {
-      if (isRefType) typeOf[AnyRef]
-      else typeOf[Long]
+      if (isRefType) typeOf[AnyRef] else typeOf[Int]
     }
-    def pushTree(implicit t: Table): Tree = q"""
-      scala.coroutines.common.Stack.push[$stacktpe](
-        c.$stackname, $initialValue, ${t.initialStackSize})
-    """
-    def popTree = q"""
-      scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
-    """
-    def storeTree(coroutine: Tree, x: Tree): Tree = {
-      val encoded = {
-        if (isUnitType) q"$x.asInstanceOf[AnyRef]"
-        else if (isRefType) x
-        else encodeLong(x)
-      }
-      q"""
-        scala.coroutines.common.Stack.set[$stacktpe](
-          $coroutine.$stackname, $stackpos, $encoded)
+    def pushTree(implicit t: Table): Tree = {
+      if (isWide) {
+        val (decl, ident) = encodeWide(initialValue)
+        q"""
+          $decl
+
+          scala.coroutines.common.Stack.push[$stacktpe](
+            c.$stackname, ($ident & 0xffffffff).toInt, ${t.initialStackSize})
+          scala.coroutines.common.Stack.push[$stacktpe](
+            c.$stackname, (($ident >>> 32) & 0xffffffff).toInt, ${t.initialStackSize})
+        """
+      } else q"""
+        scala.coroutines.common.Stack.push[$stacktpe](
+          c.$stackname, ${encodeInt(initialValue)}, ${t.initialStackSize})
       """
     }
-    def loadTree(coroutine: Tree): Tree = {
-      if (isUnitType) q"()"
-      else {
-        val t = q"""
-          scala.coroutines.common.Stack.get[$stacktpe]($coroutine.$stackname, $stackpos)
+    def popTree = {
+      if (isWide) q"""
+        scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
+        scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
+      """ else q"""
+        scala.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
+      """
+    }
+    def storeTree(coroutine: Tree, x: Tree): Tree = {
+      if (isWide) {
+        val (decl, v) = encodeWide(x)
+        q"""
+          $decl
+
+          scala.coroutines.common.Stack.set[$stacktpe](
+            $coroutine.$stackname, ${stackpos._1 + 0}, ($v & 0xffffffff).toInt)
+          scala.coroutines.common.Stack.set[$stacktpe](
+            $coroutine.$stackname, ${stackpos._1 + 1}, (($v >>> 32) & 0xffffffff).toInt)
         """
-        if (isRefType) q"$t.asInstanceOf[$tpe]"
-        else decodeLong(t)
+      } else {
+        val encoded = {
+          if (isUnitType) q"$x.asInstanceOf[AnyRef]"
+          else if (isRefType) x
+          else encodeInt(x)
+        }
+        q"""
+          scala.coroutines.common.Stack.set[$stacktpe](
+            $coroutine.$stackname, ${stackpos._1}, $encoded)
+        """
+      }
+    }
+    def loadTree(coroutine: Tree): Tree = {
+      if (isWide) {
+        val nme0 = TermName(c.freshName("v"))
+        val nme1 = TermName(c.freshName("v"))
+        val decoded = decodeWide(q"($nme1.toLong << 32) | $nme0")
+        q"""
+          val $nme0 = scala.coroutines.common.Stack.get[$stacktpe](
+            $coroutine.$stackname, ${stackpos._1 + 0})
+          val $nme1 = scala.coroutines.common.Stack.get[$stacktpe](
+            $coroutine.$stackname, ${stackpos._1 + 1})
+          $decoded
+        """
+      } else {
+        if (isUnitType) q"()"
+        else {
+          val t = q"""
+            scala.coroutines.common.Stack.get[$stacktpe](
+              $coroutine.$stackname, ${stackpos._1})
+          """
+          if (isRefType) q"$t.asInstanceOf[$tpe]"
+          else decodeInt(t)
+        }
       }
     }
     override def toString = s"VarInfo($uid, $sym)"

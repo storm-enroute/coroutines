@@ -31,7 +31,7 @@ class CoroutineTest extends FunSuite with Matchers {
 
   test("should yield once") {
     val plusMinus = coroutine { (x: Int) =>
-       yieldval(x)
+      yieldval(x)
       -x
     }
     val c = call(plusMinus(5))
@@ -624,5 +624,38 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c() == 5)
     assert(c() == -5)
     assert(c.isStopped)
+  }
+}
+
+
+class WideValueTypesTest extends FunSuite with Matchers {
+  test("should use a long stack variable") {
+    val rube = coroutine { (x: Long) =>
+      var y = x
+      y = x * 3
+      yieldval(-x)
+      yieldval(y)
+      x * 2
+    }
+
+    val c = call(rube(15L))
+    assert(c() == -15L)
+    assert(c() == 45L)
+    assert(c() == 30L)
+  }
+
+  test("should use a double stack variable") {
+    val rube = coroutine { (x: Double) =>
+      var y = x
+      y = x * 4
+      yieldval(-x)
+      yieldval(y)
+      x * 2
+    }
+
+    val c = call(rube(2.0))
+    assert(c() == -2.0)
+    assert(c() == 8.0)
+    assert(c() == 4.0)
   }
 }

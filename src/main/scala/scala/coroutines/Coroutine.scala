@@ -24,7 +24,7 @@ class Coroutine[@specialized +T] {
   private[coroutines] var refstackptr = 0
   private[coroutines] var refstack: Array[AnyRef] = _
   private[coroutines] var valstackptr = 0
-  private[coroutines] var valstack: Array[Long] = _
+  private[coroutines] var valstack: Array[Int] = _
   private[coroutines] var target: Coroutine[T] @uncheckedVariance = null
   private[coroutines] var result: T @uncheckedVariance = null.asInstanceOf[T]
 

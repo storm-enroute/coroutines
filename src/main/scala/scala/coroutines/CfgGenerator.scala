@@ -667,8 +667,8 @@ trait CfgGenerator[C <: Context] {
       def compute(vars: Map[Symbol, VarInfo]) {
         var poscount = 0
         for ((sym, info) <- vars if stackVars.contains(sym) || info.isArg) {
-          info.stackpos = poscount
-          poscount += 1
+          info.stackpos = (poscount, info.width)
+          poscount += info.width
         }
       }
 
@@ -752,6 +752,7 @@ trait CfgGenerator[C <: Context] {
           if (mustLoadVar(sym, chain)) {
             val cparam = table.names.coroutineParam
             val stack = info.stackname
+            println(info.sym)
             val decodedget = info.loadTree(q"$cparam")
             val valdef = info.origtree match {
               case q"$mods val $name: $tpt = $_" =>

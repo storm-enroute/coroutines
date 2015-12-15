@@ -130,9 +130,10 @@ with ThreeAddressFormTransformation[C] {
     val storedRefVars = cfg.storedRefVars
     def genVarPushes(allvars: Map[Symbol, VarInfo], stack: Tree): List[Tree] = {
       val vars = allvars.filter(kv => stackVars.contains(kv._1))
+      val varsize = vars.map(_._2.stackpos._2).sum
       val stacksize = math.max(table.initialStackSize, vars.size)
       val bulkpushes = if (vars.size == 0) Nil else List(q"""
-        scala.coroutines.common.Stack.bulkPush($stack, ${vars.size}, $stacksize)
+        scala.coroutines.common.Stack.bulkPush($stack, $varsize, $stacksize)
       """)
       val args = vars.values.filter(_.isArg).toList
       val argstores = for (a <- args) yield a.storeTree(q"c", q"${a.name}")
