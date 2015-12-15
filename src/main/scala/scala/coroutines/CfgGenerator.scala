@@ -102,7 +102,6 @@ trait CfgGenerator[C <: Context] {
     protected def storePointVarsInChain(subgraph: SubCfg): List[(Symbol, VarInfo)] =
       for {
         (sym, info) <- chain.alldecls
-        _ = println(sym, info)
         if subgraph.mustStoreVar(this, sym)
       } yield (sym, info)
 
@@ -659,7 +658,6 @@ trait CfgGenerator[C <: Context] {
       // find all stack variables
       stackVars ++= (for {
         sub <- subgraphs.values
-        _ = println("---------->  ", sub.uid)
         n <- sub.start.dfs
         s <- n.stackVars(sub)
       } yield s)
@@ -696,15 +694,11 @@ trait CfgGenerator[C <: Context] {
           (block, chainmaps.flatMap(_._2.map(_.block)).toSet)
         }
       for (c <- chains) if (!childBlocks.contains(c.block)) childBlocks(c.block) = Set()
-      println(uid)
-      println(childBlocks)
     }
 
     //val isOccurringInBlockDescendants: Cache._2[Symbol, Block, Boolean] = cached {
     val isOccurringInBlockDescendants: Function2[Symbol, Block, Boolean] = {
       (s, b) =>
-      println(b.occurrences.contains(s))
-      println(b -> childBlocks(b))
       b.occurrences.contains(s) ||
         childBlocks(b).exists(isOccurringInBlockDescendants(s, _))
     }
@@ -750,7 +744,6 @@ trait CfgGenerator[C <: Context] {
       (sym, chain) =>
       val isVisible = chain.contains(sym)
       val isOccurring = isOccurringInBlockDescendants(sym, chain.block)
-      println("---> must load?", sym, isVisible, isOccurring)
       isVisible && isOccurring
     }
 
@@ -760,14 +753,10 @@ trait CfgGenerator[C <: Context] {
           if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
           else findStart(chain.parent).descend(trees => q"..$trees")
         }
-        println("--------------------")
-        println(this.uid, chain)
         for ((sym, info) <- chain.decls) {
-          println(sym)
           if (mustLoadVar(sym, chain)) {
             val cparam = table.names.coroutineParam
             val stack = info.stackname
-            println(info.sym)
             val decodedget = info.loadTree(q"$cparam")
             val valdef = info.origtree match {
               case q"$mods val $name: $tpt = $_" =>
