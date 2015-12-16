@@ -18,12 +18,18 @@ with CfgGenerator[C]
 with ThreeAddressFormTransformation[C] {
   import c.universe._
 
+  val NUM_PREDEFINED_ENTRY_STUBS = 40
+
   private def genEntryPoint(
     subgraph: SubCfg, rettpt: Tree
   )(implicit table: Table): Tree = {
     val body = subgraph.emit()
     val defname = TermName(s"ep${subgraph.uid}")
-    val defdef = q"""
+    val defdef = if (subgraph.uid < NUM_PREDEFINED_ENTRY_STUBS) q"""
+      override def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {
+        $body
+      }
+    """ else q"""
       def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {
         $body
       }
@@ -44,14 +50,14 @@ with ThreeAddressFormTransformation[C] {
     entrypoints: Map[Long, Tree], tpt: Tree
   )(implicit table: Table): Tree = {
     if (entrypoints.size == 1) {
-      val q"def $ep($_): Unit = $_" = entrypoints(0)
+      val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
 
       q"""
-        def enter(c: Coroutine[$tpt]): Unit = $ep(c)
+        def enter(c: Coroutine[$tpt]): Unit = $ep0(c)
       """
     } else if (entrypoints.size == 2) {
-      val q"def $ep0($_): Unit = $_" = entrypoints(0)
-      val q"def $ep1($_): Unit = $_" = entrypoints(1)
+      val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
+      val q"$_ def $ep1($_): Unit = $_" = entrypoints(1)
 
       q"""
         def enter(c: Coroutine[$tpt]): Unit = {
@@ -61,7 +67,7 @@ with ThreeAddressFormTransformation[C] {
       """
     } else {
       val cases = for ((index, defdef) <- entrypoints) yield {
-        val q"def $ep($_): Unit = $rhs" = defdef
+        val q"$_ def $ep($_): Unit = $rhs" = defdef
         cq"${index.toShort} => $ep(c)"
       }
 

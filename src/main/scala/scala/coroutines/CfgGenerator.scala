@@ -125,7 +125,7 @@ trait CfgGenerator[C <: Context] {
       q"""
         pop($cparam)
         if (scala.coroutines.common.Stack.isEmpty($cparam.costack)) {
-          $cparam.result = $untypedtree
+          $$assignresult($cparam, $untypedtree)
         } else {
           import scala.coroutines.Permission.canCall
           $cparam.target = $cparam
@@ -501,7 +501,7 @@ trait CfgGenerator[C <: Context] {
         val savestate = genSaveState(subgraph)
         val exittree = q"""
           ..$savestate
-          $cparam.result = ${table.untyper.untypecheck(x)}
+          $$assignresult($cparam, ${table.untyper.untypecheck(x)})
           return
         """
         val z1 = z.append(exittree)

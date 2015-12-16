@@ -66,9 +66,40 @@ object Coroutine {
     }
   }
 
-  abstract class Blueprint[T] {
+  trait Blueprint[@specialized T] {
     def enter(c: Coroutine[T]): Unit
+    def $assignresult(c: Coroutine[T], v: T): Unit = c.result = v
     def returnvalue(c: Coroutine[T], v: T)(implicit cc: CanCallInternal): Unit
+    def ep0(c: Coroutine[T]): Unit = {}
+    def ep1(c: Coroutine[T]): Unit = {}
+    def ep2(c: Coroutine[T]): Unit = {}
+    def ep3(c: Coroutine[T]): Unit = {}
+    def ep4(c: Coroutine[T]): Unit = {}
+    def ep5(c: Coroutine[T]): Unit = {}
+    def ep6(c: Coroutine[T]): Unit = {}
+    def ep7(c: Coroutine[T]): Unit = {}
+    def ep8(c: Coroutine[T]): Unit = {}
+    def ep9(c: Coroutine[T]): Unit = {}
+    def ep10(c: Coroutine[T]): Unit = {}
+    def ep11(c: Coroutine[T]): Unit = {}
+    def ep12(c: Coroutine[T]): Unit = {}
+    def ep13(c: Coroutine[T]): Unit = {}
+    def ep14(c: Coroutine[T]): Unit = {}
+    def ep15(c: Coroutine[T]): Unit = {}
+    def ep16(c: Coroutine[T]): Unit = {}
+    def ep17(c: Coroutine[T]): Unit = {}
+    def ep18(c: Coroutine[T]): Unit = {}
+    def ep19(c: Coroutine[T]): Unit = {}
+    def ep20(c: Coroutine[T]): Unit = {}
+    def ep21(c: Coroutine[T]): Unit = {}
+    def ep22(c: Coroutine[T]): Unit = {}
+    def ep23(c: Coroutine[T]): Unit = {}
+    def ep24(c: Coroutine[T]): Unit = {}
+    def ep25(c: Coroutine[T]): Unit = {}
+    def ep26(c: Coroutine[T]): Unit = {}
+    def ep27(c: Coroutine[T]): Unit = {}
+    def ep28(c: Coroutine[T]): Unit = {}
+    def ep29(c: Coroutine[T]): Unit = {}
   }
 
   def synthesize(c: Context)(f: c.Tree): c.Tree = {
