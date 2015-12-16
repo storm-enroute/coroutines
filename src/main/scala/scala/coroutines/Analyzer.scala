@@ -102,8 +102,8 @@ trait Analyzer[C <: Context] {
       if (isRefType) t else t
     }
     val stackname = {
-      if (isRefType) TermName("refstack")
-      else TermName("valstack")
+      if (isRefType) TermName("$refstack")
+      else TermName("$valstack")
     }
     val stacktpe = {
       if (isRefType) typeOf[AnyRef] else typeOf[Int]

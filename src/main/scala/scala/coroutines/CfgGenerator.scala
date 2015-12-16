@@ -114,7 +114,7 @@ trait CfgGenerator[C <: Context] {
       // update pc state
       val pc = subgraph.exitSubgraphs(this).uid
       val pcstackset = q"""
-        scala.coroutines.common.Stack.update($cparam.pcstack, $pc.toShort)
+        scala.coroutines.common.Stack.update($cparam.$$pcstack, $pc.toShort)
       """
       pcstackset :: stackstores.toList
     }
@@ -124,13 +124,13 @@ trait CfgGenerator[C <: Context] {
       val untypedtree = t.untyper.untypecheck(n.value)
       q"""
         pop($cparam)
-        if (scala.coroutines.common.Stack.isEmpty($cparam.costack)) {
+        if (scala.coroutines.common.Stack.isEmpty($cparam.$$costack)) {
           $$assignresult($cparam, $untypedtree)
         } else {
           import scala.coroutines.Permission.canCall
-          $cparam.target = $cparam
-          scala.coroutines.common.Stack.top($cparam.costack)
-            .returnvalue($cparam, $untypedtree)
+          $cparam.$$target = $cparam
+          scala.coroutines.common.Stack.top($cparam.$$costack)
+            .$$returnvalue($cparam, $untypedtree)
         }
         return
       """
@@ -478,7 +478,7 @@ trait CfgGenerator[C <: Context] {
           import scala.coroutines.Permission.canCall
           ..$savestate
           $co.push($cparam, ..$untypedArgs)
-          $cparam.target = $cparam
+          $cparam.$$target = $cparam
         """
       }
     }
@@ -542,7 +542,7 @@ trait CfgGenerator[C <: Context] {
         val savestate = genSaveState(subgraph)
         val exittree = q"""
           ..$savestate
-          $cparam.target = ${table.untyper.untypecheck(co)}
+          $cparam.$$target = ${table.untyper.untypecheck(co)}
           return
         """
         z.append(exittree)

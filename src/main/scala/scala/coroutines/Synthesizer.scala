@@ -24,7 +24,7 @@ with ThreeAddressFormTransformation[C] {
     subgraph: SubCfg, rettpt: Tree
   )(implicit table: Table): Tree = {
     val body = subgraph.emit()
-    val defname = TermName(s"ep${subgraph.uid}")
+    val defname = TermName(s"$$ep${subgraph.uid}")
     val defdef = if (subgraph.uid < NUM_PREDEFINED_ENTRY_STUBS) q"""
       override def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {
         $body
@@ -53,15 +53,15 @@ with ThreeAddressFormTransformation[C] {
       val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
 
       q"""
-        def enter(c: Coroutine[$tpt]): Unit = $ep0(c)
+        def $$enter(c: Coroutine[$tpt]): Unit = $ep0(c)
       """
     } else if (entrypoints.size == 2) {
       val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
       val q"$_ def $ep1($_): Unit = $_" = entrypoints(1)
 
       q"""
-        def enter(c: Coroutine[$tpt]): Unit = {
-          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+        def $$enter(c: Coroutine[$tpt]): Unit = {
+          val pc = scala.coroutines.common.Stack.top(c.$$pcstack)
           if (pc == 0) $ep0(c) else $ep1(c)
         }
       """
@@ -72,8 +72,8 @@ with ThreeAddressFormTransformation[C] {
       }
 
       q"""
-        def enter(c: Coroutine[$tpt]): Unit = {
-          val pc: Short = scala.coroutines.common.Stack.top(c.pcstack)
+        def $$enter(c: Coroutine[$tpt]): Unit = {
+          val pc: Short = scala.coroutines.common.Stack.top(c.$$pcstack)
           (pc: @scala.annotation.switch) match {
             case ..$cases
           }
@@ -101,7 +101,7 @@ with ThreeAddressFormTransformation[C] {
         returnstores(0)._2
       } else if (returnstores.size == 2) {
         q"""
-          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+          val pc = scala.coroutines.common.Stack.top(c.$$pcstack)
           if (pc == ${returnstores(0)._1.toShort}) {
             ${returnstores(0)._2}
           } else {
@@ -113,7 +113,7 @@ with ThreeAddressFormTransformation[C] {
           cq"${pcvalue.toShort} => $rvset"
         }
         q"""
-          val pc = scala.coroutines.common.Stack.top(c.pcstack)
+          val pc = scala.coroutines.common.Stack.top(c.$$pcstack)
           (pc: @scala.annotation.switch) match {
             case ..$cases
           }
@@ -122,7 +122,7 @@ with ThreeAddressFormTransformation[C] {
     }
 
     q"""
-      def returnvalue(c: scala.coroutines.Coroutine[$tpt], v: $tpt)(
+      def $$returnvalue(c: scala.coroutines.Coroutine[$tpt], v: $tpt)(
         implicit cc: scala.coroutines.CanCallInternal
       ): Unit = {
         $body
@@ -147,13 +147,15 @@ with ThreeAddressFormTransformation[C] {
       bulkpushes ::: argstores
     }
     val varpushes = {
-      genVarPushes(storedRefVars, q"c.refstack") ++
-      genVarPushes(storedValVars, q"c.valstack")
+      genVarPushes(storedRefVars, q"c.$$refstack") ++
+      genVarPushes(storedValVars, q"c.$$valstack")
     }
     val varpops = (for ((sym, info) <- storedRefVars.toList) yield {
       info.popTree
     }) ++ (if (storedValVars.size == 0) Nil else List(
-      q"scala.coroutines.common.Stack.bulkPop(c.valstack, ${stackSize(storedValVars)})"
+      q"""
+        scala.coroutines.common.Stack.bulkPop(c.$$valstack, ${stackSize(storedValVars)})
+      """
     ))
     (varpushes, varpops)
   }
@@ -219,13 +221,13 @@ with ThreeAddressFormTransformation[C] {
         def push(c: scala.coroutines.Coroutine[$rettpt], ..$args)(
           implicit cc: scala.coroutines.CanCallInternal
         ): Unit = {
-          scala.coroutines.common.Stack.push(c.costack, this, -1)
-          scala.coroutines.common.Stack.push(c.pcstack, 0.toShort, -1)
+          scala.coroutines.common.Stack.push(c.$$costack, this, -1)
+          scala.coroutines.common.Stack.push(c.$$pcstack, 0.toShort, -1)
           ..$varpushes
         }
         def pop(c: scala.coroutines.Coroutine[$rettpt]): Unit = {
-          scala.coroutines.common.Stack.pop(c.pcstack)
-          scala.coroutines.common.Stack.pop(c.costack)
+          scala.coroutines.common.Stack.pop(c.$$pcstack)
+          scala.coroutines.common.Stack.pop(c.$$costack)
           ..$varpops
         }
         $entermethod

@@ -16,24 +16,24 @@ import scala.util.Try
 
 class Coroutine[@specialized +T] {
   import Coroutine._
-  var costackptr = 0
-  var costack: Array[Blueprint[T]] @uncheckedVariance =
+  var $costackptr = 0
+  var $costack: Array[Blueprint[T]] @uncheckedVariance =
     new Array[Blueprint[T]](INITIAL_COSTACK_SIZE)
-  var pcstackptr = 0
-  var pcstack = new Array[Short](INITIAL_COSTACK_SIZE)
-  var refstackptr = 0
-  var refstack: Array[AnyRef] = _
-  var valstackptr = 0
-  var valstack: Array[Int] = _
-  var target: Coroutine[T] @uncheckedVariance = null
-  var result: T @uncheckedVariance = null.asInstanceOf[T]
+  var $pcstackptr = 0
+  var $pcstack = new Array[Short](INITIAL_COSTACK_SIZE)
+  var $refstackptr = 0
+  var $refstack: Array[AnyRef] = _
+  var $valstackptr = 0
+  var $valstack: Array[Int] = _
+  var $target: Coroutine[T] @uncheckedVariance = null
+  var $result: T @uncheckedVariance = null.asInstanceOf[T]
 
   def apply(): T = {
     if (isAlive) Coroutine.enter[T](this)
     else throw new CoroutineStoppedException
   }
 
-  def isAlive: Boolean = costackptr > 0
+  def isAlive: Boolean = $costackptr > 0
 
   def isStopped: Boolean = !isAlive
 
@@ -53,53 +53,53 @@ object Coroutine {
 
   @tailrec
   private[coroutines] final def enter[T](c: Coroutine[T]): T = {
-    val cd = Stack.top(c.costack)
-    cd.enter(c)
-    if (c.target ne null) {
-      val nc = c.target
-      c.target = null
+    val cd = Stack.top(c.$costack)
+    cd.$enter(c)
+    if (c.$target ne null) {
+      val nc = c.$target
+      c.$target = null
       enter(nc)
     } else {
-      val res = c.result
-      c.result = null.asInstanceOf[T]
+      val res = c.$result
+      c.$result = null.asInstanceOf[T]
       res
     }
   }
 
   trait Blueprint[@specialized T] {
-    def enter(c: Coroutine[T]): Unit
-    def $assignresult(c: Coroutine[T], v: T): Unit = c.result = v
-    def returnvalue(c: Coroutine[T], v: T)(implicit cc: CanCallInternal): Unit
-    def ep0(c: Coroutine[T]): Unit = {}
-    def ep1(c: Coroutine[T]): Unit = {}
-    def ep2(c: Coroutine[T]): Unit = {}
-    def ep3(c: Coroutine[T]): Unit = {}
-    def ep4(c: Coroutine[T]): Unit = {}
-    def ep5(c: Coroutine[T]): Unit = {}
-    def ep6(c: Coroutine[T]): Unit = {}
-    def ep7(c: Coroutine[T]): Unit = {}
-    def ep8(c: Coroutine[T]): Unit = {}
-    def ep9(c: Coroutine[T]): Unit = {}
-    def ep10(c: Coroutine[T]): Unit = {}
-    def ep11(c: Coroutine[T]): Unit = {}
-    def ep12(c: Coroutine[T]): Unit = {}
-    def ep13(c: Coroutine[T]): Unit = {}
-    def ep14(c: Coroutine[T]): Unit = {}
-    def ep15(c: Coroutine[T]): Unit = {}
-    def ep16(c: Coroutine[T]): Unit = {}
-    def ep17(c: Coroutine[T]): Unit = {}
-    def ep18(c: Coroutine[T]): Unit = {}
-    def ep19(c: Coroutine[T]): Unit = {}
-    def ep20(c: Coroutine[T]): Unit = {}
-    def ep21(c: Coroutine[T]): Unit = {}
-    def ep22(c: Coroutine[T]): Unit = {}
-    def ep23(c: Coroutine[T]): Unit = {}
-    def ep24(c: Coroutine[T]): Unit = {}
-    def ep25(c: Coroutine[T]): Unit = {}
-    def ep26(c: Coroutine[T]): Unit = {}
-    def ep27(c: Coroutine[T]): Unit = {}
-    def ep28(c: Coroutine[T]): Unit = {}
-    def ep29(c: Coroutine[T]): Unit = {}
+    def $enter(c: Coroutine[T]): Unit
+    def $assignresult(c: Coroutine[T], v: T): Unit = c.$result = v
+    def $returnvalue(c: Coroutine[T], v: T)(implicit cc: CanCallInternal): Unit
+    def $ep0(c: Coroutine[T]): Unit = {}
+    def $ep1(c: Coroutine[T]): Unit = {}
+    def $ep2(c: Coroutine[T]): Unit = {}
+    def $ep3(c: Coroutine[T]): Unit = {}
+    def $ep4(c: Coroutine[T]): Unit = {}
+    def $ep5(c: Coroutine[T]): Unit = {}
+    def $ep6(c: Coroutine[T]): Unit = {}
+    def $ep7(c: Coroutine[T]): Unit = {}
+    def $ep8(c: Coroutine[T]): Unit = {}
+    def $ep9(c: Coroutine[T]): Unit = {}
+    def $ep10(c: Coroutine[T]): Unit = {}
+    def $ep11(c: Coroutine[T]): Unit = {}
+    def $ep12(c: Coroutine[T]): Unit = {}
+    def $ep13(c: Coroutine[T]): Unit = {}
+    def $ep14(c: Coroutine[T]): Unit = {}
+    def $ep15(c: Coroutine[T]): Unit = {}
+    def $ep16(c: Coroutine[T]): Unit = {}
+    def $ep17(c: Coroutine[T]): Unit = {}
+    def $ep18(c: Coroutine[T]): Unit = {}
+    def $ep19(c: Coroutine[T]): Unit = {}
+    def $ep20(c: Coroutine[T]): Unit = {}
+    def $ep21(c: Coroutine[T]): Unit = {}
+    def $ep22(c: Coroutine[T]): Unit = {}
+    def $ep23(c: Coroutine[T]): Unit = {}
+    def $ep24(c: Coroutine[T]): Unit = {}
+    def $ep25(c: Coroutine[T]): Unit = {}
+    def $ep26(c: Coroutine[T]): Unit = {}
+    def $ep27(c: Coroutine[T]): Unit = {}
+    def $ep28(c: Coroutine[T]): Unit = {}
+    def $ep29(c: Coroutine[T]): Unit = {}
   }
 
   def synthesize(c: Context)(f: c.Tree): c.Tree = {
