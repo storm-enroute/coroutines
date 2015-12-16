@@ -28,21 +28,22 @@ trait ThreeAddressFormTransformation[C <: Context] {
 
   object NestedContextValidator extends Traverser {
     override def traverse(tree: Tree): Unit = tree match {
-      case q"coroutines.this.`package`.coroutine[$_]($_)" =>
+      case q"$qual.coroutine[$_]($_)" if isCoroutinesPkg(qual) =>
         // no need to check further, this is checked in a different expansion
-      case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+        sys.error("Found!")
+      case q"$qual.yieldval[$_]($_)" if isCoroutinesPkg(qual) =>
         c.abort(
           tree.pos,
           "The yieldval statement only be invoked directly inside the coroutine. " +
           "Nested classes, functions or for-comprehensions, should either use the " +
           "call statement or declare another coroutine.")
-      case q"coroutines.this.`package`.yieldto[$_]($_)" =>
+      case q"$qual.yieldto[$_]($_)" if isCoroutinesPkg(qual) =>
         c.abort(
           tree.pos,
           "The yieldto statement only be invoked directly inside the coroutine. " +
           "Nested classes, functions or for-comprehensions, should either use the " +
           "call statement or declare another coroutine.")
-      case q"coroutines.this.`package`.call($co.apply(..$args))" =>
+      case q"$qual.call($co.apply(..$args))" if isCoroutinesPkg(qual) =>
         // no need to check further, the call macro will validate the coroutine type
       case q"$co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
         c.abort(

@@ -486,16 +486,16 @@ trait CfgGenerator[C <: Context] {
     case class YieldVal(tree: Tree, chain: Chain, uid: Long) extends Node {
       override def code = {
         tree match {
-          case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
-          case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
+          case q"$_ val $_: $_ = $qual.yieldval[$_]($x)" if isCoroutinesPkg(qual) => x
+          case q"$_ var $_: $_ = $qual.yieldval[$_]($x)" if isCoroutinesPkg(qual) => x
         }
       }
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
       ): Zipper = {
         val x = tree match {
-          case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
-          case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($x)" => x
+          case q"$_ val $_: $_ = $qual.yieldval[$_]($x)" if isCoroutinesPkg(qual) => x
+          case q"$_ var $_: $_ = $qual.yieldval[$_]($x)" if isCoroutinesPkg(qual) => x
         }
         val cparam = table.names.coroutineParam
         val savestate = genSaveState(subgraph)
@@ -527,16 +527,16 @@ trait CfgGenerator[C <: Context] {
     case class YieldTo(tree: Tree, chain: Chain, uid: Long) extends Node {
       override def code = {
         tree match {
-          case q"$_ val $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
-          case q"$_ var $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
+          case q"$_ val $_: $_ = $qual.yieldto[$_]($x)" if isCoroutinesPkg(qual) => x
+          case q"$_ var $_: $_ = $qual.yieldto[$_]($x)" if isCoroutinesPkg(qual) => x
         }
       }
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
       ): Zipper = {
         val co = tree match {
-          case q"$_ val $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
-          case q"$_ var $_: $_ = coroutines.this.`package`.yieldto[$_]($x)" => x
+          case q"$_ val $_: $_ = $qual.yieldto[$_]($x)" if isCoroutinesPkg(qual) => x
+          case q"$_ var $_: $_ = $qual.yieldto[$_]($x)" if isCoroutinesPkg(qual) => x
         }
         val cparam = table.names.coroutineParam
         val savestate = genSaveState(subgraph)
@@ -780,25 +780,25 @@ trait CfgGenerator[C <: Context] {
   ): Cfg = {
     def traverse(t: Tree, ch: Chain): (Node, Node) = {
       t match {
-        case q"$_ val $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
+        case q"$_ val $_: $_ = $qual.yieldval[$_]($_)" if isCoroutinesPkg(qual) =>
           val nch = ch.withDecl(t, false)
           val n = Node.YieldVal(t, ch, table.newNodeUid())
           val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
           n.successors += u
           (n, u)
-        case q"$_ var $_: $_ = coroutines.this.`package`.yieldval[$_]($_)" =>
+        case q"$_ var $_: $_ = $qual.yieldval[$_]($_)" if isCoroutinesPkg(qual) =>
           val nch = ch.withDecl(t, false)
           val n = Node.YieldVal(t, ch, table.newNodeUid())
           val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
           n.successors += u
           (n, u)
-        case q"$_ val $_: $_ = coroutines.this.`package`.yieldto[$_]($_)" =>
+        case q"$_ val $_: $_ = $qual.yieldto[$_]($_)" if isCoroutinesPkg(qual) =>
           val nch = ch.withDecl(t, false)
           val n = Node.YieldTo(t, ch, table.newNodeUid())
           val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
           n.successors += u
           (n, u)
-        case q"$_ var $_: $_ = coroutines.this.`package`.yieldto[$_]($_)" =>
+        case q"$_ var $_: $_ = $qual.yieldto[$_]($_)" if isCoroutinesPkg(qual) =>
           val nch = ch.withDecl(t, false)
           val n = Node.YieldTo(t, ch, table.newNodeUid())
           val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())

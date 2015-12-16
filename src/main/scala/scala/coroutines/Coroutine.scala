@@ -16,17 +16,17 @@ import scala.util.Try
 
 class Coroutine[@specialized +T] {
   import Coroutine._
-  private[coroutines] var costackptr = 0
-  private[coroutines] var costack: Array[Blueprint[T]] @uncheckedVariance =
+  var costackptr = 0
+  var costack: Array[Blueprint[T]] @uncheckedVariance =
     new Array[Blueprint[T]](INITIAL_COSTACK_SIZE)
-  private[coroutines] var pcstackptr = 0
-  private[coroutines] var pcstack = new Array[Short](INITIAL_COSTACK_SIZE)
-  private[coroutines] var refstackptr = 0
-  private[coroutines] var refstack: Array[AnyRef] = _
-  private[coroutines] var valstackptr = 0
-  private[coroutines] var valstack: Array[Int] = _
-  private[coroutines] var target: Coroutine[T] @uncheckedVariance = null
-  private[coroutines] var result: T @uncheckedVariance = null.asInstanceOf[T]
+  var pcstackptr = 0
+  var pcstack = new Array[Short](INITIAL_COSTACK_SIZE)
+  var refstackptr = 0
+  var refstack: Array[AnyRef] = _
+  var valstackptr = 0
+  var valstack: Array[Int] = _
+  var target: Coroutine[T] @uncheckedVariance = null
+  var result: T @uncheckedVariance = null.asInstanceOf[T]
 
   def apply(): T = {
     if (isAlive) Coroutine.enter[T](this)
@@ -79,25 +79,25 @@ object Coroutine {
     new Synthesizer[c.type](c).call(f)
   }
 
-  abstract class _0[@specialized T] extends Coroutine.Blueprint[T] {
+  abstract class _0[@specialized T] extends Blueprint[T] {
     def call()(implicit cc: CanCallInternal): Coroutine[T]
     def apply(): T
     def push(c: Coroutine[T])(implicit cc: CanCallInternal): Unit
   }
 
-  abstract class _1[A0, @specialized T] extends Coroutine.Blueprint[T] {
+  abstract class _1[A0, @specialized T] extends Blueprint[T] {
     def call(a0: A0)(implicit cc: CanCallInternal): Coroutine[T]
     def apply(a0: A0): T
     def push(c: Coroutine[T], a0: A0)(implicit cc: CanCallInternal): Unit
   }
 
-  abstract class _2[A0, A1, @specialized T] extends Coroutine.Blueprint[T] {
+  abstract class _2[A0, A1, @specialized T] extends Blueprint[T] {
     def call(a0: A0, a1: A1)(implicit cc: CanCallInternal): Coroutine[T]
     def apply(a0: A0, a1: A1): T
     def push(c: Coroutine[T], a0: A0, a1: A1)(implicit cc: CanCallInternal): Unit
   }
 
-  abstract class _3[A0, A1, A2, @specialized T] extends Coroutine.Blueprint[T] {
+  abstract class _3[A0, A1, A2, @specialized T] extends Blueprint[T] {
     def call(a0: A0, a1: A1, a2: A2)(implicit cc: CanCallInternal): Coroutine[T]
     def apply(a0: A0, a1: A1, a2: A2): T
     def push(c: Coroutine[T], a0: A0, a1: A1, a2: A2)(

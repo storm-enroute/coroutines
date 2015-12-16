@@ -324,35 +324,37 @@ trait Analyzer[C <: Context] {
 
   object CoroutineOp {
     def unapply(t: Tree): Option[Tree] = t match {
-      case q"coroutines.this.`package`.coroutine[$_]($_)" =>
+      case q"$qual.`package`.coroutine[$_]($_)" if isCoroutinesPkg(qual) =>
         Some(t)
-      case q"coroutines.this.`package`.yieldval[$_]($_)" =>
+      case q"$qual.`package`.yieldval[$_]($_)" if isCoroutinesPkg(qual) =>
         Some(t)
-      case q"coroutines.this.`package`.yieldto[$_]($_)" =>
+      case q"$qual.`package`.yieldto[$_]($_)" if isCoroutinesPkg(qual) =>
         Some(t)
-      case q"coroutines.this.`package`.call($co.apply(..$args))" =>
+      case q"$qual.`package`.call($_.apply(..$_))" if isCoroutinesPkg(qual) =>
         Some(t)
-      case q"$co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
+      case q"$co.apply(..$_)" if isCoroutineBlueprint(co.tpe) =>
         Some(t)
       case _ =>
         None
     }
   }
 
+  // return type is the lub of the function return type and yield argument types
+  def isCoroutinesPkg(q: Tree) = q match {
+    case q"scala.coroutines.`package`" => true
+    case q"coroutines.this.`package`" => true
+    case t => false
+  }
+
   def inferReturnType(body: Tree): Tree = {
     // return type must correspond to the return type of the function literal
     val rettpe = body.tpe
 
-    // return type is the lub of the function return type and yield argument types
-    def isCoroutinesPackage(q: Tree) = q match {
-      case q"coroutines.this.`package`" => true
-      case t => false
-    }
     // TODO: ensure that this does not capture constraints from nested class scopes
     // TODO: ensure that this does not collect nested coroutine invocations
     val constraintTpes = body.collect {
-      case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPackage(qual) => tpt.tpe
-      case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPackage(qual) => tpt.tpe
+      case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPkg(qual) => tpt.tpe
+      case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPkg(qual) => tpt.tpe
     }
     tq"${lub(rettpe :: constraintTpes).widen}"
   }
