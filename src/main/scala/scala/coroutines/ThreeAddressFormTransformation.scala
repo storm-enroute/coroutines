@@ -205,6 +205,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       NestedContextValidator.traverse(tree)
       (Nil, tree)
     case q"{ case ..$cases }" =>
+      // partial function
       NestedContextValidator.traverse(tree)
       (Nil, tree)
     case q"while ($cond) $body" =>
