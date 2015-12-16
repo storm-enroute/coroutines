@@ -114,8 +114,6 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (decls, q"$localvarname")
     case q"$r.$method[..$tpts](...$paramss)" if tpts.length > 0 || paramss.length > 0 =>
       // application
-      // TODO: translate boolean && and || to if statements, then regenerate, to adher
-      // to the short-circuit evaluation rules
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
       val (rdecls, rident) = threeAddressForm(r)
       val (pdeclss, pidents) = paramss.map(_.map(threeAddressForm).unzip).unzip
@@ -218,16 +216,16 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // The correct solution is to duplicate the trees so that duplicate value decls in
       // the two trees get fresh names.
       val (xdecls1, xident1) = threeAddressForm(cond)
-      val localvarname0 = TermName(c.freshName("x"))
+      val localvarname = TermName(c.freshName("x"))
       val decls = if (xdecls0 != Nil) {
         xdecls0 ++ List(
-          q"var $localvarname0 = $xident0",
+          q"var $localvarname = $xident0",
           q"""
-            while ($localvarname0) {
+            while ($localvarname) {
               ${transform(body)}
 
               ..$xdecls1
-              $localvarname0 = $xident1
+              $localvarname = $xident1
             }
           """)
       } else List(q"""
@@ -238,23 +236,40 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (decls, q"()")
     case q"do $body while ($cond)" =>
       // do-while
-      val (xdecls, xident) = threeAddressForm(cond)
+      // TODO: This translation is a temporary fix, and can result in O(2^n) time. The
+      // correct solution is to transform the subtree once, duplicate the transformed
+      // trees and rename the variables.
+      val (xdecls0, xident0) = threeAddressForm(cond)
+      val (xdecls1, xident1) = threeAddressForm(cond)
       val localvarname = TermName(c.freshName("x"))
-      val decls = if (xdecls != Nil) xdecls ++ List(
-        q"var $localvarname = $xident",
+      val decls = if (xdecls0 != Nil) List(
         q"""
-          do {
+          {
+            ${transform(body)}
+          }
+        """
+      ) ++ xdecls0 ++ List(
+        q"var $localvarname = $xident0",
+        q"""
+          while ($localvarname) {
             ${transform(body)}
 
-            ..$xdecls
-            $localvarname = $xident
-          } while ($localvarname)
+            ..$xdecls1
+
+            $localvarname = $xident1
+          }
         """
-      ) else List(q"""
-        do {
-          ${transform(body)}
-        } while ($cond)
-      """)
+      ) else List(
+        q"""
+          {
+            ${transform(body)}
+          }
+
+          while ($cond) {
+            ${transform(body)}
+          }
+        """
+      )
       (decls, q"()")
     case q"for (..$enums) $body" =>
       // for loop

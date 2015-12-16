@@ -192,7 +192,7 @@ with ThreeAddressFormTransformation[C] {
     val (varpushes, varpops) = genVarPushesAndPops(cfg)
 
     // emit coroutine instantiation
-    val coroutineTpe = TypeName(s"Arity${args.size}")
+    val coroutineTpe = TypeName(s"_${args.size}")
     val entrypointmethods = entrypoints.map(_._2)
     val valnme = TermName(c.freshName("c"))
     val co = q"""

@@ -79,25 +79,25 @@ object Coroutine {
     new Synthesizer[c.type](c).call(f)
   }
 
-  abstract class Arity0[@specialized T] extends Coroutine.Blueprint[T] {
+  abstract class _0[@specialized T] extends Coroutine.Blueprint[T] {
     def call()(implicit cc: CanCallInternal): Coroutine[T]
     def apply(): T
     def push(c: Coroutine[T])(implicit cc: CanCallInternal): Unit
   }
 
-  abstract class Arity1[A0, @specialized T] extends Coroutine.Blueprint[T] {
+  abstract class _1[A0, @specialized T] extends Coroutine.Blueprint[T] {
     def call(a0: A0)(implicit cc: CanCallInternal): Coroutine[T]
     def apply(a0: A0): T
     def push(c: Coroutine[T], a0: A0)(implicit cc: CanCallInternal): Unit
   }
 
-  abstract class Arity2[A0, A1, @specialized T] extends Coroutine.Blueprint[T] {
+  abstract class _2[A0, A1, @specialized T] extends Coroutine.Blueprint[T] {
     def call(a0: A0, a1: A1)(implicit cc: CanCallInternal): Coroutine[T]
     def apply(a0: A0, a1: A1): T
     def push(c: Coroutine[T], a0: A0, a1: A1)(implicit cc: CanCallInternal): Unit
   }
 
-  abstract class Arity3[A0, A1, A2, @specialized T] extends Coroutine.Blueprint[T] {
+  abstract class _3[A0, A1, A2, @specialized T] extends Coroutine.Blueprint[T] {
     def call(a0: A0, a1: A1, a2: A2)(implicit cc: CanCallInternal): Coroutine[T]
     def apply(a0: A0, a1: A1, a2: A2): T
     def push(c: Coroutine[T], a0: A0, a1: A1, a2: A2)(

@@ -453,6 +453,56 @@ class CoroutineTest extends FunSuite with Matchers {
 }
 
 
+class WideValueTypesTest extends FunSuite with Matchers {
+  test("should use a long stack variable") {
+    val rube = coroutine { (x: Long) =>
+      var y = x
+      y = x * 3
+      yieldval(-x)
+      yieldval(y)
+      x * 2
+    }
+
+    val c = call(rube(15L))
+    assert(c() == -15L)
+    assert(c() == 45L)
+    assert(c() == 30L)
+  }
+
+  test("should use a double stack variable") {
+    val rube = coroutine { (x: Double) =>
+      var y = x
+      y = x * 4
+      yieldval(-x)
+      yieldval(y)
+      x * 2
+    }
+
+    val c = call(rube(2.0))
+    assert(c() == -2.0)
+    assert(c() == 8.0)
+    assert(c() == 4.0)
+  }
+
+  test("should call a coroutine that returns a double value") {
+    val twice = coroutine { (x: Double) =>
+      x * 2
+    }
+    val rube = coroutine { (x: Double) =>
+      yieldval(x)
+      yieldval(twice(x))
+      x * 4
+    }
+
+    val c = call(rube(2.0))
+    assert(c() == 2.0)
+    assert(c() == 4.0)
+    assert(c() == 8.0)
+    assert(c.isStopped)
+  }
+}
+
+
 class ToaTransformationTest extends FunSuite with Matchers {
   test("if state ments with applications") {
     val rube = coroutine { () =>
@@ -661,54 +711,30 @@ class ToaTransformationTest extends FunSuite with Matchers {
     assert(c1.isStopped)
     assert(state == "touched")
   }
-}
 
+  test("do-while should be simplified into a while loop") {
+    val rube = coroutine { (x: Int) =>
+      var i = 0
+      do {
+        yieldval(i)
 
-class WideValueTypesTest extends FunSuite with Matchers {
-  test("should use a long stack variable") {
-    val rube = coroutine { (x: Long) =>
-      var y = x
-      y = x * 3
-      yieldval(-x)
-      yieldval(y)
-      x * 2
+        i += 1
+      } while (i < x)
+      i
     }
 
-    val c = call(rube(15L))
-    assert(c() == -15L)
-    assert(c() == 45L)
-    assert(c() == 30L)
-  }
+    val c0 = call(rube(5))
+    assert(c0() == 0)
+    assert(c0() == 1)
+    assert(c0() == 2)
+    assert(c0() == 3)
+    assert(c0() == 4)
+    assert(c0() == 5)
+    assert(c0.isStopped)
 
-  test("should use a double stack variable") {
-    val rube = coroutine { (x: Double) =>
-      var y = x
-      y = x * 4
-      yieldval(-x)
-      yieldval(y)
-      x * 2
-    }
-
-    val c = call(rube(2.0))
-    assert(c() == -2.0)
-    assert(c() == 8.0)
-    assert(c() == 4.0)
-  }
-
-  test("should call a coroutine that returns a double value") {
-    val twice = coroutine { (x: Double) =>
-      x * 2
-    }
-    val rube = coroutine { (x: Double) =>
-      yieldval(x)
-      yieldval(twice(x))
-      x * 4
-    }
-
-    val c = call(rube(2.0))
-    assert(c() == 2.0)
-    assert(c() == 4.0)
-    assert(c() == 8.0)
-    assert(c.isStopped)
+    val c1 = call(rube(0))
+    assert(c1() == 0)
+    assert(c1() == 1)
+    assert(c1.isStopped)
   }
 }
