@@ -324,6 +324,11 @@ trait Analyzer[C <: Context] {
     tpe.baseType(codefsym) != NoType
   }
 
+  def isCoroutineBlueprintSugar(tpe: Type) = {
+    val codefsym = typeOf[~>[_, _]].typeConstructor.typeSymbol
+    tpe.baseType(codefsym) != NoType
+  }
+
   def coroutineElemType(tpe: Type) = {
     val codefsym = typeOf[Coroutine.BlueprintMarker[_]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) match {
@@ -348,6 +353,8 @@ trait Analyzer[C <: Context] {
         Some(t)
       case q"$co.apply(..$_)" if isCoroutineBlueprintMarker(co.tpe) =>
         Some(t)
+      case q"$co.apply[..$_](..$_)($_)" if isCoroutineBlueprintSugar(co.tpe) =>
+        Some(t)
       case _ =>
         None
     }
@@ -369,6 +376,8 @@ trait Analyzer[C <: Context] {
       case q"$qual.yieldto[$tpt]($_)" if isCoroutinesPkg(qual) =>
         tpt.tpe
       case q"$co.apply(..$_)" if isCoroutineBlueprintMarker(co.tpe) =>
+        coroutineElemType(co.tpe)
+      case q"$co.apply[..$_](..$_)($_)" if isCoroutineBlueprintSugar(co.tpe) =>
         coroutineElemType(co.tpe)
     }
     tq"${lub(rettpe :: constraintTpes).widen}"

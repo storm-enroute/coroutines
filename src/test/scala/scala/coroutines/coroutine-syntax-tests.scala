@@ -80,7 +80,7 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
     assert(c.isStopped)
   }
 
-  test("Another coroutine must be invoked as normal coroutine") {
+  test("Another coroutine must be invoked without syntax sugar") {
     val gimmeFive = coroutine { () => 5 }
     val rube = coroutine { () =>
       gimmeFive()
@@ -91,7 +91,7 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
     assert(c.isStopped)
   }
 
-  test("Another coroutine must be invoked") {
+  test("Another coroutine must be invoked with syntax sugar") {
     val gimmeFive: ~~~>[Int] = coroutine { () => 5 }
     val rube = coroutine { () =>
       gimmeFive()
@@ -99,6 +99,17 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
 
     val c = call(rube())
     assert(c() == 5)
+    assert(c.isStopped)
+  }
+
+  test("Another arity-2 coroutine must be invoked with syntax sugar") {
+    val mult: (Int, Int) ~> Int = coroutine { (x: Int, y: Int) => x * y }
+    val rube = coroutine { () =>
+      mult(3, 4)
+    }
+
+    val c = call(rube())
+    assert(c() == 12)
     assert(c.isStopped)
   }
 }

@@ -236,8 +236,8 @@ with ThreeAddressFormTransformation[C] {
     co
   }
 
-  def call[T: WeakTypeTag](lambda: Tree): Tree = {
-    val (receiver, args) = lambda match {
+  def call[T: WeakTypeTag](tree: Tree): Tree = {
+    val (receiver, args) = tree match {
       case q"$r.apply(..$args)" =>
         if (!isCoroutineBlueprintMarker(r.tpe))
           c.abort(r.pos,
@@ -245,9 +245,16 @@ with ThreeAddressFormTransformation[C] {
             s"required: Coroutine.Blueprint[${implicitly[WeakTypeTag[T]]}]\n" +
             s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
         (r, args)
+      case q"$r.apply[..$_](..$args)($_)" =>
+        if (!isCoroutineBlueprintSugar(r.tpe))
+          c.abort(r.pos,
+            s"Receiver must be a coroutine.\n" +
+            s"required: Coroutine.Blueprint[${implicitly[WeakTypeTag[T]]}]\n" +
+            s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
+        (r, args)
       case _ =>
         c.abort(
-          lambda.pos,
+          tree.pos,
           "The call statement must take a coroutine invocation expression:\n" +
           "  call(<coroutine>.apply(<arg0>, ..., <argN>))")
     }

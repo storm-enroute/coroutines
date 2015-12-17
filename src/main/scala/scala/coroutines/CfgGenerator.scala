@@ -421,12 +421,12 @@ trait CfgGenerator[C <: Context] {
     }
 
     case class ApplyCoroutine(tree: Tree, chain: Chain, uid: Long) extends Node {
-      def coroutine: Tree = {
-        val q"$_ val $_: $_ = $co.apply(..$_)" = tree
-        co
+      val (co, args) = tree match {
+        case q"$_ val $_: $_ = $co.apply(..$args)" => (co, args)
+        case q"$_ val $_: $_ = $co.apply[..$_](..$args)($_)" => (co, args)
       }
+      def coroutine: Tree = co
       override def code: Tree = {
-        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
         q"""
           $co
 
@@ -436,7 +436,6 @@ trait CfgGenerator[C <: Context] {
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
       ): Zipper = {
-        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
         val exittree = genCoroutineCall(co, args, subgraph)
         z.append(exittree)
       }
@@ -808,6 +807,20 @@ trait CfgGenerator[C <: Context] {
           (n, u)
         case ValDecl(t @ q"$_ var $_ = $c.apply(..$_)")
           if isCoroutineBlueprintMarker(c.tpe) =>
+          val nch = ch.withDecl(t, false)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
+          n.successors += u
+          (n, u)
+        case ValDecl(t @ q"$_ val $_ = $c.apply[..$_](..$_)($_)")
+          if isCoroutineBlueprintSugar(c.tpe) =>
+          val nch = ch.withDecl(t, false)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
+          n.successors += u
+          (n, u)
+        case ValDecl(t @ q"$_ var $_ = $c.apply[..$_](..$_)($_)")
+          if isCoroutineBlueprintSugar(c.tpe) =>
           val nch = ch.withDecl(t, false)
           val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
           val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
