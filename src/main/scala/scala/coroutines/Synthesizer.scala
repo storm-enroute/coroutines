@@ -205,11 +205,11 @@ with ThreeAddressFormTransformation[C] {
     val valnme = TermName(c.freshName("c"))
     val co = q"""
       new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
-        def call(..$args)(
+        def $$call(..$args)(
           implicit cc: scala.coroutines.CanCallInternal
         ): scala.coroutines.Coroutine[$rettpt] = {
           val $valnme = new scala.coroutines.Coroutine[$rettpt]
-          push($valnme, ..$argidents)
+          $$push($valnme, ..$argidents)
           $valnme
         }
         def apply(..$args): $rettpt = {
@@ -218,14 +218,14 @@ with ThreeAddressFormTransformation[C] {
             "Use `call(<coroutine>(<arg0>, ..., <argN>))` instead if you want to " +
             "start a new coroutine.")
         }
-        def push(c: scala.coroutines.Coroutine[$rettpt], ..$args)(
+        def $$push(c: scala.coroutines.Coroutine[$rettpt], ..$args)(
           implicit cc: scala.coroutines.CanCallInternal
         ): Unit = {
           scala.coroutines.common.Stack.push(c.$$costack, this, -1)
           scala.coroutines.common.Stack.push(c.$$pcstack, 0.toShort, -1)
           ..$varpushes
         }
-        def pop(c: scala.coroutines.Coroutine[$rettpt]): Unit = {
+        def $$pop(c: scala.coroutines.Coroutine[$rettpt]): Unit = {
           scala.coroutines.common.Stack.pop(c.$$pcstack)
           scala.coroutines.common.Stack.pop(c.$$costack)
           ..$varpops
@@ -258,7 +258,7 @@ with ThreeAddressFormTransformation[C] {
     val tpe = implicitly[WeakTypeTag[T]]
     val t = q"""
       import scala.coroutines.Permission.canCall
-      $receiver.call(..$args)
+      $receiver.$$call(..$args)
     """
     t
   }
