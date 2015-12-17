@@ -127,7 +127,6 @@ trait CfgGenerator[C <: Context] {
         if (scala.coroutines.common.Stack.isEmpty($cparam.$$costack)) {
           $$assignresult($cparam, $untypedtree)
         } else {
-          import scala.coroutines.Permission.canCall
           $cparam.$$target = $cparam
           scala.coroutines.common.Stack.top($cparam.$$costack)
             .$$returnvalue($cparam, $untypedtree)
@@ -468,7 +467,6 @@ trait CfgGenerator[C <: Context] {
         val untypedco = table.untyper.untypecheck(co)
         val untypedargs = for (a <- args) yield table.untyper.untypecheck(a)
         q"""
-          import scala.coroutines.Permission.canCall
           ..$savestate
           $untypedco.$$push($cparam.asInstanceOf[Coroutine[$coelemtpe]], ..$untypedargs)
           $cparam.$$target = $cparam

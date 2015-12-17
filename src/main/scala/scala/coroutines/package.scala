@@ -15,15 +15,6 @@ package object coroutines {
     "Use `call(<coroutine>(<arg0>, ..., <argN>))` instead if you want to " +
     "start a new coroutine."
 
-  @implicitNotFound(
-    "To create a coroutine, use the call(<coroutine>(<arguments>)) expression " +
-    "instead of invoking the coroutine definition's call method directly.")
-  sealed trait CanCallInternal
-
-  object Permission {
-    implicit val canCall = new CanCallInternal {}
-  }
-
   case class CoroutineStoppedException() extends Exception
 
   def yieldval[T](x: T): Unit = {
@@ -45,9 +36,9 @@ package object coroutines {
   ) extends Coroutine.BlueprintMarker[S] {
     def apply(): S =
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
-    def $call()(implicit cc: CanCallInternal): Coroutine[S] =
+    def $call(): Coroutine[S] =
       blueprint.asInstanceOf[Coroutine._0[S]].$call()
-    def $push(co: Coroutine[S])(implicit cc: CanCallInternal): Unit =
+    def $push(co: Coroutine[S]): Unit =
       blueprint.asInstanceOf[Coroutine._0[S]].$push(co)
   }
 
@@ -56,9 +47,9 @@ package object coroutines {
   ) extends Coroutine.BlueprintMarker[S] {
     def apply(t: T): S =
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
-    def $call(t: T)(implicit cc: CanCallInternal): Coroutine[S] =
+    def $call(t: T): Coroutine[S] =
       blueprint.asInstanceOf[Coroutine._1[T, S]].$call(t)
-    def $push(co: Coroutine[S], t: T)(implicit cc: CanCallInternal): Unit =
+    def $push(co: Coroutine[S], t: T): Unit =
       blueprint.asInstanceOf[Coroutine._1[T, S]].$push(co, t)
   }
 
@@ -68,12 +59,12 @@ package object coroutines {
     def apply[T1, T2](t1: T1, t2: T2)(implicit e: PS =:= Tuple2[T1, T2]): S =
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
     def $call[T1, T2](t1: T1, t2: T2)(
-      implicit cc: CanCallInternal, e: PS =:= Tuple2[T1, T2]
+      implicit e: PS =:= Tuple2[T1, T2]
     ): Coroutine[S] = {
       blueprint.asInstanceOf[Coroutine._2[T1, T2, S]].$call(t1, t2)
     }
     def $push[T1, T2](co: Coroutine[S], t1: T1, t2: T2)(
-      implicit cc: CanCallInternal, e: PS =:= Tuple2[T1, T2]
+      implicit e: PS =:= Tuple2[T1, T2]
     ): Unit = {
       blueprint.asInstanceOf[Coroutine._2[T1, T2, S]].$push(co, t1, t2)
     }
@@ -83,12 +74,12 @@ package object coroutines {
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
     }
     def $call[T1, T2, T3](t1: T1, t2: T2, t3: T3)(
-      implicit cc: CanCallInternal, e: PS =:= Tuple3[T1, T2, T3]
+      implicit e: PS =:= Tuple3[T1, T2, T3]
     ): Coroutine[S] = {
       blueprint.asInstanceOf[Coroutine._3[T1, T2, T3, S]].$call(t1, t2, t3)
     }
     def $push[T1, T2, T3](co: Coroutine[S], t1: T1, t2: T2, t3: T3)(
-      implicit cc: CanCallInternal, e: PS =:= Tuple3[T1, T2, T3]
+      implicit e: PS =:= Tuple3[T1, T2, T3]
     ): Unit = {
       blueprint.asInstanceOf[Coroutine._3[T1, T2, T3, S]].$push(co, t1, t2, t3)
     }

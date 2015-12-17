@@ -122,9 +122,7 @@ with ThreeAddressFormTransformation[C] {
     }
 
     q"""
-      def $$returnvalue(c: scala.coroutines.Coroutine[$tpt], v: $tpt)(
-        implicit cc: scala.coroutines.CanCallInternal
-      ): Unit = {
+      def $$returnvalue(c: scala.coroutines.Coroutine[$tpt], v: $tpt): Unit = {
         $body
       }
     """
@@ -205,9 +203,7 @@ with ThreeAddressFormTransformation[C] {
     val valnme = TermName(c.freshName("c"))
     val co = q"""
       new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
-        def $$call(..$args)(
-          implicit cc: scala.coroutines.CanCallInternal
-        ): scala.coroutines.Coroutine[$rettpt] = {
+        def $$call(..$args): scala.coroutines.Coroutine[$rettpt] = {
           val $valnme = new scala.coroutines.Coroutine[$rettpt]
           $$push($valnme, ..$argidents)
           $valnme
@@ -215,9 +211,7 @@ with ThreeAddressFormTransformation[C] {
         def apply(..$args): $rettpt = {
           sys.error(scala.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
         }
-        def $$push(c: scala.coroutines.Coroutine[$rettpt], ..$args)(
-          implicit cc: scala.coroutines.CanCallInternal
-        ): Unit = {
+        def $$push(c: scala.coroutines.Coroutine[$rettpt], ..$args): Unit = {
           scala.coroutines.common.Stack.push(c.$$costack, this, -1)
           scala.coroutines.common.Stack.push(c.$$pcstack, 0.toShort, -1)
           ..$varpushes
@@ -261,7 +255,6 @@ with ThreeAddressFormTransformation[C] {
 
     val tpe = implicitly[WeakTypeTag[T]]
     val t = q"""
-      import scala.coroutines.Permission.canCall
       $receiver.$$call(..$args)
     """
     t

@@ -29,4 +29,15 @@ class SeparatePackageTest extends FunSuite with Matchers {
     assert(c1() == -1)
     assert(c1.isStopped)
   }
+
+  test("Another coroutine must be invoked without syntax sugar") {
+    val id = coroutine { (x: Int) => x }
+    val rube = coroutine { () =>
+      id(7)
+    }
+
+    val c = call(rube())
+    assert(c() == 7)
+    assert(c.isStopped)
+  }
 }
