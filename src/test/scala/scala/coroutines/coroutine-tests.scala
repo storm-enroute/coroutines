@@ -462,6 +462,20 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c() == "ok" :: 1 :: Nil)
     assert(c.isStopped)
   }
+
+  test("nested coroutine definitions should not affect type of outer coroutine") {
+    val rube: Coroutine._1[List[Int], List[Int]] = coroutine { (xs: List[Int]) =>
+      val nested = coroutine { (x: Int) =>
+        yieldval(-x)
+        x
+      }
+      2 :: xs
+    }
+
+    val c = call(rube(1 :: Nil))
+    assert(c() == 2 :: 1 :: Nil)
+    assert(c.isStopped)
+  }
 }
 
 

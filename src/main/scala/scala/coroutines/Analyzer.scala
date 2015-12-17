@@ -358,9 +358,6 @@ trait Analyzer[C <: Context] {
   def inferReturnType(body: Tree): Tree = {
     // return type must correspond to the return type of the function literal
     val rettpe = body.tpe
-
-    // TODO: ensure that this does not capture constraints from nested class scopes
-    // TODO: ensure that this does not collect nested coroutine invocations
     val constraintTpes = body.collect {
       case q"$qual.yieldval[$tpt]($_)" if isCoroutinesPkg(qual) =>
         tpt.tpe

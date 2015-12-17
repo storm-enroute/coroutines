@@ -26,7 +26,8 @@ trait ThreeAddressFormTransformation[C <: Context] {
 
   import c.universe._
 
-  object NestedContextValidator extends Traverser {
+  class NestedContextValidator(implicit typer: ByTreeTyper[c.type])
+  extends Traverser {
     override def traverse(tree: Tree): Unit = tree match {
       case q"$qual.coroutine[$_]($_)" if isCoroutinesPkg(qual) =>
         // no need to check further, this is checked in a different expansion
@@ -45,7 +46,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
           "call statement or declare another coroutine.")
       case q"$qual.call($co.apply(..$args))" if isCoroutinesPkg(qual) =>
         // no need to check further, the call macro will validate the coroutine type
-      case q"$co.apply(..$args)" if isCoroutineBlueprint(co.tpe) =>
+      case q"$co.apply(..$args)" if isCoroutineBlueprint(typer.typeOf(co)) =>
         c.abort(
           tree.pos,
           "Coroutine blueprints can only be invoked directly inside the coroutine. " +
@@ -203,11 +204,11 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (decls, q"$localvarname")
     case q"(..$params) => $body" =>
       // function
-      NestedContextValidator.traverse(tree)
+      new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case q"{ case ..$cases }" =>
       // partial function
-      NestedContextValidator.traverse(tree)
+      new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case q"while ($cond) $body" =>
       // while
@@ -275,17 +276,17 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (decls, q"()")
     case q"for (..$enums) $body" =>
       // for loop
-      for (e <- enums) NestedContextValidator.traverse(e)
-      NestedContextValidator.traverse(body)
+      for (e <- enums) new NestedContextValidator().traverse(e)
+      new NestedContextValidator().traverse(body)
       (Nil, tree)
     case q"for (..$enums) yield $body" =>
       // for-yield loop
-      for (e <- enums) NestedContextValidator.traverse(e)
-      NestedContextValidator.traverse(body)
+      for (e <- enums) new NestedContextValidator().traverse(e)
+      new NestedContextValidator().traverse(body)
       (Nil, tree)
     case q"new { ..$edefs } with ..$bases { $self => ..$stats }" =>
       // new
-      NestedContextValidator.traverse(tree)
+      new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case Block(stats, expr) =>
       // block
@@ -314,23 +315,23 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (decls, q"")
     case q"$mods def $tname[..$tparams](...$paramss): $tpt = $expr" =>
       // method
-      NestedContextValidator.traverse(tree)
+      new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case q"$mods type $tpname[..$tparams] = $tpt" =>
       // type
-      NestedContextValidator.traverse(tree)
+      new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case q"$_ class $_[..$_] $_(...$_) extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
       // class
-      NestedContextValidator.traverse(tree)
+      new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case q"$_ trait $_[..$_] extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
       // trait
-      NestedContextValidator.traverse(tree)
+      new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case q"$_ object $_ extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
       // object
-      NestedContextValidator.traverse(tree)
+      new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case _ =>
       // empty
