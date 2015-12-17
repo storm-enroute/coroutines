@@ -319,10 +319,13 @@ trait Analyzer[C <: Context] {
     tpe.baseType(codefsym) != NoType
   }
 
-  def isCoroutineBlueprintMarker(tpe: Type) = tpe <:< typeOf[Coroutine.BlueprintMarker]
+  def isCoroutineBlueprintMarker(tpe: Type) = {
+    val codefsym = typeOf[Coroutine.BlueprintMarker[_]].typeConstructor.typeSymbol
+    tpe.baseType(codefsym) != NoType
+  }
 
   def coroutineElemType(tpe: Type) = {
-    val codefsym = typeOf[Coroutine.Blueprint[_]].typeConstructor.typeSymbol
+    val codefsym = typeOf[Coroutine.BlueprintMarker[_]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) match {
       case TypeRef(pre, sym, List(tpe)) => tpe
     }
@@ -343,7 +346,7 @@ trait Analyzer[C <: Context] {
         Some(t)
       case q"$qual.`package`.call($_.apply(..$_))" if isCoroutinesPkg(qual) =>
         Some(t)
-      case q"$co.apply(..$_)" if isCoroutineBlueprint(co.tpe) =>
+      case q"$co.apply(..$_)" if isCoroutineBlueprintMarker(co.tpe) =>
         Some(t)
       case _ =>
         None
@@ -365,7 +368,7 @@ trait Analyzer[C <: Context] {
         tpt.tpe
       case q"$qual.yieldto[$tpt]($_)" if isCoroutinesPkg(qual) =>
         tpt.tpe
-      case q"$co.apply(..$_)" if isCoroutineBlueprint(co.tpe) =>
+      case q"$co.apply(..$_)" if isCoroutineBlueprintMarker(co.tpe) =>
         coroutineElemType(co.tpe)
     }
     tq"${lub(rettpe :: constraintTpes).widen}"

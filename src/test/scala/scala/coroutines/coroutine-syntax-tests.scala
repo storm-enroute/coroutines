@@ -79,4 +79,15 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
     assert(c() == 8)
     assert(c.isStopped)
   }
+
+  test("Another coroutine must be invoked as normal coroutine") {
+    val gimmeFive = coroutine { () => 5 }
+    val rube = coroutine { () =>
+      gimmeFive()
+    }
+
+    val c = call(rube())
+    assert(c() == 5)
+    assert(c.isStopped)
+  }
 }
