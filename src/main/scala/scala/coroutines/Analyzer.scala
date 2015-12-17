@@ -319,6 +319,8 @@ trait Analyzer[C <: Context] {
     tpe.baseType(codefsym) != NoType
   }
 
+  def isCoroutineBlueprintMarker(tpe: Type) = tpe <:< typeOf[Coroutine.BlueprintMarker]
+
   def coroutineElemType(tpe: Type) = {
     val codefsym = typeOf[Coroutine.Blueprint[_]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) match {

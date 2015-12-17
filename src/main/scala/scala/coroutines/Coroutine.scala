@@ -65,7 +65,9 @@ object Coroutine {
     }
   }
 
-  trait Blueprint[@specialized T] {
+  trait BlueprintMarker
+
+  trait Blueprint[@specialized T] extends BlueprintMarker {
     def $enter(c: Coroutine[T]): Unit
     def $assignresult(c: Coroutine[T], v: T): Unit = c.$result = v
     def $returnvalue(c: Coroutine[T], v: T)(implicit cc: CanCallInternal): Unit
@@ -112,26 +114,20 @@ object Coroutine {
   abstract class _0[@specialized T] extends Blueprint[T] {
     def apply(): T
     def $call()(implicit cc: CanCallInternal): Coroutine[T]
-    def $push(c: Coroutine[T])(implicit cc: CanCallInternal): Unit
   }
 
   abstract class _1[A0, @specialized T] extends Blueprint[T] {
     def apply(a0: A0): T
     def $call(a0: A0)(implicit cc: CanCallInternal): Coroutine[T]
-    def $push(c: Coroutine[T], a0: A0)(implicit cc: CanCallInternal): Unit
   }
 
   abstract class _2[A0, A1, @specialized T] extends Blueprint[T] {
     def apply(a0: A0, a1: A1): T
     def $call(a0: A0, a1: A1)(implicit cc: CanCallInternal): Coroutine[T]
-    def $push(c: Coroutine[T], a0: A0, a1: A1)(implicit cc: CanCallInternal): Unit
   }
 
   abstract class _3[A0, A1, A2, @specialized T] extends Blueprint[T] {
     def apply(a0: A0, a1: A1, a2: A2): T
     def $call(a0: A0, a1: A1, a2: A2)(implicit cc: CanCallInternal): Coroutine[T]
-    def $push(c: Coroutine[T], a0: A0, a1: A1, a2: A2)(
-      implicit cc: CanCallInternal
-    ): Unit
   }
 }

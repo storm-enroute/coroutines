@@ -213,10 +213,7 @@ with ThreeAddressFormTransformation[C] {
           $valnme
         }
         def apply(..$args): $rettpt = {
-          sys.error(
-            "Coroutines can only be invoked directly from within other coroutines. " +
-            "Use `call(<coroutine>(<arg0>, ..., <argN>))` instead if you want to " +
-            "start a new coroutine.")
+          sys.error(scala.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
         }
         def $$push(c: scala.coroutines.Coroutine[$rettpt], ..$args)(
           implicit cc: scala.coroutines.CanCallInternal
@@ -242,10 +239,10 @@ with ThreeAddressFormTransformation[C] {
   def call[T: WeakTypeTag](lambda: Tree): Tree = {
     val (receiver, args) = lambda match {
       case q"$r.apply(..$args)" =>
-        if (!isCoroutineBlueprint(r.tpe))
+        if (!isCoroutineBlueprintMarker(r.tpe))
           c.abort(r.pos,
             s"Receiver must be a coroutine.\n" +
-            s"required: Coroutine.Definition[${implicitly[WeakTypeTag[T]]}]\n" +
+            s"required: Coroutine.Blueprint[${implicitly[WeakTypeTag[T]]}]\n" +
             s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
         (r, args)
       case _ =>
