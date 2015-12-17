@@ -538,11 +538,12 @@ trait CfgGenerator[C <: Context] {
           case q"$_ val $_: $_ = $qual.yieldto[$_]($x)" if isCoroutinesPkg(qual) => x
           case q"$_ var $_: $_ = $qual.yieldto[$_]($x)" if isCoroutinesPkg(qual) => x
         }
+        val untypedco = table.untyper.untypecheck(co)
         val cparam = table.names.coroutineParam
         val savestate = genSaveState(subgraph)
         val exittree = q"""
           ..$savestate
-          $cparam.$$target = ${table.untyper.untypecheck(co)}
+          $cparam.$$target = $untypedco.asInstanceOf[Coroutine[${table.returnType}]]
           return
         """
         z.append(exittree)

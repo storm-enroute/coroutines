@@ -183,6 +183,8 @@ trait Analyzer[C <: Context] {
   }
 
   class Table(private val lambda: Tree) {
+    val q"(..$args) => $body" = lambda
+    val returnType = inferReturnType(body)
     private var varCount = 0
     private var nodeCount = 0L
     private var subgraphCount = 0L

@@ -14,19 +14,18 @@ import scala.util.Try
 
 
 
-class Coroutine[@specialized +T] {
+class Coroutine[@specialized T] {
   import Coroutine._
   var $costackptr = 0
-  var $costack: Array[Blueprint[T]] @uncheckedVariance =
-    new Array[Blueprint[T]](INITIAL_COSTACK_SIZE)
+  var $costack: Array[Blueprint[T]] = new Array[Blueprint[T]](INITIAL_COSTACK_SIZE)
   var $pcstackptr = 0
   var $pcstack = new Array[Short](INITIAL_COSTACK_SIZE)
   var $refstackptr = 0
   var $refstack: Array[AnyRef] = _
   var $valstackptr = 0
   var $valstack: Array[Int] = _
-  var $target: Coroutine[T] @uncheckedVariance = null
-  var $result: T @uncheckedVariance = null.asInstanceOf[T]
+  var $target: Coroutine[T] = null
+  var $result: T = null.asInstanceOf[T]
 
   def apply(): T = {
     if (isAlive) Coroutine.enter[T](this)

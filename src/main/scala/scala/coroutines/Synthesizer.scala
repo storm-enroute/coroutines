@@ -182,7 +182,7 @@ with ThreeAddressFormTransformation[C] {
     }).unzip
 
     // infer coroutine return type
-    val rettpt = inferReturnType(body)
+    val rettpt = table.returnType
 
     // generate control flow graph
     val cfg = genControlFlowGraph(args, body, rettpt)
