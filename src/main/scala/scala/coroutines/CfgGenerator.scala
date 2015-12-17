@@ -466,11 +466,12 @@ trait CfgGenerator[C <: Context] {
         val coelemtpe = coroutineElemType(co.tpe)
         val cparam = table.names.coroutineParam
         val savestate = genSaveState(subgraph)
-        val untypedArgs = for (a <- args) yield table.untyper.untypecheck(a)
+        val untypedco = table.untyper.untypecheck(co)
+        val untypedargs = for (a <- args) yield table.untyper.untypecheck(a)
         q"""
           import scala.coroutines.Permission.canCall
           ..$savestate
-          $co.$$push($cparam.asInstanceOf[Coroutine[$coelemtpe]], ..$untypedArgs)
+          $untypedco.$$push($cparam.asInstanceOf[Coroutine[$coelemtpe]], ..$untypedargs)
           $cparam.$$target = $cparam
         """
       }
