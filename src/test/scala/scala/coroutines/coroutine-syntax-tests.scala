@@ -49,4 +49,34 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
     assert(c() == "ok")
     assert(c.isStopped)
   }
+
+  test("Coroutine._2 must be invoked") {
+    val rube = coroutine { (x: Int, y: Int) =>
+      yieldval(x + y)
+      yieldval(x - y)
+      x * y
+    }
+
+    val co: (Int, Int) ~> Int = rube
+    val c = call(co(7, 4))
+    assert(c() == 11)
+    assert(c() == 3)
+    assert(c() == 28)
+    assert(c.isStopped)
+  }
+
+  test("Coroutine._3 must be invoked") {
+    val rube = coroutine { (x: Int, y: Int, z: Int) =>
+      yieldval(x)
+      yieldval(y)
+      z
+    }
+
+    val co: (Int, Int, Int) ~> Int = rube
+    val c = call(co(3, 5, 8))
+    assert(c() == 3)
+    assert(c() == 5)
+    assert(c() == 8)
+    assert(c.isStopped)
+  }
 }

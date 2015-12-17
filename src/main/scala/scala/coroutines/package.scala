@@ -20,7 +20,25 @@ package object coroutines {
     "instead of invoking the coroutine definition's call method directly.")
   sealed trait CanCallInternal
 
+  object Permission {
+    implicit val canCall = new CanCallInternal {}
+  }
+
   case class CoroutineStoppedException() extends Exception
+
+  def yieldval[T](x: T): Unit = {
+    sys.error("Yield allowed only inside coroutines.")
+  }
+
+  def yieldto[T](f: Coroutine[T]): Unit = {
+    sys.error("Yield allowed only inside coroutines.")
+  }
+
+  def call[T](f: T): Coroutine[T] = macro Coroutine.call[T]
+
+  def coroutine[T](f: Any): Any = macro Coroutine.synthesize
+
+  /* syntax sugar */
 
   class ~>[T, @specialized S] private[coroutines] (
     val blueprint: Coroutine.Blueprint[S])
@@ -74,20 +92,24 @@ package object coroutines {
   implicit def coroutine1quotedops[T, @specialized S](c: \[T] ~> S) =
     new coroutine1quotedops(c)
 
-  object Permission {
-    implicit val canCall = new CanCallInternal {}
+  class coroutine2ops[T1, T2, @specialized S](val c: (T1, T2) ~> S)
+  extends Coroutine.BlueprintMarker {
+    def apply(t1: T1, t2: T2) = sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
+    def $call(t1: T1, t2: T2)(implicit cc: CanCallInternal): Coroutine[S] =
+      c.blueprint.asInstanceOf[Coroutine._2[T1, T2, S]].$call(t1, t2)
   }
 
-  def yieldval[T](x: T): Unit = {
-    sys.error("Yield allowed only inside coroutines.")
+  implicit def coroutine2ops[T1, T2, @specialized S](c: (T1, T2) ~> S) =
+    new coroutine2ops(c)
+
+  class coroutine3ops[T1, T2, T3, @specialized S](val c: (T1, T2, T3) ~> S)
+  extends Coroutine.BlueprintMarker {
+    def apply(t1: T1, t2: T2, t3: T3) = sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
+    def $call(t1: T1, t2: T2, t3: T3)(implicit cc: CanCallInternal): Coroutine[S] =
+      c.blueprint.asInstanceOf[Coroutine._3[T1, T2, T3, S]].$call(t1, t2, t3)
   }
 
-  def yieldto[T](f: Coroutine[T]): Unit = {
-    sys.error("Yield allowed only inside coroutines.")
-  }
-
-  def call[T](f: T): Coroutine[T] = macro Coroutine.call[T]
-
-  def coroutine[T](f: Any): Any = macro Coroutine.synthesize
+  implicit def coroutine3ops[T1, T2, T3, @specialized S](c: (T1, T2, T3) ~> S) =
+    new coroutine3ops(c)
 
 }
