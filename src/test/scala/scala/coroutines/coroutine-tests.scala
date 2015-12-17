@@ -450,6 +450,18 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c1() == 117)
     assert(c1.isStopped)
   }
+
+  test("should lub nested coroutine calls and returns") {
+    val id = coroutine { (xs: List[Int]) => xs }
+    val attach = coroutine { (xs: List[Int]) =>
+      val ys = id(xs)
+      "ok" :: ys
+    }
+
+    val c = call(attach(1 :: Nil))
+    assert(c() == "ok" :: 1 :: Nil)
+    assert(c.isStopped)
+  }
 }
 
 

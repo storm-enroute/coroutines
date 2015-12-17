@@ -452,14 +452,6 @@ trait CfgGenerator[C <: Context] {
         seen(this) = nthis
         nthis.updateBlock()
 
-        val coroutinetpe = coroutineTypeFor(ctx.rettpt.tpe)
-        val q"$_ val $_: $_ = $co.apply(..$args)" = tree
-        if (!(co.tpe <:< coroutinetpe)) {
-          c.abort(co.pos,
-            s"Coroutine invocation site has invalid return type.\n" +
-            s"required: $coroutinetpe\n" +
-            s"found:    ${co.tpe} (with underlying type ${co.tpe.widen})")
-        }
         this.addSuccessorsToNodeFront(ctx)
         ctx.exitPoints(subgraph)(nthis) = this.successors.head.uid
 
@@ -471,13 +463,14 @@ trait CfgGenerator[C <: Context] {
       def genCoroutineCall(
         co: Tree, args: List[Tree], subgraph: SubCfg
       )(implicit table: Table): Tree = {
+        val coelemtpe = coroutineElemType(co.tpe)
         val cparam = table.names.coroutineParam
         val savestate = genSaveState(subgraph)
         val untypedArgs = for (a <- args) yield table.untyper.untypecheck(a)
         q"""
           import scala.coroutines.Permission.canCall
           ..$savestate
-          $co.push($cparam, ..$untypedArgs)
+          $co.push($cparam.asInstanceOf[Coroutine[$coelemtpe]], ..$untypedArgs)
           $cparam.$$target = $cparam
         """
       }

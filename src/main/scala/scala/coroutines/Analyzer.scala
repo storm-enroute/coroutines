@@ -319,6 +319,13 @@ trait Analyzer[C <: Context] {
     tpe.baseType(codefsym) != NoType
   }
 
+  def coroutineElemType(tpe: Type) = {
+    val codefsym = typeOf[Coroutine.Blueprint[_]].typeConstructor.typeSymbol
+    tpe.baseType(codefsym) match {
+      case TypeRef(pre, sym, List(tpe)) => tpe
+    }
+  }
+
   def coroutineTypeFor(tpe: Type) = {
     val codeftpe = typeOf[Coroutine.Blueprint[_]].typeConstructor
     appliedType(codeftpe, List(tpe))
@@ -355,8 +362,12 @@ trait Analyzer[C <: Context] {
     // TODO: ensure that this does not capture constraints from nested class scopes
     // TODO: ensure that this does not collect nested coroutine invocations
     val constraintTpes = body.collect {
-      case q"$qual.yieldval[$tpt]($v)" if isCoroutinesPkg(qual) => tpt.tpe
-      case q"$qual.yieldto[$tpt]($f)" if isCoroutinesPkg(qual) => tpt.tpe
+      case q"$qual.yieldval[$tpt]($_)" if isCoroutinesPkg(qual) =>
+        tpt.tpe
+      case q"$qual.yieldto[$tpt]($_)" if isCoroutinesPkg(qual) =>
+        tpt.tpe
+      case q"$co.apply(..$_)" if isCoroutineBlueprint(co.tpe) =>
+        coroutineElemType(co.tpe)
     }
     tq"${lub(rettpe :: constraintTpes).widen}"
   }
