@@ -14,7 +14,7 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
       yieldval(-5)
       10
     }
-    val co: <> ~> Int = rube
+    val co: ~~~>[Int] = rube
     val c = call(co())
     assert(c() == 5)
     assert(c() == -5)
@@ -29,7 +29,7 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
       x
     }
 
-    val co: Int ~> Int = rube
+    val co: Int ~~> Int = rube
     val c = call(co(7))
     assert(c() == 14)
     assert(c() == -7)
@@ -43,7 +43,7 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
       t._2
     }
 
-    val co: \[(Int, String)] ~> Any = rube
+    val co: (Int, String) ~~> Any = rube
     val c = call(co((7, "ok")))
     assert(c() == 7)
     assert(c() == "ok")

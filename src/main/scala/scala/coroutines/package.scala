@@ -40,17 +40,20 @@ package object coroutines {
 
   /* syntax sugar */
 
+  class ~~~>[@specialized S] private[coroutines] (
+    val blueprint: Coroutine.Blueprint[S])
+
+  class ~~>[T, @specialized S] private[coroutines] (
+    val blueprint: Coroutine.Blueprint[S])
+
   class ~>[T, @specialized S] private[coroutines] (
     val blueprint: Coroutine.Blueprint[S])
 
   implicit def coroutine0[@specialized S](b: Coroutine._0[S]) =
-    new ~>[<>, S](b)
+    new ~~~>[S](b)
 
   implicit def coroutine1[T, @specialized S](b: Coroutine._1[T, S]) =
-    new ~>[T, S](b)
-
-  implicit def coroutine1quoted[T, @specialized S](b: Coroutine._1[T, S]) =
-    new ~>[\[T], S](b)
+    new ~~>[T, S](b)
 
   implicit def coroutine2[T1, T2, @specialized S](b: Coroutine._2[T1, T2, S]) =
     new ~>[Tuple2[T1, T2], S](b)
@@ -58,39 +61,25 @@ package object coroutines {
   implicit def coroutine3[T1, T2, T3, @specialized S](b: Coroutine._3[T1, T2, T3, S]) =
     new ~>[Tuple3[T1, T2, T3], S](b)
 
-  final class <> private ()
-
-  final class \[T] private ()
-
-  class coroutine0ops[@specialized S](val c: <> ~> S)
+  class coroutine0ops[@specialized S](val c: ~~~>[S])
   extends Coroutine.BlueprintMarker {
     def apply() = sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
     def $call()(implicit cc: CanCallInternal): Coroutine[S] =
       c.blueprint.asInstanceOf[Coroutine._0[S]].$call()
   }
 
-  implicit def coroutine0ops[@specialized S](c: <> ~> S) =
+  implicit def coroutine0ops[@specialized S](c: ~~~>[S]) =
     new coroutine0ops(c)
 
-  class coroutine1ops[T, @specialized S](val c: T ~> S)
+  class coroutine1ops[T, @specialized S](val c: T ~~> S)
   extends Coroutine.BlueprintMarker {
     def apply(t: T) = sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
     def $call(t: T)(implicit cc: CanCallInternal): Coroutine[S] =
       c.blueprint.asInstanceOf[Coroutine._1[T, S]].$call(t)
   }
 
-  implicit def coroutine1ops[T, @specialized S](c: T ~> S) =
+  implicit def coroutine1ops[T, @specialized S](c: T ~~> S) =
     new coroutine1ops(c)
-
-  class coroutine1quotedops[T, @specialized S](val c: \[T] ~> S)
-  extends Coroutine.BlueprintMarker {
-    def apply(t: T) = sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
-    def $call(t: T)(implicit cc: CanCallInternal): Coroutine[S] =
-      c.blueprint.asInstanceOf[Coroutine._1[T, S]].$call(t)
-  }
-
-  implicit def coroutine1quotedops[T, @specialized S](c: \[T] ~> S) =
-    new coroutine1quotedops(c)
 
   class coroutine2ops[T1, T2, @specialized S](val c: (T1, T2) ~> S)
   extends Coroutine.BlueprintMarker {
