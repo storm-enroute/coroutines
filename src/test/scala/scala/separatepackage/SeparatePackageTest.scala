@@ -31,13 +31,13 @@ class SeparatePackageTest extends FunSuite with Matchers {
   }
 
   test("Another coroutine must be invoked without syntax sugar") {
-    val add = coroutine { (x: Int, y: Int) => x + y }
+    val inc = coroutine { (x: Int) => x + 1 }
     val rube = coroutine { () =>
-      add(3, 4)
+      inc(3)
     }
 
     val c = call(rube())
-    assert(c() == 7)
+    assert(c() == 4)
     assert(c.isStopped)
   }
 }

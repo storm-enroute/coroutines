@@ -158,6 +158,35 @@ with ThreeAddressFormTransformation[C] {
     (varpushes, varpops)
   }
 
+  def typeChar(tpt: Tree): Char = tpt match {
+    case tq"scala.Boolean" => 'Z'
+    case tq"scala.Byte" => 'B'
+    case tq"scala.Short" => 'S'
+    case tq"scala.Char" => 'Z'
+    case tq"scala.Int" => 'I'
+    case tq"scala.Float" => 'F'
+    case tq"scala.Long" => 'J'
+    case tq"scala.Double" => 'D'
+    case _ => 'L'
+  }
+
+  def genCoroutineTpe(argtpts: List[Tree], rettpt: Tree): (Tree, List[Tree]) = {
+    if (argtpts.length == 1) {
+      println(argtpts(0))
+      typeChar(argtpts(0)) match {
+        case 'L' =>
+          val nme = TypeName(s"_1$$spec$$L")
+          (tq"scala.coroutines.$nme", argtpts :+ rettpt)
+        case c =>
+          val nme = TypeName(s"_1$$spec$$${c}")
+          (tq"scala.coroutines.$nme", List(rettpt))
+      }
+    } else if (argtpts.length == 0 || argtpts.length > 1) {
+      val nme = TypeName(s"_${argtpts.size}")
+      (tq"scala.coroutines.Coroutine.$nme", argtpts :+ rettpt)
+    } else sys.error("Unreachable case.")
+  }
+
   def synthesize(rawlambda: Tree): Tree = {
     // transform to two operand assignment form
     val typedtaflambda = transformToThreeAddressForm(rawlambda)
@@ -198,11 +227,11 @@ with ThreeAddressFormTransformation[C] {
     val (varpushes, varpops) = genVarPushesAndPops(cfg)
 
     // emit coroutine instantiation
-    val coroutineTpe = TypeName(s"_${args.size}")
+    val (coroutinequal, tparams) = genCoroutineTpe(argtpts, rettpt)
     val entrypointmethods = entrypoints.map(_._2)
     val valnme = TermName(c.freshName("c"))
     val co = q"""
-      new scala.coroutines.Coroutine.$coroutineTpe[..$argtpts, $rettpt] {
+      new $coroutinequal[..$tparams] {
         def $$call(..$args): scala.coroutines.Coroutine[$rettpt] = {
           val $valnme = new scala.coroutines.Coroutine[$rettpt]
           $$push($valnme, ..$argidents)
