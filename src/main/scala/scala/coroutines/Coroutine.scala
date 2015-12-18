@@ -117,7 +117,7 @@ object Coroutine {
     def $push(c: Coroutine[T]): Unit
   }
 
-  trait _1[A0, @specialized T] extends Blueprint[T] {
+  abstract class _1[A0, @specialized T] extends Blueprint[T] {
     def apply(a0: A0): T
     def $call(a0: A0): Coroutine[T]
     def $push(c: Coroutine[T], a0: A0): Unit

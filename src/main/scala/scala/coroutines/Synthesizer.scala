@@ -158,30 +158,95 @@ with ThreeAddressFormTransformation[C] {
     (varpushes, varpops)
   }
 
-  def typeChar(tpt: Tree): Char = tpt match {
-    case tq"scala.Boolean" => 'Z'
-    case tq"scala.Byte" => 'B'
-    case tq"scala.Short" => 'S'
-    case tq"scala.Char" => 'Z'
-    case tq"scala.Int" => 'I'
-    case tq"scala.Float" => 'F'
-    case tq"scala.Long" => 'J'
-    case tq"scala.Double" => 'D'
-    case _ => 'L'
+  def specArity1(argtpts: List[Tree], rettpt: Tree): (Tree, List[Tree]) = {
+    argtpts(0) match {
+      case tq"scala.Boolean" =>
+        (tq"scala.coroutines.Coroutine._1", argtpts :+ rettpt)
+      case tq"scala.Byte" =>
+        (tq"scala.coroutines.Coroutine._1", argtpts :+ rettpt)
+      case tq"scala.Short" =>
+        val nme = TypeName(s"_1$$spec$$S")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case tq"scala.Char" =>
+        val nme = TypeName(s"_1$$spec$$C")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case tq"scala.Int" =>
+        val nme = TypeName(s"_1$$spec$$I")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case tq"scala.Float" =>
+        val nme = TypeName(s"_1$$spec$$F")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case tq"scala.Long" =>
+        val nme = TypeName(s"_1$$spec$$J")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case tq"scala.Double" =>
+        val nme = TypeName(s"_1$$spec$$D")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case _ =>
+        val nme = TypeName(s"_1$$spec$$L")
+        (tq"scala.coroutines.$nme", argtpts :+ rettpt)
+    }
+  }
+
+  def specArity2(argtpts: List[Tree], rettpt: Tree): (Tree, List[Tree]) = {
+    (argtpts(0), argtpts(1)) match {
+      case (tq"scala.Int", tq"scala.Int") =>
+        val nme = TypeName(s"_2$$spec$$II")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (tq"scala.Long", tq"scala.Int") =>
+        val nme = TypeName(s"_2$$spec$$JI")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (tq"scala.Double", tq"scala.Int") =>
+        val nme = TypeName(s"_2$$spec$$DI")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (_, tq"scala.Int") =>
+        val nme = TypeName(s"_2$$spec$$LI")
+        (tq"scala.coroutines.$nme", argtpts(0) :: rettpt :: Nil)
+      case (tq"scala.Int", tq"scala.Long") =>
+        val nme = TypeName(s"_2$$spec$$IJ")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (tq"scala.Long", tq"scala.Long") =>
+        val nme = TypeName(s"_2$$spec$$JJ")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (tq"scala.Double", tq"scala.Long") =>
+        val nme = TypeName(s"_2$$spec$$DJ")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (_, tq"scala.Long") =>
+        val nme = TypeName(s"_2$$spec$$LJ")
+        (tq"scala.coroutines.$nme", argtpts(0) :: rettpt :: Nil)
+      case (tq"scala.Int", tq"scala.Double") =>
+        val nme = TypeName(s"_2$$spec$$ID")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (tq"scala.Long", tq"scala.Double") =>
+        val nme = TypeName(s"_2$$spec$$JD")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (tq"scala.Double", tq"scala.Double") =>
+        val nme = TypeName(s"_2$$spec$$DD")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (_, tq"scala.Double") =>
+        val nme = TypeName(s"_2$$spec$$LD")
+        (tq"scala.coroutines.$nme", argtpts(0) :: rettpt :: Nil)
+      case (tq"scala.Int", _) =>
+        val nme = TypeName(s"_2$$spec$$IL")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (tq"scala.Long", _) =>
+        val nme = TypeName(s"_2$$spec$$JL")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (tq"scala.Double", _) =>
+        val nme = TypeName(s"_2$$spec$$DL")
+        (tq"scala.coroutines.$nme", rettpt :: Nil)
+      case (_, _) =>
+        val nme = TypeName(s"_2$$spec$$LL")
+        (tq"scala.coroutines.$nme", argtpts(0) :: rettpt :: Nil)
+    }
   }
 
   def genCoroutineTpe(argtpts: List[Tree], rettpt: Tree): (Tree, List[Tree]) = {
     if (argtpts.length == 1) {
-      println(argtpts(0))
-      typeChar(argtpts(0)) match {
-        case 'L' =>
-          val nme = TypeName(s"_1$$spec$$L")
-          (tq"scala.coroutines.$nme", argtpts :+ rettpt)
-        case c =>
-          val nme = TypeName(s"_1$$spec$$${c}")
-          (tq"scala.coroutines.$nme", List(rettpt))
-      }
-    } else if (argtpts.length == 0 || argtpts.length > 1) {
+      specArity1(argtpts, rettpt)
+    } else if (argtpts.length == 2) {
+      specArity2(argtpts, rettpt)
+    } else if (argtpts.length == 0 || argtpts.length > 2) {
       val nme = TypeName(s"_${argtpts.size}")
       (tq"scala.coroutines.Coroutine.$nme", argtpts :+ rettpt)
     } else sys.error("Unreachable case.")
