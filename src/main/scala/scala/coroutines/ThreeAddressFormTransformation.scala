@@ -10,8 +10,8 @@ import scala.reflect.macros.whitebox.Context
 
 
 /** Transforms the coroutine body into three address form with restricted control flow
- *  that contains only try-catch statements, while loops, do-while loops, if-statements,
- *  value and variable declarations, pattern matches, nested blocks and function calls.
+ *  that contains only try-catch statements, while loops, if-statements, value and
+ *  variable declarations, pattern matches, nested blocks and function calls.
  *
  *  Newly synthesized variables get mangled fresh names, and existing variable names are
  *  preserved.
