@@ -158,6 +158,55 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // tuples
       val (xsdecls, xsidents) = xs.map(threeAddressForm).unzip
       (xsdecls.flatten, q"(..$xsidents)")
+    case q"throw $expr" =>
+      // throw
+      val (decls, ident) = threeAddressForm(expr)
+      val ndecls = decls ++ List(q"throw $ident")
+      (ndecls, q"()")
+    case q"try $body catch { case ..$cases } finally $expr" =>
+      // try
+      val tpe = typer.typeOf(tree)
+      val localvarname = TermName(c.freshName("x"))
+      val exceptionvarname = TermName(c.freshName("e"))
+      val bindingname = TermName(c.freshName("t"))
+      val (bodydecls, bodyident) = threeAddressForm(body)
+      val (exprdecls, exprident) = threeAddressForm(expr)
+      val ncases = (for (cq"$pat => $casebody" <- cases) yield {
+        val (casedecls, caseident) = threeAddressForm(casebody)
+        cq"""
+          $pat =>
+            ..$casedecls
+
+            $localvarname = $caseident
+        """
+      }) ++ List(cq"${pq"_"} => throw $exceptionvarname")
+      val ndecls = List(
+        q"var $localvarname = null.asInstanceOf[$tpe]",
+        q"var $exceptionvarname: Throwable = null",
+        q"""
+          try {
+            ..$bodydecls
+
+            $localvarname = $bodyident
+          } catch {
+            case $bindingname: Throwable => $exceptionvarname = $bindingname
+          }
+        """
+      ) ++ List(if (expr == q"") q"""
+          $exceptionvarname match {
+            case ..$ncases
+          }
+        """ else q"""
+          try {
+            $exceptionvarname match {
+              case ..$ncases
+            }
+          } finally {
+            $expr
+          }
+        """
+      )
+      (ndecls, q"$localvarname")
     case q"if ($cond) $thenbranch else $elsebranch" =>
       // if
       val (conddecls, condident) = threeAddressForm(cond)
