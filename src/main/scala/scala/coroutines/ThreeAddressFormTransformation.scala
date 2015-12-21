@@ -141,10 +141,6 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case q"return $_" =>
       // return
       c.abort(tree.pos, "The return statement is not allowed inside coroutines.")
-    case q"throw $e" =>
-      // throw
-      val (edecls, eident) = threeAddressForm(e)
-      (edecls, q"throw $eident")
     case q"$x: $tpt" =>
       // ascription
       disallowCoroutinesIn(tpt)

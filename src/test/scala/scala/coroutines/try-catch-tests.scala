@@ -29,4 +29,13 @@ class TryCatchTest extends FunSuite with Matchers {
       }
     }
   }
+
+  test("should declare a coroutine with a throw statement") {
+    val rube = coroutine { () =>
+      throw {
+        val str = "boom"
+        new Exception(str)
+      }
+    }
+  }
 }
