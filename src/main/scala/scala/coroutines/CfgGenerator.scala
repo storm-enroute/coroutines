@@ -28,6 +28,8 @@ trait CfgGenerator[C <: Context] {
   abstract class Node {
     var successor: Option[Node] = None
 
+    var throwSuccessor: Option[Node] = None
+
     def successors: Seq[Node]
 
     val uid: Long

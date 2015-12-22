@@ -56,8 +56,11 @@ package object coroutines {
   class ~>[PS, @specialized S] private[coroutines] (
     val blueprint: Coroutine.Blueprint[S]
   ) extends Coroutine.BlueprintMarker[S] {
-    def apply[T1, T2](t1: T1, t2: T2)(implicit e: PS =:= Tuple2[T1, T2]): S =
+    def apply[T1, T2](t1: T1, t2: T2)(
+      implicit e: PS =:= Tuple2[T1, T2]
+    ): S = {
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
+    }
     def $call[T1, T2](t1: T1, t2: T2)(
       implicit e: PS =:= Tuple2[T1, T2]
     ): Coroutine[S] = {
