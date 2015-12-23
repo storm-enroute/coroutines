@@ -20,10 +20,10 @@ with ThreeAddressFormTransformation[C] {
 
   val NUM_PREDEFINED_ENTRY_STUBS = 40
 
-  private def genEntryPoint(
-    subgraph: SubCfg, rettpt: Tree
-  )(implicit table: Table): Tree = {
-    val body = subgraph.emit()
+  private def genEntryPoint(cfg: Cfg, subgraph: SubCfg, rettpt: Tree)(
+    implicit table: Table
+  ): Tree = {
+    val body = subgraph.emit(cfg)
     val defname = TermName(s"$$ep${subgraph.uid}")
     val defdef = if (subgraph.uid < NUM_PREDEFINED_ENTRY_STUBS) q"""
       override def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {
@@ -41,7 +41,7 @@ with ThreeAddressFormTransformation[C] {
     cfg: Cfg, rettpt: Tree
   )(implicit table: Table): Map[Long, Tree] = {
     val entrypoints = for ((orignode, subgraph) <- cfg.subgraphs) yield {
-      (subgraph.uid, genEntryPoint(subgraph, rettpt))
+      (subgraph.uid, genEntryPoint(cfg, subgraph, rettpt))
     }
     mutable.LinkedHashMap() ++= entrypoints.toSeq.sortBy(_._1)
   }

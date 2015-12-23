@@ -31,7 +31,6 @@ trait ThreeAddressFormTransformation[C <: Context] {
     override def traverse(tree: Tree): Unit = tree match {
       case q"$qual.coroutine[$_]($_)" if isCoroutinesPkg(qual) =>
         // no need to check further, this is checked in a different expansion
-        sys.error("Found!")
       case q"$qual.yieldval[$_]($_)" if isCoroutinesPkg(qual) =>
         c.abort(
           tree.pos,
@@ -331,7 +330,12 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"new { ..$edefs } with ..$bases { $self => ..$stats }" =>
       // new
-      new NestedContextValidator().traverse(tree)
+      if (true) {
+        // if this class was not generated from a coroutine declaration, then validate
+        // the nested context
+        println(tree)
+        new NestedContextValidator().traverse(tree)
+      }
       (Nil, tree)
     case Block(stats, expr) =>
       // block
@@ -368,6 +372,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"$_ class $_[..$_] $_(...$_) extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
       // class
+      println("class ----> " + tree)
       new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case q"$_ trait $_[..$_] extends { ..$_ } with ..$_ { $_ => ..$_ }" =>

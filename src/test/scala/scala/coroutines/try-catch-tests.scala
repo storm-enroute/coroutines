@@ -38,4 +38,11 @@ class TryCatchTest extends FunSuite with Matchers {
       }
     }
   }
+
+  test("should invoke another coroutine that ") {
+    val boom = coroutine { () => throw new Exception }
+    val rube = coroutine { () =>
+      boom()
+    }
+  }
 }

@@ -768,7 +768,8 @@ trait CfgGenerator[C <: Context] {
       isVisible && isOccurring
     }
 
-    def emit()(implicit table: Table): Tree = {
+    def emit(cfg: Cfg)(implicit table: Table): Tree = {
+      val cparam = table.names.coroutineParam
       def findStart(chain: Chain): Zipper = {
         var z = {
           if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
@@ -776,7 +777,6 @@ trait CfgGenerator[C <: Context] {
         }
         for ((sym, info) <- chain.decls) {
           if (mustLoadVar(sym, chain)) {
-            val cparam = table.names.coroutineParam
             val stack = info.stackname
             val decodedget = info.loadTree(q"$cparam")
             val valdef = info.origtree match {
@@ -793,7 +793,42 @@ trait CfgGenerator[C <: Context] {
       val startzipper = findStart(start.chain)
       val bodyzipper = start.emitCode(startzipper, this)
       val body = bodyzipper.result
-      body
+      val checkexception = {
+        val needcheck = cfg.subgraphs.exists {
+          case (_, sub) if sub.exitSubgraphs.exists(_._2 eq this) =>
+            sub.exitSubgraphs.find(_._2 eq this).get._1 match {
+              case Node.ApplyCoroutine(_, _, _) => true
+              case _ => false
+            }
+          case _ =>
+            false
+        }
+        if (needcheck) {
+          val exceptionvarname = TermName(c.freshName("e"))
+          q"""
+            if ($cparam.$$exception != null) {
+              val $exceptionvarname = $cparam.$$exception
+              $cparam.$$exception = null
+              throw $exceptionvarname
+            }
+          """
+        } else {
+          q""
+        }
+      }
+      q"""
+        try {
+          $checkexception
+          $body
+        } catch {
+          case t: Throwable =>
+            $cparam.$$exception = t
+            $$pop($cparam)
+            if (!scala.coroutines.common.Stack.isEmpty($cparam.$$costack)) {
+              $cparam.$$target = $cparam
+            }
+        }
+      """
     }
   }
 

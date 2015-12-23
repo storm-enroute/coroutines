@@ -25,6 +25,7 @@ class Coroutine[@specialized T] {
   var $valstackptr = 0
   var $valstack: Array[Int] = _
   var $target: Coroutine[T] = null
+  var $exception: Throwable = null
   var $result: T = null.asInstanceOf[T]
 
   def apply(): T = {
@@ -58,6 +59,10 @@ object Coroutine {
       val nc = c.$target
       c.$target = null
       enter(nc)
+    } else if (c.$exception ne null) {
+      val e = c.$exception
+      c.$exception = null
+      throw e
     } else {
       val res = c.$result
       c.$result = null.asInstanceOf[T]
