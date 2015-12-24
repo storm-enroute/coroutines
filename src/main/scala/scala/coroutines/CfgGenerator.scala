@@ -806,7 +806,7 @@ trait CfgGenerator[C <: Context] {
         if (needcheck) {
           val exceptionvarname = TermName(c.freshName("e"))
           q"""
-            if ($cparam.$$exception != null) {
+            if ($cparam.$$exception ne null) {
               val $exceptionvarname = $cparam.$$exception
               $cparam.$$exception = null
               throw $exceptionvarname
