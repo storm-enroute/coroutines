@@ -189,7 +189,7 @@ trait Analyzer[C <: Context] {
     private var nodeCount = 0L
     private var subgraphCount = 0L
     val vars = mutable.LinkedHashMap[Symbol, VarInfo]()
-    val topChain = Chain(new Block, Nil, this, null)
+    val topChain = Chain(new BlockStats, Nil, this, null)
     val untyper = new ByTreeUntyper[c.type](c)(lambda)
     def initialStackSize: Int = 4
     object names {
@@ -217,7 +217,7 @@ trait Analyzer[C <: Context] {
     def valvars = vars.filter(_._2.isValType)
   }
 
-  class Block {
+  class BlockStats {
     val decls = mutable.LinkedHashMap[Symbol, VarInfo]()
     val occurrences = mutable.LinkedHashMap[Symbol, VarInfo]()
     val assignments = mutable.LinkedHashMap[Symbol, VarInfo]()
@@ -229,7 +229,7 @@ trait Analyzer[C <: Context] {
   }
 
   case class Chain(
-    block: Block, decls: List[(Symbol, VarInfo)], table: Table, parent: Chain
+    stats: BlockStats, decls: List[(Symbol, VarInfo)], table: Table, parent: Chain
   ) {
     def alldecls: List[(Symbol, VarInfo)] = {
       decls ::: (if (parent != null) parent.alldecls else Nil)
@@ -246,23 +246,23 @@ trait Analyzer[C <: Context] {
       else None
     }
     def isDescendantOf(that: Chain): Boolean = {
-      (this.block == that.block && this.decls.length >= that.decls.length) ||
+      (this.stats == that.stats && this.decls.length >= that.decls.length) ||
         (parent != null && parent.isDescendantOf(that))
     }
     def isAssigned(s: Symbol): Boolean = {
-      block.assignments.contains(s)
+      stats.assignments.contains(s)
     }
     def isAssignedInAncestors(s: Symbol): Boolean = {
       isAssigned(s) || (parent != null && parent.isAssignedInAncestors(s))
     }
     def isDeclared(s: Symbol): Boolean = {
-      block.decls.contains(s)
+      stats.decls.contains(s)
     }
     def isDeclaredInAncestors(s: Symbol): Boolean = {
       isDeclared(s) || (parent != null && parent.isDeclaredInAncestors(s))
     }
     def isOccurring(s: Symbol): Boolean = {
-      block.occurrences.contains(s)
+      stats.occurrences.contains(s)
     }
     def isOccurringInAncestors(s: Symbol): Boolean = {
       isOccurring(s) || (parent != null && parent.isOccurringInAncestors(s))
@@ -276,12 +276,12 @@ trait Analyzer[C <: Context] {
           new VarInfo(table.newVarUid, valdef, sym, isArg, table)
       }
       table.vars(sym) = info
-      Chain(block, (sym, info) :: decls, table, parent)
+      Chain(stats, (sym, info) :: decls, table, parent)
     }
-    def descend = Chain(new Block, Nil, table, this)
+    def descend = Chain(new BlockStats, Nil, table, this)
     def copyWithoutBlocks: Chain = {
       val nparent = if (parent == null) null else parent.copyWithoutBlocks
-      Chain(new Block, decls, table, nparent)
+      Chain(new BlockStats, decls, table, nparent)
     }
     override def equals(that: Any) = that match {
       case that: AnyRef => this eq that
@@ -293,7 +293,7 @@ trait Analyzer[C <: Context] {
       if (parent != null) s + parent.toString else s
     }
     def verboseString: String = {
-      val b = block.toString
+      val b = stats.toString
       val s = s"[${decls.map(_._1.name).mkString(", ")} | <$b>] -> "
       if (parent != null) s + parent.verboseString else s
     }

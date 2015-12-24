@@ -41,7 +41,7 @@ trait CfgGenerator[C <: Context] {
     def updateBlock()(implicit table: Table) {
       for (t <- code) {
         if (table.contains(t.symbol)) {
-          chain.block.occurrences(t.symbol) = table(t.symbol)
+          chain.stats.occurrences(t.symbol) = table(t.symbol)
         }
       }
     }
@@ -363,7 +363,7 @@ trait CfgGenerator[C <: Context] {
       def copyWithoutSuccessors(nch: Chain) = WhileEnd(nch, uid)
     }
 
-    case class Block(tree: Tree, chain: Chain, uid: Long) extends Node {
+    case class CodeBlock(tree: Tree, chain: Chain, uid: Long) extends Node {
       override def code = q""
       def successors = successor.toSeq
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
@@ -390,10 +390,10 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = Block(tree, nch, uid)
+      def copyWithoutSuccessors(nch: Chain) = CodeBlock(tree, nch, uid)
     }
 
-    case class BlockEnd(chain: Chain, uid: Long) extends Node {
+    case class CodeBlockEnd(chain: Chain, uid: Long) extends Node {
       val tree: Tree = q""
       def successors = successor.toSeq
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
@@ -437,7 +437,7 @@ trait CfgGenerator[C <: Context] {
         case None => true
         case Some(s) => s.isEmptyAtReturn
       }
-      def copyWithoutSuccessors(nch: Chain) = BlockEnd(nch , uid)
+      def copyWithoutSuccessors(nch: Chain) = CodeBlockEnd(nch , uid)
     }
 
     case class ApplyCoroutine(tree: Tree, chain: Chain, uid: Long) extends Node {
@@ -608,7 +608,7 @@ trait CfgGenerator[C <: Context] {
         super.updateBlock()
         tree match {
           case q"$x = $v" if table.contains(x.symbol) =>
-            chain.block.assignments(x.symbol) = table(x.symbol)
+            chain.stats.assignments(x.symbol) = table(x.symbol)
           case _ =>
         }
       }
@@ -643,7 +643,7 @@ trait CfgGenerator[C <: Context] {
       }
       override def updateBlock()(implicit table: Table) {
         super.updateBlock()
-        chain.block.decls(tree.symbol) = table(tree.symbol)
+        chain.stats.decls(tree.symbol) = table(tree.symbol)
       }
       def extract(
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
@@ -704,30 +704,30 @@ trait CfgGenerator[C <: Context] {
     val exitSubgraphs = mutable.LinkedHashMap[Node, SubCfg]()
     var start: Node = _
     val all = mutable.LinkedHashMap[Long, Node]()
-    val childBlocks = mutable.LinkedHashMap[Block, Set[Block]]()
+    val childStats = mutable.LinkedHashMap[BlockStats, Set[BlockStats]]()
 
     def initializeBlocks() {
       val chains = start.dfs.map(_.chain).map(_.ancestors).flatten.toSet
-      childBlocks ++= chains
+      childStats ++= chains
         .filter(_.parent != null)
         .groupBy(_.parent)
-        .groupBy(_._1.block)
+        .groupBy(_._1.stats)
         .map { case (block, chainmaps) =>
-          (block, chainmaps.flatMap(_._2.map(_.block)).toSet)
+          (block, chainmaps.flatMap(_._2.map(_.stats)).toSet)
         }
-      for (c <- chains) if (!childBlocks.contains(c.block)) childBlocks(c.block) = Set()
+      for (c <- chains) if (!childStats.contains(c.stats)) childStats(c.stats) = Set()
     }
 
-    val isOccurringInBlockDescendants: Cache._2[Symbol, Block, Boolean] = cached {
+    val isOccurringInBlockDescendants: Cache._2[Symbol, BlockStats, Boolean] = cached {
       (s, b) =>
       b.occurrences.contains(s) ||
-        childBlocks(b).exists(isOccurringInBlockDescendants(s, _))
+        childStats(b).exists(isOccurringInBlockDescendants(s, _))
     }
 
-    val isAssignedInBlockDescendants: Cache._2[Symbol, Block, Boolean] = cached {
+    val isAssignedInBlockDescendants: Cache._2[Symbol, BlockStats, Boolean] = cached {
       (s, b) =>
       b.assignments.contains(s) ||
-        childBlocks(b).exists(isAssignedInBlockDescendants(s, _))
+        childStats(b).exists(isAssignedInBlockDescendants(s, _))
     }
 
     val isLoadedInReachableSubgraphs: Cache._2[Node, Symbol, Boolean] = cached {
@@ -745,9 +745,9 @@ trait CfgGenerator[C <: Context] {
       isLoaded(exitSubgraphs(n), mutable.Set())
     }
 
-    val declarationBlockFrom: Cache._2[Symbol, Chain, Block] = cached {
+    val declarationBlockFrom: Cache._2[Symbol, Chain, BlockStats] = cached {
       (s, chain) =>
-      chain.ancestors.find(_.decls.toMap.contains(s)).get.block
+      chain.ancestors.find(_.decls.toMap.contains(s)).get.stats
     }
 
     val mustStoreVar: Cache._2[Node, Symbol, Boolean] = cached {
@@ -764,7 +764,7 @@ trait CfgGenerator[C <: Context] {
     val mustLoadVar: Cache._2[Symbol, Chain, Boolean] = cached {
       (sym, chain) =>
       val isVisible = chain.contains(sym)
-      val isOccurring = isOccurringInBlockDescendants(sym, chain.block)
+      val isOccurring = isOccurringInBlockDescendants(sym, chain.stats)
       isVisible && isOccurring
     }
 
@@ -926,8 +926,8 @@ trait CfgGenerator[C <: Context] {
           whilenode.endSuccessor = Some(endnode)
           (whilenode, endnode)
         case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
-          val blocknode = Node.Block(t, ch, table.newNodeUid())
-          val endnode = Node.BlockEnd(ch, table.newNodeUid())
+          val blocknode = Node.CodeBlock(t, ch, table.newNodeUid())
+          val endnode = Node.CodeBlockEnd(ch, table.newNodeUid())
           val nestedchain = ch.descend
           val (first, childlast) = traverse(stats.head, nestedchain)
           var current = childlast
