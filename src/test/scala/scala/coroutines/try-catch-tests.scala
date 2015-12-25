@@ -8,27 +8,27 @@ import scala.util.Failure
 
 
 class TryCatchTest extends FunSuite with Matchers {
-  test("should declare a coroutine with a try-catch block") {
-    val rube = coroutine { () =>
-      try {
-        throw new Exception
-      } catch {
-        case e: Exception =>
-      }
-    }
-  }
+  // test("should declare a coroutine with a try-catch block") {
+  //   val rube = coroutine { () =>
+  //     try {
+  //       throw new Exception
+  //     } catch {
+  //       case e: Exception =>
+  //     }
+  //   }
+  // }
 
-  test("should declare a coroutine with a try-catch-finally block") {
-    val rube = coroutine { () =>
-      try {
-        throw new Exception
-      } catch {
-        case e: Exception =>
-      } finally {
-        sys.error("done")
-      }
-    }
-  }
+  // test("should declare a coroutine with a try-catch-finally block") {
+  //   val rube = coroutine { () =>
+  //     try {
+  //       throw new Exception
+  //     } catch {
+  //       case e: Exception =>
+  //     } finally {
+  //       sys.error("done")
+  //     }
+  //   }
+  // }
 
   test("should declare a coroutine with a throw statement") {
     val rube = coroutine { () =>

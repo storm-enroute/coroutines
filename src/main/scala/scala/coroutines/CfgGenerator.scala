@@ -440,6 +440,62 @@ trait CfgGenerator[C <: Context] {
       def copyWithoutSuccessors(nch: Chain) = CodeBlockEnd(nch , uid)
     }
 
+    case class TryBlock(tree: Tree, chain: Chain, uid: Long) extends Node {
+      override def code = q""
+      def successors = successor.toSeq
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = ???
+      def extract(
+        prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit table: Table): Node = ???
+      def copyWithoutSuccessors(nch: Chain) = TryBlock(tree, nch, uid)
+    }
+
+    case class Catch(tree: Tree, chain: Chain, uid: Long) extends Node {
+      override def code = {
+        val cq"$pat => $assignment" = tree
+        assignment
+      }
+      def successors = successor.toSeq
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = ???
+      def extract(
+        prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit table: Table): Node = ???
+      def copyWithoutSuccessors(nch: Chain) = Catch(tree, nch, uid)
+    }
+
+    case class Finally(tree: Tree, chain: Chain, uid: Long) extends Node {
+      override def code = q""
+      def successors = successor.toSeq
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = ???
+      def extract(
+        prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit table: Table): Node = ???
+      def copyWithoutSuccessors(nch: Chain) = Finally(tree, nch, uid)
+    }
+
+    case class TryBlockEnd(chain: Chain, uid: Long) extends Node {
+      val tree: Tree = q""
+      override def code = q""
+      def successors = successor.toSeq
+      def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
+        implicit cc: CanCall, table: Table
+      ): Zipper = ???
+      def extract(
+        prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
+        subgraph: SubCfg
+      )(implicit table: Table): Node = ???
+      def copyWithoutSuccessors(nch: Chain) = TryBlockEnd(nch, uid)
+    }
+
     case class ApplyCoroutine(tree: Tree, chain: Chain, uid: Long) extends Node {
       val (co, args) = tree match {
         case q"$_ val $_: $_ = $co.apply(..$args)" => (co, args)
@@ -925,6 +981,30 @@ trait CfgGenerator[C <: Context] {
           endnode.whileSuccessor = Some(whilenode)
           whilenode.endSuccessor = Some(endnode)
           (whilenode, endnode)
+        case q"try $body catch { case ..$cases }" =>
+          assert(cases.length == 1)
+          val trynode = Node.TryBlock(t, ch, table.newNodeUid())
+          val catchnode = Node.Catch(cases.head, ch, table.newNodeUid())
+          val endnode = Node.TryBlockEnd(ch, table.newNodeUid())
+          val nestedchain = ch.descend
+          val (childhead, childlast) = traverse(body, nestedchain)
+          trynode.successor = Some(childhead)
+          childlast.successor = Some(catchnode)
+          catchnode.successor = Some(endnode)
+          (trynode, endnode)
+        case q"try $body finally $expr" =>
+          val trynode = Node.TryBlock(t, ch, table.newNodeUid())
+          val finallynode = Node.Finally(expr, ch, table.newNodeUid())
+          val endnode = Node.TryBlockEnd(ch, table.newNodeUid())
+          val trynestedchain = ch.descend
+          val (tryhead, trylast) = traverse(body, trynestedchain)
+          trynode.successor = Some(tryhead)
+          trylast.successor = Some(finallynode)
+          val finallynestedchain = ch.descend
+          val (finallyhead, finallylast) = traverse(body, finallynestedchain)
+          finallynode.successor = Some(finallyhead)
+          finallylast.successor = Some(endnode)
+          (trynode, endnode)
         case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
           val blocknode = Node.CodeBlock(t, ch, table.newNodeUid())
           val endnode = Node.CodeBlockEnd(ch, table.newNodeUid())
