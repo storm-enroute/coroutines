@@ -28,6 +28,8 @@ trait Analyzer[C <: Context] {
       Zipper(above.above, ctor(left.reverse) :: above.left, above.ctor)
     }
     def descend(ctor: List[Tree] => Tree) = Zipper(this, Nil, ctor)
+    def popLeft = (Zipper(above, Nil, ctor), left)
+    def replaceCtor(ctor: List[Tree] => Tree) = Zipper(above, left, ctor)
   }
 
   class VarInfo(
