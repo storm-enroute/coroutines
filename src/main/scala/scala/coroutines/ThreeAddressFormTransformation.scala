@@ -144,11 +144,11 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // ascription
       disallowCoroutinesIn(tpt)
       val (xdecls, xident) = threeAddressForm(x)
-      (xdecls, q"xident: $tpt")
+      (xdecls, q"$xident: $tpt")
     case q"$x: @$annot" =>
       // annotation
       val (xdecls, xident) = threeAddressForm(x)
-      (xdecls, q"xident: $annot")
+      (xdecls, q"$xident: $annot")
     case q"(..$xs)" if xs.length > 1 =>
       // tuples
       val (xsdecls, xsidents) = xs.map(threeAddressForm).unzip
@@ -166,15 +166,12 @@ trait ThreeAddressFormTransformation[C <: Context] {
       val bindingname = TermName(c.freshName("t"))
       val (bodydecls, bodyident) = threeAddressForm(body)
       val (exprdecls, exprident) = threeAddressForm(expr)
-      val ncases = (for (cq"$pat => $casebody" <- cases) yield {
-        val (casedecls, caseident) = threeAddressForm(casebody)
-        cq"""
-          $pat =>
-            ..$casedecls
-
-            $localvarname = $caseident
-        """
-      }) ++ List(cq"${pq"_"} => throw $exceptionvarname")
+      val matchcases = cases :+ cq"${pq"_"} => throw $exceptionvarname"
+      val exceptionident = q"$exceptionvarname"
+      val matchbody = q"$exceptionident match { case ..$matchcases }"
+      typer.typeOf(matchbody) = typer.typeOf(tree)
+      typer.typeOf(exceptionident) = typeOf[Throwable]
+      val (matchdecls, matchident) = threeAddressForm(matchbody)
       val ndecls = List(
         q"var $localvarname = null.asInstanceOf[$tpe]",
         q"var $exceptionvarname: Throwable = null",
@@ -188,14 +185,14 @@ trait ThreeAddressFormTransformation[C <: Context] {
           }
         """
       ) ++ List(if (expr == q"") q"""
-          $exceptionvarname match {
-            case ..$ncases
-          }
+          ..$matchdecls
+
+          $localvarname = $matchident
         """ else q"""
           try {
-            $exceptionvarname match {
-              case ..$ncases
-            }
+            ..$matchdecls
+
+            $localvarname = $matchident
           } finally {
             $expr
           }
@@ -223,15 +220,23 @@ trait ThreeAddressFormTransformation[C <: Context] {
         """
       )
       (decls, q"$localvarname")
-    case q"$x match { case ..$cases }" =>
+    case q"$expr match { case ..$cases }" =>
       // pattern match
       val localvarname = TermName(c.freshName("x"))
-      val (xdecls, xident) = threeAddressForm(x)
+      val (exdecls, exident) = threeAddressForm(expr)
+      val tpe = typer.typeOf(tree)
+      val extpe = typer.typeOf(expr)
       val ncases = for (cq"$pat => $branch" <- cases) yield {
         disallowCoroutinesIn(pat)
         val (branchdecls, branchident) = threeAddressForm(branch)
-        val checkcases = List(cq"$pat => true", cq"_ => false")
-        val patdecl = q"val $pat: Any = $xident"
+        val isWildcard = pat match {
+          case pq"_" => true
+          case _ => false
+        }
+        val checkcases =
+          if (isWildcard) List(cq"$pat => true")
+          else List(cq"$pat => true", cq"_ => false")
+        val patdecl = q"val $pat: $exident = $exident"
         val body = q"""
           ..$patdecl
 
@@ -239,17 +244,17 @@ trait ThreeAddressFormTransformation[C <: Context] {
 
           $localvarname = $branchident
         """
-        (q"$xident match { case ..$checkcases }", body)
+        println(body)
+        (q"$exident match { case ..$checkcases }", body)
       }
       val patternmatch =
-        ncases.foldRight(q"throw new scala.MatchError($xident)": Tree) {
-          case ((pattern, ifbranch), elsebranch) =>
-            q"if ($pattern) $ifbranch else $elsebranch"
+        ncases.foldRight(q"throw new scala.MatchError($exident)": Tree) {
+          case ((patternmatch, ifbranch), elsebranch) =>
+            q"if ($patternmatch) $ifbranch else $elsebranch"
         }
-      val tpe = typer.typeOf(tree)
       val decls =
         List(q"var $localvarname = null.asInstanceOf[${tpe.widen}]") ++
-        xdecls ++
+        exdecls ++
         List(patternmatch)
       (decls, q"$localvarname")
     case q"(..$params) => $body" =>

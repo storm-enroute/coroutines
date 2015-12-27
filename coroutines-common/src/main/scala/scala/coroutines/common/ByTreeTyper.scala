@@ -17,5 +17,13 @@ private[coroutines] class ByTreeTyper[C <: Context](val c: C)(val treeValue: Any
   val untypedTree = c.untypecheck(tree)
   traverser.traverseByShape(untypedTree, tree)((t, pt) => treeMapping(t) = pt)
 
-  def typeOf(t: Tree) = if (treeMapping.contains(t)) treeMapping(t).tpe else t.tpe
+  object typeOf {
+    private val augmentedTypes = mutable.Map[Tree, Type]()
+    def apply(t: Tree) = {
+      if (augmentedTypes.contains(t)) augmentedTypes(t)
+      else if (treeMapping.contains(t)) treeMapping(t).tpe
+      else t.tpe
+    }
+    def update(t: Tree, tpe: Type) = augmentedTypes(t) = tpe
+  }
 }
