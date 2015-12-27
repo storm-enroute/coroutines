@@ -38,7 +38,7 @@ trait CfgGenerator[C <: Context] {
 
     def chain: Chain
 
-    def updateBlock()(implicit table: Table) {
+    def updateBlockStats()(implicit table: Table) {
       for (t <- code) {
         if (table.contains(t.symbol)) {
           chain.stats.occurrences(t.symbol) = table(t.symbol)
@@ -123,9 +123,9 @@ trait CfgGenerator[C <: Context] {
       pcstackset :: stackstores.toList
     }
 
-    protected def genExit(n: Node, subgraph: SubCfg)(implicit t: Table): Tree = {
+    protected def genExit(value: Tree, subgraph: SubCfg)(implicit t: Table): Tree = {
       val cparam = t.names.coroutineParam
-      val untypedtree = t.untyper.untypecheck(n.value)
+      val untypedtree = t.untyper.untypecheck(value)
       q"""
         $$pop($cparam)
         if (scala.coroutines.common.Stack.isEmpty($cparam.$$costack)) {
@@ -214,7 +214,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.descend
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         def extract(s: Node, add: Node => Unit) {
           if (!seen.contains(s)) {
@@ -241,13 +241,13 @@ trait CfgGenerator[C <: Context] {
         successor match {
           case Some(s) =>
             if (successors.head.isEmptyAtReturn) {
-              val exittree = genExit(this, subgraph)
+              val exittree = genExit(this.value, subgraph)
               z.append(exittree)
             } else {
               successors.head.markEmit(z, seen, subgraph)
             }
           case None =>
-            val exittree = genExit(this, subgraph)
+            val exittree = genExit(this.value, subgraph)
             z.append(exittree)
         }
       }
@@ -258,7 +258,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.parent
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         this.successor match {
           case None =>
@@ -307,7 +307,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.descend
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         def extract(s: Node, add: Node => Unit) {
           if (!seen.contains(s)) {
@@ -352,7 +352,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.parent
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         def extract(s: Node, add: Node => Unit) {
           if (!seen.contains(s)) {
@@ -389,7 +389,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.descend
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         val s = successor.get
         if (!seen.contains(s)) {
@@ -413,14 +413,14 @@ trait CfgGenerator[C <: Context] {
         successor match {
           case Some(s) =>
             if (s.isEmptyAtReturn) {
-              val exittree = genExit(this, subgraph)
+              val exittree = genExit(this.value, subgraph)
               z.append(exittree)
             } else {
               val z1 = z.ascend
               s.markEmit(z1, seen, subgraph)
             }
           case None =>
-            val exittree = genExit(this, subgraph)
+            val exittree = genExit(this.value, subgraph)
             z.append(exittree)
         }
       }
@@ -431,7 +431,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.parent
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         successor match {
           case Some(s) =>
@@ -469,7 +469,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.descend
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         successor match {
           case Some(s) =>
@@ -495,7 +495,12 @@ trait CfgGenerator[C <: Context] {
       def successors = successor.toSeq
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
-      ): Zipper = ???
+      ): Zipper = {
+        val cases = List(table.untyper.untypecheck(tree))
+        val (z1, stats) = z.popLeft
+        val z2 = z1.replaceCtor(tress => q"try { ..$stats } catch { case ..$cases }")
+        successor.get.markEmit(z2, seen, subgraph)
+      }
       def extract(
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -503,7 +508,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         successor match {
           case Some(s) =>
@@ -526,7 +531,11 @@ trait CfgGenerator[C <: Context] {
       def successors = successor.toSeq
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
-      ): Zipper = ???
+      ): Zipper = {
+        val (z1, stats) = z.popLeft
+        val z2 = z1.replaceCtor(trees => q"try { ..$stats } finally { ..$trees }")
+        successor.get.markEmit(z2, seen, subgraph)
+      }
       def extract(
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -534,7 +543,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         successor match {
           case Some(s) =>
@@ -558,11 +567,42 @@ trait CfgGenerator[C <: Context] {
       def successors = successor.toSeq
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
-      ): Zipper = ???
+      ): Zipper = {
+        successor match {
+          case Some(s) =>
+            if (s.isEmptyAtReturn) {
+              val z1 = z.ascend
+              val exittree = genExit(this.value, subgraph)
+              z1.append(exittree)
+            } else {
+              val z1 = z.ascend
+              s.markEmit(z1, seen, subgraph)
+            }
+          case None =>
+            val exittree = genExit(this.value, subgraph)
+            z.append(exittree)
+        }
+      }
       def extract(
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
-      )(implicit table: Table): Node = ???
+      )(implicit table: Table): Node = {
+        val nchain = prevchain.parent
+        val nthis = this.copyWithoutSuccessors(nchain)
+        seen(this) = nthis
+        nthis.updateBlockStats()
+
+        successor match {
+          case Some(s) =>
+            if (!seen.contains(s)) {
+              s.extract(nthis.chain, seen, ctx, subgraph)
+            }
+            nthis.successor = Some(seen(s))
+          case None =>
+        }
+
+        nthis
+      }
       def copyWithoutSuccessors(nch: Chain) = TryBlockEnd(nch, uid, catchSuccessor)
     }
 
@@ -588,9 +628,6 @@ trait CfgGenerator[C <: Context] {
         val exittree = genCoroutineCall(co, args, subgraph)
         z.append(exittree)
       }
-      override def updateBlock()(implicit table: Table) {
-        super.updateBlock()
-      }
       def extract(
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
@@ -598,7 +635,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.withDecl(tree, false)
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         this.addSuccessorsToNodeFront(ctx)
         ctx.exitPoints(subgraph)(nthis) = successor.get.uid
@@ -659,7 +696,7 @@ trait CfgGenerator[C <: Context] {
       )(implicit table: Table): Node = {
         val nthis = this.copyWithoutSuccessors(prevchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         this.addSuccessorsToNodeFront(ctx)
         ctx.exitPoints(subgraph)(nthis) = successor.get.uid
@@ -703,7 +740,7 @@ trait CfgGenerator[C <: Context] {
       )(implicit table: Table): Node = {
         val nthis = this.copyWithoutSuccessors(prevchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         this.addSuccessorsToNodeFront(ctx)
         ctx.exitPoints(subgraph)(nthis) = successor.get.uid
@@ -722,14 +759,14 @@ trait CfgGenerator[C <: Context] {
         successor match {
           case Some(s) =>
             if (s.isEmptyAtReturn) {
-              val exittree = genExit(this, subgraph)
+              val exittree = genExit(this.value, subgraph)
               z.append(exittree)
             } else {
               val z1 = z.append(table.untyper.untypecheck(tree))
               s.markEmit(z1, seen, subgraph)
             }
           case None =>
-            val exittree = genExit(this, subgraph)
+            val exittree = genExit(this.value, subgraph)
             z.append(exittree)
         }
       }
@@ -738,8 +775,8 @@ trait CfgGenerator[C <: Context] {
     case class DefaultStatement(
       tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
     ) extends Statement {
-      override def updateBlock()(implicit table: Table) {
-        super.updateBlock()
+      override def updateBlockStats()(implicit table: Table) {
+        super.updateBlockStats()
         tree match {
           case q"$x = $v" if table.contains(x.symbol) =>
             chain.stats.assignments(x.symbol) = table(x.symbol)
@@ -752,7 +789,7 @@ trait CfgGenerator[C <: Context] {
       )(implicit table: Table): Node = {
         val nthis = this.copyWithoutSuccessors(prevchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         successor match {
           case Some(s) =>
@@ -777,8 +814,8 @@ trait CfgGenerator[C <: Context] {
         case q"$_ val $_: $_ = $rhs" => rhs
         case q"$_ var $_: $_ = $rhs" => rhs
       }
-      override def updateBlock()(implicit table: Table) {
-        super.updateBlock()
+      override def updateBlockStats()(implicit table: Table) {
+        super.updateBlockStats()
         chain.stats.decls(tree.symbol) = table(tree.symbol)
       }
       def extract(
@@ -788,7 +825,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.withDecl(tree, false)
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlock()
+        nthis.updateBlockStats()
 
         successor match {
           case Some(s) =>
@@ -1083,7 +1120,7 @@ trait CfgGenerator[C <: Context] {
           trylast.successor = Some(finallynode)
           val finallynestedchain = ch.descend
           val (finallyhead, finallylast) =
-            traverse(body, finallynestedchain, catchSuccessor)
+            traverse(expr, finallynestedchain, catchSuccessor)
           finallynode.successor = Some(finallyhead)
           finallylast.successor = Some(endnode)
           (trynode, endnode)
