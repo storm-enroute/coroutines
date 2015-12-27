@@ -226,25 +226,31 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case q"$x match { case ..$cases }" =>
       // pattern match
       val localvarname = TermName(c.freshName("x"))
+      val (xdecls, xident) = threeAddressForm(x)
       val ncases = for (cq"$pat => $branch" <- cases) yield {
         disallowCoroutinesIn(pat)
         val (branchdecls, branchident) = threeAddressForm(branch)
-        cq"""
-          $pat =>
-            ..$branchdecls
-            $localvarname = $branchident
+        val checkcases = List(cq"$pat => true", cq"_ => false")
+        val patdecl = q"val $pat: Any = $xident"
+        val body = q"""
+          ..$patdecl
+
+          ..$branchdecls
+
+          $localvarname = $branchident
         """
+        (q"$xident match { case ..$checkcases }", body)
       }
-      val (xdecls, xident) = threeAddressForm(x)
+      val patternmatch =
+        ncases.foldRight(q"throw new scala.MatchError($xident)": Tree) {
+          case ((pattern, ifbranch), elsebranch) =>
+            q"if ($pattern) $ifbranch else $elsebranch"
+        }
       val tpe = typer.typeOf(tree)
       val decls =
         List(q"var $localvarname = null.asInstanceOf[${tpe.widen}]") ++
         xdecls ++
-        List(q"""
-          $x match {
-            case ..$ncases
-          }
-        """)
+        List(patternmatch)
       (decls, q"$localvarname")
     case q"(..$params) => $body" =>
       // function
