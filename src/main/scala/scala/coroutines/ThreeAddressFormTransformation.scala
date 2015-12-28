@@ -244,7 +244,6 @@ trait ThreeAddressFormTransformation[C <: Context] {
 
           $localvarname = $branchident
         """
-        println(body)
         (q"$exident match { case ..$checkcases }", body)
       }
       val patternmatch =
@@ -382,7 +381,6 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"$_ class $_[..$_] $_(...$_) extends { ..$_ } with ..$_ { $_ => ..$_ }" =>
       // class
-      println("class ----> " + tree)
       new NestedContextValidator().traverse(tree)
       (Nil, tree)
     case q"$_ trait $_[..$_] extends { ..$_ } with ..$_ { $_ => ..$_ }" =>

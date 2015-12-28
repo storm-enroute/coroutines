@@ -91,7 +91,7 @@ with ThreeAddressFormTransformation[C] {
       (pcvalue, q"$rvset")
     }
     val returnstores = cfg.start.dfs.collect {
-      case n @ Node.ApplyCoroutine(_, _, _, _) => genReturnValueStore(n)
+      case n @ Node.ApplyCoroutine(_, _, _) => genReturnValueStore(n)
     }
 
     val body = {

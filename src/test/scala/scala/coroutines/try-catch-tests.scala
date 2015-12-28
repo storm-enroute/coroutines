@@ -68,43 +68,43 @@ class TryCatchTest extends FunSuite with Matchers {
     assert(c0.isStopped)
   }
 
-  test("coroutine with a throw statement") {
-    val rube = coroutine { () =>
-      throw {
-        val str = "boom"
-        new Exception(str)
-      }
-    }
+  // test("coroutine with a throw statement") {
+  //   val rube = coroutine { () =>
+  //     throw {
+  //       val str = "boom"
+  //       new Exception(str)
+  //     }
+  //   }
 
-    val c = call(rube())
-    c.tryGet() match {
-      case Failure(e: Exception) => assert(e.getMessage == "boom")
-      case _ => assert(false)
-    }
-  }
+  //   val c = call(rube())
+  //   c.tryGet() match {
+  //     case Failure(e: Exception) => assert(e.getMessage == "boom")
+  //     case _ => assert(false)
+  //   }
+  // }
 
-  test("invoke another coroutine that throws") {
-    val boom = coroutine { () => throw new Exception("kaboom") }
-    val rube = coroutine { () =>
-      boom()
-    }
+  // test("invoke another coroutine that throws") {
+  //   val boom = coroutine { () => throw new Exception("kaboom") }
+  //   val rube = coroutine { () =>
+  //     boom()
+  //   }
 
-    val c = call(rube())
-    c.tryGet() match {
-      case Failure(e: Exception) => assert(e.getMessage == "kaboom")
-      case _ => assert(false)
-    }
-  }
+  //   val c = call(rube())
+  //   c.tryGet() match {
+  //     case Failure(e: Exception) => assert(e.getMessage == "kaboom")
+  //     case _ => assert(false)
+  //   }
+  // }
 
-  test("yield inside throw") {
-    val rube = coroutine { () =>
-      try {
-        yieldval("inside")
-      } catch {
-        case r: RuntimeException => "runtime"
-        case e: Exception => "generic"
-      }
-      "done"
-    }
-  }
+  // test("yield inside throw") {
+  //   val rube = coroutine { () =>
+  //     try {
+  //       yieldval("inside")
+  //     } catch {
+  //       case r: RuntimeException => "runtime"
+  //       case e: Exception => "generic"
+  //     }
+  //     "done"
+  //   }
+  // }
 }
