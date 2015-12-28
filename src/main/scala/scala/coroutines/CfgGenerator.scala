@@ -963,9 +963,13 @@ trait CfgGenerator[C <: Context] {
         }
         z
       }
+
+      // emit body
       val startzipper = findStart(start.chain)
       val bodyzipper = start.emitCode(startzipper, this)
       val body = bodyzipper.result
+
+      // add exception check
       val checkexception = {
         val needcheck = cfg.subgraphs.exists {
           case (_, sub) if sub.exitSubgraphs.exists(_._2 eq this) =>
@@ -989,6 +993,8 @@ trait CfgGenerator[C <: Context] {
           q""
         }
       }
+
+      // wrap inside an exception
       q"""
         try {
           $checkexception

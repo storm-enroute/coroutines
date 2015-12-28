@@ -50,6 +50,7 @@ trait Analyzer[C <: Context] {
     def width: Int = if (isWide) 2 else 1
     def stackpos_=(v: (Int, Int)) = rawstackpos = v
     def isUnitType = tpe =:= typeOf[Unit]
+    def isAnyType = tpe =:= typeOf[Any]
     def isRefType = {
       tpe <:< typeOf[AnyRef] || tpe =:= typeOf[Unit] || tpe =:= typeOf[Any]
     }
@@ -148,6 +149,7 @@ trait Analyzer[C <: Context] {
       } else {
         val encoded = {
           if (isUnitType) q"$x.asInstanceOf[AnyRef]"
+          else if (isAnyType) q"$x.asInstanceOf[AnyRef]"
           else if (isRefType) x
           else encodeInt(x)
         }
