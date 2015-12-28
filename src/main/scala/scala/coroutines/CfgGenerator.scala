@@ -28,7 +28,7 @@ trait CfgGenerator[C <: Context] {
   abstract class Node {
     var successor: Option[Node] = None
 
-    def catchSuccessor: Option[Long]
+    def trySuccessor: Option[Long]
 
     def successors: Seq[Node]
 
@@ -178,7 +178,7 @@ trait CfgGenerator[C <: Context] {
 
   object Node {
     case class If(
-      enduid: Long, tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      enduid: Long, tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       var elseSuccessor: Option[Node] = None
       def successors = (successor ++ elseSuccessor).toSeq
@@ -227,11 +227,11 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = If(enduid, tree, nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = If(enduid, tree, nch, uid, trySuccessor)
     }
 
     case class IfEnd(
-      chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       val tree: Tree = q""
       def successors = successor.toSeq
@@ -271,7 +271,7 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = IfEnd(nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = IfEnd(nch, uid, trySuccessor)
       override def isEmptyAtReturn = successor match {
         case None => true
         case Some(s) => s.isEmptyAtReturn
@@ -279,7 +279,7 @@ trait CfgGenerator[C <: Context] {
     }
 
     case class While(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       override def code = {
         val q"while ($cond) $_" = tree
@@ -320,11 +320,11 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = While(tree, nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = While(tree, nch, uid, trySuccessor)
     }
 
     case class WhileEnd(
-      chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       val tree: Tree = q""
       var whileSuccessor: Option[Node] = None
@@ -368,11 +368,11 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = WhileEnd(nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = WhileEnd(nch, uid, trySuccessor)
     }
 
     case class CodeBlock(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       override def code = q""
       def successors = successor.toSeq
@@ -399,11 +399,11 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = CodeBlock(tree, nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = CodeBlock(tree, nch, uid, trySuccessor)
     }
 
     case class CodeBlockEnd(
-      chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       val tree: Tree = q""
       def successors = successor.toSeq
@@ -448,11 +448,11 @@ trait CfgGenerator[C <: Context] {
         case None => true
         case Some(s) => s.isEmptyAtReturn
       }
-      def copyWithoutSuccessors(nch: Chain) = CodeBlockEnd(nch , uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = CodeBlockEnd(nch , uid, trySuccessor)
     }
 
     case class TryBlock(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       override def code = q""
       def successors = successor.toSeq
@@ -482,11 +482,11 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = TryBlock(tree, nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = TryBlock(tree, nch, uid, trySuccessor)
     }
 
     case class Catch(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       override def code = {
         val cq"$pat => $assignment" = tree
@@ -521,11 +521,11 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = Catch(tree, nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = Catch(tree, nch, uid, trySuccessor)
     }
 
     case class Finally(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       override def code = q""
       def successors = successor.toSeq
@@ -556,11 +556,11 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = Finally(tree, nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = Finally(tree, nch, uid, trySuccessor)
     }
 
     case class TryBlockEnd(
-      chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       val tree: Tree = q""
       override def code = q""
@@ -603,11 +603,11 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = TryBlockEnd(nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = TryBlockEnd(nch, uid, trySuccessor)
     }
 
     case class ApplyCoroutine(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       val (co, args) = tree match {
         case q"$_ val $_: $_ = $co.apply(..$args)" => (co, args)
@@ -643,7 +643,7 @@ trait CfgGenerator[C <: Context] {
         nthis
       }
       def copyWithoutSuccessors(nch: Chain) =
-        ApplyCoroutine(tree, nch, uid, catchSuccessor)
+        ApplyCoroutine(tree, nch, uid, trySuccessor)
       override def stackVars(sub: SubCfg) =
         tree.symbol :: storePointVarsInChain(sub).map(_._1)
       def genCoroutineCall(
@@ -663,7 +663,7 @@ trait CfgGenerator[C <: Context] {
     }
 
     case class YieldVal(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       def successors = successor.toSeq
       override def code = {
@@ -703,11 +703,11 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = YieldVal(tree, nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = YieldVal(tree, nch, uid, trySuccessor)
     }
 
     case class YieldTo(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Node {
       def successors = successor.toSeq
       override def code = {
@@ -747,7 +747,7 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = YieldTo(tree, nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = YieldTo(tree, nch, uid, trySuccessor)
     }
 
     abstract class Statement extends Node {
@@ -773,7 +773,7 @@ trait CfgGenerator[C <: Context] {
     }
 
     case class DefaultStatement(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Statement {
       override def updateBlockStats()(implicit table: Table) {
         super.updateBlockStats()
@@ -803,11 +803,11 @@ trait CfgGenerator[C <: Context] {
         nthis
       }
       def copyWithoutSuccessors(nch: Chain) =
-        DefaultStatement(tree, nch, uid, catchSuccessor)
+        DefaultStatement(tree, nch, uid, trySuccessor)
     }
 
     case class Decl(
-      tree: Tree, chain: Chain, uid: Long, catchSuccessor: Option[Long]
+      tree: Tree, chain: Chain, uid: Long, trySuccessor: Option[Long]
     ) extends Statement {
       override def value = q"()"
       override def code: Tree = tree match {
@@ -838,7 +838,7 @@ trait CfgGenerator[C <: Context] {
 
         nthis
       }
-      def copyWithoutSuccessors(nch: Chain) = Decl(tree, nch, uid, catchSuccessor)
+      def copyWithoutSuccessors(nch: Chain) = Decl(tree, nch, uid, trySuccessor)
     }
   }
 
@@ -1008,78 +1008,78 @@ trait CfgGenerator[C <: Context] {
   def genControlFlowGraph(args: List[Tree], body: Tree, tpt: Tree)(
     implicit table: Table
   ): Cfg = {
-    def traverse(t: Tree, ch: Chain, catchSuccessor: Option[Long]): (Node, Node) = {
+    def traverse(t: Tree, ch: Chain, trySuccessor: Option[Long]): (Node, Node) = {
       t match {
         case q"$_ val $_: $_ = $qual.yieldval[$_]($_)" if isCoroutinesPkg(qual) =>
           val nch = ch.withDecl(t, false)
-          val n = Node.YieldVal(t, ch, table.newNodeUid(), catchSuccessor)
-          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), catchSuccessor)
+          val n = Node.YieldVal(t, ch, table.newNodeUid(), trySuccessor)
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), trySuccessor)
           n.successor = Some(u)
           (n, u)
         case q"$_ var $_: $_ = $qual.yieldval[$_]($_)" if isCoroutinesPkg(qual) =>
           val nch = ch.withDecl(t, false)
-          val n = Node.YieldVal(t, ch, table.newNodeUid(), catchSuccessor)
-          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), catchSuccessor)
+          val n = Node.YieldVal(t, ch, table.newNodeUid(), trySuccessor)
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), trySuccessor)
           n.successor = Some(u)
           (n, u)
         case q"$_ val $_: $_ = $qual.yieldto[$_]($_)" if isCoroutinesPkg(qual) =>
           val nch = ch.withDecl(t, false)
-          val n = Node.YieldTo(t, ch, table.newNodeUid(), catchSuccessor)
-          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), catchSuccessor)
+          val n = Node.YieldTo(t, ch, table.newNodeUid(), trySuccessor)
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), trySuccessor)
           n.successor = Some(u)
           (n, u)
         case q"$_ var $_: $_ = $qual.yieldto[$_]($_)" if isCoroutinesPkg(qual) =>
           val nch = ch.withDecl(t, false)
-          val n = Node.YieldTo(t, ch, table.newNodeUid(), catchSuccessor)
-          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), catchSuccessor)
+          val n = Node.YieldTo(t, ch, table.newNodeUid(), trySuccessor)
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), trySuccessor)
           n.successor = Some(u)
           (n, u)
         case ValDecl(t @ q"$_ val $_ = $c.apply(..$_)")
           if isCoroutineBlueprintMarker(c.tpe) =>
           val nch = ch.withDecl(t, false)
-          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid(), catchSuccessor)
-          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), catchSuccessor)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid(), trySuccessor)
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), trySuccessor)
           n.successor = Some(u)
           (n, u)
         case ValDecl(t @ q"$_ var $_ = $c.apply(..$_)")
           if isCoroutineBlueprintMarker(c.tpe) =>
           val nch = ch.withDecl(t, false)
-          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid(), catchSuccessor)
-          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), catchSuccessor)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid(), trySuccessor)
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), trySuccessor)
           n.successor = Some(u)
           (n, u)
         case ValDecl(t @ q"$_ val $_ = $c.apply[..$_](..$_)($_)")
           if isCoroutineBlueprintSugar(c.tpe) =>
           val nch = ch.withDecl(t, false)
-          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid(), catchSuccessor)
-          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), catchSuccessor)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid(), trySuccessor)
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), trySuccessor)
           n.successor = Some(u)
           (n, u)
         case ValDecl(t @ q"$_ var $_ = $c.apply[..$_](..$_)($_)")
           if isCoroutineBlueprintSugar(c.tpe) =>
           val nch = ch.withDecl(t, false)
-          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid(), catchSuccessor)
-          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), catchSuccessor)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid(), trySuccessor)
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), trySuccessor)
           n.successor = Some(u)
           (n, u)
         case ValDecl(t) =>
           val nch = ch.withDecl(t, false)
-          val n = Node.Decl(t, ch, table.newNodeUid(), catchSuccessor)
-          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), catchSuccessor)
+          val n = Node.Decl(t, ch, table.newNodeUid(), trySuccessor)
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid(), trySuccessor)
           n.successor = Some(u)
           (n, u)
         case q"return $_" =>
           c.abort(t.pos, "Return statements not allowed inside coroutines.")
         case q"if ($cond) $thenbranch else $elsebranch" =>
-          val endnode = Node.IfEnd(ch, table.newNodeUid(), catchSuccessor)
-          val ifnode = Node.If(endnode.uid, t, ch, table.newNodeUid(), catchSuccessor)
+          val endnode = Node.IfEnd(ch, table.newNodeUid(), trySuccessor)
+          val ifnode = Node.If(endnode.uid, t, ch, table.newNodeUid(), trySuccessor)
           def addBranch(branch: Tree, add: Node => Unit) {
             val nestedchain = ch.descend
-            val (childhead, childlast) = traverse(branch, nestedchain, catchSuccessor)
+            val (childhead, childlast) = traverse(branch, nestedchain, trySuccessor)
             add(childhead)
             if (childlast.tree.tpe =:= typeOf[Unit]) {
               val unode = Node.DefaultStatement(
-                q"()", nestedchain, table.newNodeUid(), catchSuccessor)
+                q"()", nestedchain, table.newNodeUid(), trySuccessor)
               childlast.successor = Some(unode)
               unode.successor = Some(endnode)
             } else {
@@ -1090,10 +1090,10 @@ trait CfgGenerator[C <: Context] {
           addBranch(elsebranch, n => ifnode.elseSuccessor = Some(n))
           (ifnode, endnode)
         case q"while ($cond) $body" =>
-          val whilenode = Node.While(t, ch, table.newNodeUid(), catchSuccessor)
-          val endnode = Node.WhileEnd(ch, table.newNodeUid(), catchSuccessor)
+          val whilenode = Node.While(t, ch, table.newNodeUid(), trySuccessor)
+          val endnode = Node.WhileEnd(ch, table.newNodeUid(), trySuccessor)
           val nestedchain = ch.descend
-          val (childhead, childlast) = traverse(body, nestedchain, catchSuccessor)
+          val (childhead, childlast) = traverse(body, nestedchain, trySuccessor)
           whilenode.successor = Some(childhead)
           childlast.successor = Some(endnode)
           endnode.whileSuccessor = Some(whilenode)
@@ -1101,9 +1101,9 @@ trait CfgGenerator[C <: Context] {
           (whilenode, endnode)
         case q"try $body catch { case ..$cases }" =>
           assert(cases.length == 1)
-          val trynode = Node.TryBlock(t, ch, table.newNodeUid(), catchSuccessor)
-          val catchnode = Node.Catch(cases.head, ch, table.newNodeUid(), catchSuccessor)
-          val endnode = Node.TryBlockEnd(ch, table.newNodeUid(), catchSuccessor)
+          val trynode = Node.TryBlock(t, ch, table.newNodeUid(), trySuccessor)
+          val catchnode = Node.Catch(cases.head, ch, table.newNodeUid(), trySuccessor)
+          val endnode = Node.TryBlockEnd(ch, table.newNodeUid(), trySuccessor)
           val nestedchain = ch.descend
           val (childhead, childlast) = traverse(body, nestedchain, Some(catchnode.uid))
           trynode.successor = Some(childhead)
@@ -1111,28 +1111,28 @@ trait CfgGenerator[C <: Context] {
           catchnode.successor = Some(endnode)
           (trynode, endnode)
         case q"try $body finally $expr" =>
-          val trynode = Node.TryBlock(t, ch, table.newNodeUid(), catchSuccessor)
-          val finallynode = Node.Finally(expr, ch, table.newNodeUid(), catchSuccessor)
-          val endnode = Node.TryBlockEnd(ch, table.newNodeUid(), catchSuccessor)
+          val trynode = Node.TryBlock(t, ch, table.newNodeUid(), trySuccessor)
+          val finallynode = Node.Finally(expr, ch, table.newNodeUid(), trySuccessor)
+          val endnode = Node.TryBlockEnd(ch, table.newNodeUid(), trySuccessor)
           val trynestedchain = ch.descend
           val (tryhead, trylast) = traverse(body, trynestedchain, Some(finallynode.uid))
           trynode.successor = Some(tryhead)
           trylast.successor = Some(finallynode)
           val finallynestedchain = ch.descend
           val (finallyhead, finallylast) =
-            traverse(expr, finallynestedchain, catchSuccessor)
+            traverse(expr, finallynestedchain, trySuccessor)
           finallynode.successor = Some(finallyhead)
           finallylast.successor = Some(endnode)
           (trynode, endnode)
         case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
-          val blocknode = Node.CodeBlock(t, ch, table.newNodeUid(), catchSuccessor)
-          val endnode = Node.CodeBlockEnd(ch, table.newNodeUid(), catchSuccessor)
+          val blocknode = Node.CodeBlock(t, ch, table.newNodeUid(), trySuccessor)
+          val endnode = Node.CodeBlockEnd(ch, table.newNodeUid(), trySuccessor)
           val nestedchain = ch.descend
-          val (first, childlast) = traverse(stats.head, nestedchain, catchSuccessor)
+          val (first, childlast) = traverse(stats.head, nestedchain, trySuccessor)
           var current = childlast
           var currchain = current.chain
           for (stat <- stats.tail) {
-            val (childhead, childlast) = traverse(stat, currchain, catchSuccessor)
+            val (childhead, childlast) = traverse(stat, currchain, trySuccessor)
             current.successor = Some(childhead)
             current = childlast
             currchain = current.chain
@@ -1141,7 +1141,7 @@ trait CfgGenerator[C <: Context] {
           current.successor = Some(endnode)
           (blocknode, endnode)
         case _ =>
-          val n = Node.DefaultStatement(t, ch, table.newNodeUid(), catchSuccessor)
+          val n = Node.DefaultStatement(t, ch, table.newNodeUid(), trySuccessor)
           (n, n)
       }
     }
