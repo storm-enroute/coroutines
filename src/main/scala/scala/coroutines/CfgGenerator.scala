@@ -36,10 +36,10 @@ trait CfgGenerator[C <: Context] {
 
     def chain: Chain
 
-    def updateBlockStats()(implicit table: Table) {
+    def updateBlockInfo()(implicit table: Table) {
       for (t <- code) {
         if (table.contains(t.symbol)) {
-          chain.stats.occurrences(t.symbol) = table(t.symbol)
+          chain.info.occurrences(t.symbol) = table(t.symbol)
         }
       }
     }
@@ -209,10 +209,10 @@ trait CfgGenerator[C <: Context] {
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
       )(implicit table: Table): Node = {
-        val nchain = prevchain.descend
+        val nchain = prevchain.descend()
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         def extract(s: Node, add: Node => Unit) {
           if (!seen.contains(s)) {
@@ -256,7 +256,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.parent
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         this.successor match {
           case None =>
@@ -302,10 +302,10 @@ trait CfgGenerator[C <: Context] {
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
       )(implicit table: Table): Node = {
-        val nchain = prevchain.descend
+        val nchain = prevchain.descend()
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         def extract(s: Node, add: Node => Unit) {
           if (!seen.contains(s)) {
@@ -350,7 +350,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.parent
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         def extract(s: Node, add: Node => Unit) {
           if (!seen.contains(s)) {
@@ -384,10 +384,10 @@ trait CfgGenerator[C <: Context] {
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
       )(implicit table: Table): Node = {
-        val nchain = prevchain.descend
+        val nchain = prevchain.descend()
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         val s = successor.get
         if (!seen.contains(s)) {
@@ -429,7 +429,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.parent
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         successor match {
           case Some(s) =>
@@ -454,7 +454,7 @@ trait CfgGenerator[C <: Context] {
     ) extends Node {
       override def code = q""
       var finallySuccessor: Option[Node] = None
-      def successors = successor.toSeq
+      def successors = (successor ++ finallySuccessor).toSeq
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
       ): Zipper = {
@@ -485,10 +485,10 @@ trait CfgGenerator[C <: Context] {
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
       )(implicit table: Table): Node = {
-        val nchain = prevchain.descend
+        val nchain = prevchain.descend()
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         successor match {
           case Some(s) =>
@@ -543,7 +543,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.parent
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         successor match {
           case Some(s) =>
@@ -588,7 +588,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.withDecl(tree, false)
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         this.addSuccessorsToNodeFront(ctx)
         ctx.exitPoints(subgraph)(nthis) = successor.get.uid
@@ -648,7 +648,7 @@ trait CfgGenerator[C <: Context] {
       )(implicit table: Table): Node = {
         val nthis = this.copyWithoutSuccessors(prevchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         this.addSuccessorsToNodeFront(ctx)
         ctx.exitPoints(subgraph)(nthis) = successor.get.uid
@@ -692,7 +692,7 @@ trait CfgGenerator[C <: Context] {
       )(implicit table: Table): Node = {
         val nthis = this.copyWithoutSuccessors(prevchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         this.addSuccessorsToNodeFront(ctx)
         ctx.exitPoints(subgraph)(nthis) = successor.get.uid
@@ -727,11 +727,11 @@ trait CfgGenerator[C <: Context] {
     case class DefaultStatement(
       tree: Tree, chain: Chain, uid: Long
     ) extends Statement {
-      override def updateBlockStats()(implicit table: Table) {
-        super.updateBlockStats()
+      override def updateBlockInfo()(implicit table: Table) {
+        super.updateBlockInfo()
         tree match {
           case q"$x = $v" if table.contains(x.symbol) =>
-            chain.stats.assignments(x.symbol) = table(x.symbol)
+            chain.info.assignments(x.symbol) = table(x.symbol)
           case _ =>
         }
       }
@@ -741,7 +741,7 @@ trait CfgGenerator[C <: Context] {
       )(implicit table: Table): Node = {
         val nthis = this.copyWithoutSuccessors(prevchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         successor match {
           case Some(s) =>
@@ -766,9 +766,9 @@ trait CfgGenerator[C <: Context] {
         case q"$_ val $_: $_ = $rhs" => rhs
         case q"$_ var $_: $_ = $rhs" => rhs
       }
-      override def updateBlockStats()(implicit table: Table) {
-        super.updateBlockStats()
-        chain.stats.decls(tree.symbol) = table(tree.symbol)
+      override def updateBlockInfo()(implicit table: Table) {
+        super.updateBlockInfo()
+        chain.info.decls(tree.symbol) = table(tree.symbol)
       }
       def extract(
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
@@ -777,7 +777,7 @@ trait CfgGenerator[C <: Context] {
         val nchain = prevchain.withDecl(tree, false)
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
-        nthis.updateBlockStats()
+        nthis.updateBlockInfo()
 
         successor match {
           case Some(s) =>
@@ -829,27 +829,27 @@ trait CfgGenerator[C <: Context] {
     val exitSubgraphs = mutable.LinkedHashMap[Node, SubCfg]()
     var start: Node = _
     val all = mutable.LinkedHashMap[Long, Node]()
-    val childStats = mutable.LinkedHashMap[BlockStats, Set[BlockStats]]()
+    val childStats = mutable.LinkedHashMap[BlockInfo, Set[BlockInfo]]()
 
     def initializeBlocks() {
       val chains = start.dfs.map(_.chain).map(_.ancestors).flatten.toSet
       childStats ++= chains
         .filter(_.parent != null)
         .groupBy(_.parent)
-        .groupBy(_._1.stats)
+        .groupBy(_._1.info)
         .map { case (block, chainmaps) =>
-          (block, chainmaps.flatMap(_._2.map(_.stats)).toSet)
+          (block, chainmaps.flatMap(_._2.map(_.info)).toSet)
         }
-      for (c <- chains) if (!childStats.contains(c.stats)) childStats(c.stats) = Set()
+      for (c <- chains) if (!childStats.contains(c.info)) childStats(c.info) = Set()
     }
 
-    val isOccurringInBlockDescendants: Cache._2[Symbol, BlockStats, Boolean] = cached {
+    val isOccurringInBlockDescendants: Cache._2[Symbol, BlockInfo, Boolean] = cached {
       (s, b) =>
       b.occurrences.contains(s) ||
         childStats(b).exists(isOccurringInBlockDescendants(s, _))
     }
 
-    val isAssignedInBlockDescendants: Cache._2[Symbol, BlockStats, Boolean] = cached {
+    val isAssignedInBlockDescendants: Cache._2[Symbol, BlockInfo, Boolean] = cached {
       (s, b) =>
       b.assignments.contains(s) ||
         childStats(b).exists(isAssignedInBlockDescendants(s, _))
@@ -870,9 +870,9 @@ trait CfgGenerator[C <: Context] {
       isLoaded(exitSubgraphs(n), mutable.Set())
     }
 
-    val declarationBlockFrom: Cache._2[Symbol, Chain, BlockStats] = cached {
+    val declarationBlockFrom: Cache._2[Symbol, Chain, BlockInfo] = cached {
       (s, chain) =>
-      chain.ancestors.find(_.decls.toMap.contains(s)).get.stats
+      chain.ancestors.find(_.decls.toMap.contains(s)).get.info
     }
 
     val mustStoreVar: Cache._2[Node, Symbol, Boolean] = cached {
@@ -889,7 +889,7 @@ trait CfgGenerator[C <: Context] {
     val mustLoadVar: Cache._2[Symbol, Chain, Boolean] = cached {
       (sym, chain) =>
       val isVisible = chain.contains(sym)
-      val isOccurring = isOccurringInBlockDescendants(sym, chain.stats)
+      val isOccurring = isOccurringInBlockDescendants(sym, chain.info)
       isVisible && isOccurring
     }
 
@@ -1032,7 +1032,7 @@ trait CfgGenerator[C <: Context] {
           val endnode = Node.IfEnd(ch, table.newNodeUid())
           val ifnode = Node.If(endnode.uid, t, ch, table.newNodeUid())
           def addBranch(branch: Tree, add: Node => Unit) {
-            val nestedchain = ch.descend
+            val nestedchain = ch.descend()
             val (childhead, childlast) = traverse(branch, nestedchain)
             add(childhead)
             if (childlast.tree.tpe =:= typeOf[Unit]) {
@@ -1050,7 +1050,7 @@ trait CfgGenerator[C <: Context] {
         case q"while ($cond) $body" =>
           val whilenode = Node.While(t, ch, table.newNodeUid())
           val endnode = Node.WhileEnd(ch, table.newNodeUid())
-          val nestedchain = ch.descend
+          val nestedchain = ch.descend()
           val (childhead, childlast) = traverse(body, nestedchain)
           whilenode.successor = Some(childhead)
           childlast.successor = Some(endnode)
@@ -1062,7 +1062,7 @@ trait CfgGenerator[C <: Context] {
           val endnode = Node.TryBlockEnd(ch, table.newNodeUid())
           val trynode =
             Node.TryBlock(endnode.uid, t, Some(cases.head), ch, table.newNodeUid())
-          val nestedchain = ch.descend
+          val nestedchain = ch.descend(Some((trynode.uid, endnode.uid)))
           val (childhead, childlast) = traverse(body, nestedchain)
           trynode.successor = Some(childhead)
           childlast.successor = Some(endnode)
@@ -1070,11 +1070,12 @@ trait CfgGenerator[C <: Context] {
         case q"try $body finally $expr" =>
           val endnode = Node.TryBlockEnd(ch, table.newNodeUid())
           val trynode = Node.TryBlock(endnode.uid, t, None, ch, table.newNodeUid())
-          val trynestedchain = ch.descend
+          val tryuids = Some((trynode.uid, endnode.uid))
+          val trynestedchain = ch.descend(tryuids)
           val (tryhead, trylast) = traverse(body, trynestedchain)
           trynode.successor = Some(tryhead)
           trylast.successor = Some(endnode)
-          val finallynestedchain = ch.descend
+          val finallynestedchain = ch.descend(tryuids)
           val (finallyhead, finallylast) =
             traverse(expr, finallynestedchain)
           trynode.finallySuccessor = Some(finallyhead)
@@ -1083,7 +1084,7 @@ trait CfgGenerator[C <: Context] {
         case q"{ ..$stats }" if stats.nonEmpty && stats.tail.nonEmpty =>
           val blocknode = Node.CodeBlock(t, ch, table.newNodeUid())
           val endnode = Node.CodeBlockEnd(ch, table.newNodeUid())
-          val nestedchain = ch.descend
+          val nestedchain = ch.descend()
           val (first, childlast) = traverse(stats.head, nestedchain)
           var current = childlast
           var currchain = current.chain
