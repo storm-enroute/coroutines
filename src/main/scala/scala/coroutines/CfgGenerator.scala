@@ -454,7 +454,8 @@ trait CfgGenerator[C <: Context] {
     ) extends Node {
       override def code = q""
       var finallySuccessor: Option[Node] = None
-      def successors = (successor ++ finallySuccessor).toSeq
+      var endSuccessor: Option[Node] = None
+      def successors = (successor ++ finallySuccessor ++ endSuccessor).toSeq
       def emit(z: Zipper, seen: mutable.Set[Node], subgraph: SubCfg)(
         implicit cc: CanCall, table: Table
       ): Zipper = {
@@ -485,7 +486,6 @@ trait CfgGenerator[C <: Context] {
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
       )(implicit table: Table): Node = {
-        println(prevchain.info)
         val nchain = prevchain.descend(Some((uid, enduid)))
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
@@ -508,6 +508,13 @@ trait CfgGenerator[C <: Context] {
             nthis.finallySuccessor = Some(seen(s))
           case None =>
         }
+
+        val endnode = ctx.allnodes(enduid)
+        if (!seen.contains(endnode)) {
+          println("to endnode ----> " + nthis.chain)
+          endnode.extract(nthis.chain, seen, ctx, subgraph)
+        }
+        nthis.endSuccessor = Some(seen(endnode))
 
         nthis
       }
@@ -796,6 +803,7 @@ trait CfgGenerator[C <: Context] {
   }
 
   class Cfg(val start: Node, val subgraphs: Map[Node, SubCfg])(implicit table: Table) {
+    val allnodes = start.dfs.map(n => (n.uid, n)).toMap
     val stackVars = mutable.Set[Symbol]()
 
     def storedValVars = table.valvars.filter(kv => stackVars.contains(kv._1))
@@ -899,8 +907,7 @@ trait CfgGenerator[C <: Context] {
       def patch(n: Node, chain: Chain): Node = {
         val head = chain.info.tryuids match {
           case Some((tryuid, enduid)) =>
-            println(tryuid)
-            all(tryuid).copyWithoutSuccessors(chain)
+            cfg.allnodes(tryuid).copyWithoutSuccessors(chain)
           case None =>
             Node.CodeBlock(q"()", chain, table.newNodeUid())
         }
@@ -933,7 +940,8 @@ trait CfgGenerator[C <: Context] {
 
       // emit body
       val startZipper = Zipper(null, Nil, trees => q"..$trees")
-      val bodyzipper = patch(start, start.chain).emitCode(startZipper, this)
+      val patchedStart = patch(start, start.chain)
+      val bodyzipper = patchedStart.emitCode(startZipper, this)
       val body = bodyzipper.result
 
       // add exception check
@@ -1137,7 +1145,7 @@ trait CfgGenerator[C <: Context] {
     cfg
   }
 
-  class ExtractSubgraphContext(val rettpt: Tree) {
+  class ExtractSubgraphContext(val rettpt: Tree, val allnodes: Map[Long, Node]) {
     val subgraphs = mutable.LinkedHashMap[Node, SubCfg]()
     val exitPoints = mutable.LinkedHashMap[SubCfg, mutable.LinkedHashMap[Node, Long]]()
     val seenEntryPoints = mutable.LinkedHashSet[Node]()
@@ -1147,7 +1155,7 @@ trait CfgGenerator[C <: Context] {
   def extractSubgraphs(start: Node, rettpt: Tree)(
     implicit table: Table
   ): Map[Node, SubCfg] = {
-    val ctx = new ExtractSubgraphContext(rettpt)
+    val ctx = new ExtractSubgraphContext(rettpt, start.dfs.map(n => (n.uid, n)).toMap)
     ctx.seenEntryPoints += start
     ctx.nodefront.enqueue(start)
 

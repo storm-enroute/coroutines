@@ -255,8 +255,8 @@ with ThreeAddressFormTransformation[C] {
   def synthesize(rawlambda: Tree): Tree = {
     // transform to two operand assignment form
     val typedtaflambda = transformToThreeAddressForm(rawlambda)
-    // println(typedtaflambda)
-    // println(typedtaflambda.tpe)
+    println(typedtaflambda)
+    println(typedtaflambda.tpe)
 
     implicit val table = new Table(typedtaflambda)
     

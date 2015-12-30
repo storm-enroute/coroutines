@@ -9,7 +9,7 @@ import scala.reflect.macros.whitebox.Context
 
 
 
-/** Analyzes coroutine trees and produces control flow graphs.
+/** Declares basic data types and analysis utilities.
  */
 trait Analyzer[C <: Context] {
   val c: C
@@ -24,7 +24,7 @@ trait Analyzer[C <: Context] {
       while (z.above != null) z = z.ascend
       z.ctor(z.left.reverse)
     }
-    def ascend: Zipper = if (above == null) null else {
+    def ascend: Zipper = if (above == null) sys.error("cannot ascend") else {
       Zipper(above.above, ctor(left.reverse) :: above.left, above.ctor)
     }
     def descend(ctor: List[Tree] => Tree) = Zipper(this, Nil, ctor)
@@ -283,12 +283,8 @@ trait Analyzer[C <: Context] {
       Chain(info, (sym, varinfo) :: decls, table, parent)
     }
     def takeDecls(n: Int) = Chain(info, decls.take(n), table, parent)
-    def descend(newtryuids: Option[(Long, Long)] = None) = newtryuids match {
-      case Some(_) =>
-        Chain(new BlockInfo(newtryuids), Nil, table, this)
-      case None =>
-        Chain(new BlockInfo(info.tryuids), Nil, table, this)
-    }
+    def descend(tryuids: Option[(Long, Long)] = None) =
+      Chain(new BlockInfo(tryuids), Nil, table, this)
     def copyWithoutBlocks: Chain = {
       val nparent = if (parent == null) null else parent.copyWithoutBlocks
       Chain(info.copyWithoutVars, decls, table, nparent)

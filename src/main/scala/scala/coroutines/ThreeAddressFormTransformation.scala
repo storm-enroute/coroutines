@@ -166,7 +166,8 @@ trait ThreeAddressFormTransformation[C <: Context] {
       val bindingname = TermName(c.freshName("t"))
       val (bodydecls, bodyident) = threeAddressForm(body)
       val (exprdecls, exprident) = threeAddressForm(expr)
-      val matchcases = cases :+ cq"${pq"_"} => throw $exceptionvarname"
+      val matchcases =
+        cases :+ cq"${pq"null"} =>" :+ cq"${pq"_"} => throw $exceptionvarname"
       val exceptionident = q"$exceptionvarname"
       val matchbody = q"$exceptionident match { case ..$matchcases }"
       typer.typeOf(matchbody) = typer.typeOf(tree)

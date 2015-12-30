@@ -96,15 +96,20 @@ class TryCatchTest extends FunSuite with Matchers {
     }
   }
 
-  // test("yield inside throw") {
-  //   val rube = coroutine { () =>
-  //     try {
-  //       yieldval("inside")
-  //     } catch {
-  //       case r: RuntimeException => "runtime"
-  //       case e: Exception => "generic"
-  //     }
-  //     "done"
-  //   }
-  // }
+  test("yield inside throw") {
+    val rube = coroutine { () =>
+      try {
+        yieldval("inside")
+      } catch {
+        case r: RuntimeException => "runtime"
+        case e: Exception => "generic"
+      }
+      "done"
+    }
+
+    val c = call(rube())
+    assert(c() == "inside")
+    assert(c() == "done")
+    assert(c.isStopped)
+  }
 }
