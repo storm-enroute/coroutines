@@ -485,7 +485,8 @@ trait CfgGenerator[C <: Context] {
         prevchain: Chain, seen: mutable.Map[Node, Node], ctx: ExtractSubgraphContext,
         subgraph: SubCfg
       )(implicit table: Table): Node = {
-        val nchain = prevchain.descend()
+        println(prevchain.info)
+        val nchain = prevchain.descend(Some((uid, enduid)))
         val nthis = this.copyWithoutSuccessors(nchain)
         seen(this) = nthis
         nthis.updateBlockInfo()
@@ -896,7 +897,13 @@ trait CfgGenerator[C <: Context] {
     def emit(cfg: Cfg)(implicit table: Table): Tree = {
       val cparam = table.names.coroutineParam
       def patch(n: Node, chain: Chain): Node = {
-        val head = Node.CodeBlock(q"()", chain, table.newNodeUid())
+        val head = chain.info.tryuids match {
+          case Some((tryuid, enduid)) =>
+            println(tryuid)
+            all(tryuid).copyWithoutSuccessors(chain)
+          case None =>
+            Node.CodeBlock(q"()", chain, table.newNodeUid())
+        }
         val decls = for {
           ((sym, info), idx) <- chain.decls.zipWithIndex
           if mustLoadVar(sym, chain)
@@ -1083,7 +1090,7 @@ trait CfgGenerator[C <: Context] {
           val (tryhead, trylast) = traverse(body, trynestedchain)
           trynode.successor = Some(tryhead)
           trylast.successor = Some(endnode)
-          val finallynestedchain = ch.descend(tryuids)
+          val finallynestedchain = ch.descend()
           val (finallyhead, finallylast) =
             traverse(expr, finallynestedchain)
           trynode.finallySuccessor = Some(finallyhead)

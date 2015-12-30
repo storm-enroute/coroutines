@@ -225,9 +225,10 @@ trait Analyzer[C <: Context] {
     val assignments = mutable.LinkedHashMap[Symbol, VarInfo]()
     def copyWithoutVars = new BlockInfo(tryuids)
     override def toString = {
-      s"decl = ${decls.map(_._1.name).mkString(", ")}, " +
+      s"[decl = ${decls.map(_._1.name).mkString(", ")}, " +
       s"occ = ${occurrences.map(_._1.name).mkString(", ")}, " +
-      s"ass = ${assignments.map(_._1.name).mkString(", ")}"
+      s"ass = ${assignments.map(_._1.name).mkString(", ")}, " +
+      s"tryuids = $tryuids]"
     }
   }
 
@@ -282,8 +283,12 @@ trait Analyzer[C <: Context] {
       Chain(info, (sym, varinfo) :: decls, table, parent)
     }
     def takeDecls(n: Int) = Chain(info, decls.take(n), table, parent)
-    def descend(tryuids: Option[(Long, Long)] = None) =
-      Chain(new BlockInfo(tryuids), Nil, table, this)
+    def descend(newtryuids: Option[(Long, Long)] = None) = newtryuids match {
+      case Some(_) =>
+        Chain(new BlockInfo(newtryuids), Nil, table, this)
+      case None =>
+        Chain(new BlockInfo(info.tryuids), Nil, table, this)
+    }
     def copyWithoutBlocks: Chain = {
       val nparent = if (parent == null) null else parent.copyWithoutBlocks
       Chain(info.copyWithoutVars, decls, table, nparent)
