@@ -895,30 +895,38 @@ trait CfgGenerator[C <: Context] {
 
     def emit(cfg: Cfg)(implicit table: Table): Tree = {
       val cparam = table.names.coroutineParam
-      def findStart(chain: Chain): Zipper = {
-        var z = {
-          if (chain.parent == null) Zipper(null, Nil, trees => q"..$trees")
-          else findStart(chain.parent).descend(trees => q"..$trees")
-        }
-        for ((sym, info) <- chain.decls) {
-          if (mustLoadVar(sym, chain)) {
-            val stack = info.stackname
-            val decodedget = info.loadTree(q"$cparam")
-            val valdef = info.origtree match {
-              case q"$mods val $name: $tpt = $_" =>
-                q"$mods val $name: $tpt = $decodedget"
-              case q"$mods var $name: $tpt = $_" =>
-                q"$mods var $name: $tpt = $decodedget"
-            }
-            z = z.append(valdef)
+      def patch(n: Node, chain: Chain): Node = {
+        val head = Node.CodeBlock(q"()", chain, table.newNodeUid())
+        val decls = for {
+          ((sym, info), idx) <- chain.decls.zipWithIndex
+          if mustLoadVar(sym, chain)
+        } yield {
+          val stack = info.stackname
+          val decodedget = info.loadTree(q"$cparam")
+          info.origtree match {
+            case q"$mods val $name: $tpt = $_" =>
+              Node.Decl(
+                q"$mods val $name: $tpt = $decodedget",
+                chain.takeDecls(idx + 1),
+                table.newNodeUid())
+            case q"$mods var $name: $tpt = $_" =>
+              Node.Decl(
+                q"$mods var $name: $tpt = $decodedget",
+                chain.takeDecls(idx + 1),
+                table.newNodeUid())
           }
         }
-        z
+        (decls.foldLeft(head: Node) {
+          (previous, current) =>
+          previous.successor = Some(current)
+          current
+        }).successor = Some(n)
+        if (chain.parent == null) head else patch(head, chain.parent)
       }
 
       // emit body
-      val startzipper = findStart(start.chain)
-      val bodyzipper = start.emitCode(startzipper, this)
+      val startZipper = Zipper(null, Nil, trees => q"..$trees")
+      val bodyzipper = patch(start, start.chain).emitCode(startZipper, this)
       val body = bodyzipper.result
 
       // add exception check

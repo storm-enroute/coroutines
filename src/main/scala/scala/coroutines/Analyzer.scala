@@ -281,6 +281,7 @@ trait Analyzer[C <: Context] {
       table.vars(sym) = varinfo
       Chain(info, (sym, varinfo) :: decls, table, parent)
     }
+    def takeDecls(n: Int) = Chain(info, decls.take(n), table, parent)
     def descend(tryuids: Option[(Long, Long)] = None) =
       Chain(new BlockInfo(tryuids), Nil, table, this)
     def copyWithoutBlocks: Chain = {
