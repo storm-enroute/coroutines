@@ -49,13 +49,20 @@ trait Analyzer[C <: Context] {
     def stackpos_=(v: (Int, Int)) = rawstackpos = v
     def isUnitType = tpe =:= typeOf[Unit]
     def isAnyType = tpe =:= typeOf[Any]
-    def isRefType = {
-      tpe <:< typeOf[AnyRef] || tpe =:= typeOf[Unit] || tpe =:= typeOf[Any]
-    }
+    def isRefType = !isValType
     def isValType = {
-      tpe <:< typeOf[AnyVal] && !(tpe =:= typeOf[Unit]) && !(tpe =:= typeOf[Any])
+      tpe =:= typeOf[Boolean] ||
+      tpe =:= typeOf[Byte] ||
+      tpe =:= typeOf[Boolean] ||
+      tpe =:= typeOf[Short] ||
+      tpe =:= typeOf[Char] ||
+      tpe =:= typeOf[Int] ||
+      tpe =:= typeOf[Float] ||
+      tpe =:= typeOf[Long] ||
+      tpe =:= typeOf[Double]
     }
     val defaultValue: Tree = {
+      println(tpe, typeOf[AnyVal], isValType)
       if (isRefType) q"null"
       else if (tpe =:= typeOf[Boolean]) q"false"
       else if (tpe =:= typeOf[Byte]) q"0.toByte"
