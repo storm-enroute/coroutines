@@ -1,4 +1,11 @@
 
+![Coroutines](/coroutines-128-xmas.md)
+
+# Scala Coroutines
+
+Coroutines is a library-level extension for the Scala programming language
+that introduces first-class polymorphic coroutines.
+
 CI service         | Status | Description
 -------------------|--------|------------
 Travis             | [![Build Status](https://travis-ci.org/storm-enroute/coroutines.png?branch=master)](https://travis-ci.org/storm-enroute/coroutines) | Testing only
