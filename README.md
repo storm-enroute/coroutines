@@ -1,5 +1,5 @@
 
-![Coroutines](/coroutines-128-xmas.md)
+![Coroutines](/coroutines-128-xmas.png)
 
 # Scala Coroutines
 
