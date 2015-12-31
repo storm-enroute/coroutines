@@ -3,7 +3,8 @@
 
 # Scala Coroutines
 
-Coroutines is a library-level extension for the Scala programming language
+[Coroutines](http://storm-enroute.com/coroutines)
+is a library-level extension for the Scala programming language
 that introduces first-class polymorphic coroutines.
 
 CI service         | Status | Description
