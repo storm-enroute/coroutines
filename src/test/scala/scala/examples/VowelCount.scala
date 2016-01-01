@@ -22,5 +22,6 @@ object VowelCounts {
     assert(c() == 2)
     assert(c() == 3)
     assert(c() == 0)
+    assert(c.isStopped)
   }
 }
