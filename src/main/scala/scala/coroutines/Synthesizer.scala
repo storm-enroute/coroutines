@@ -332,14 +332,14 @@ with ThreeAddressFormTransformation[C] {
         if (!isCoroutineDefMarker(r.tpe))
           c.abort(r.pos,
             s"Receiver must be a coroutine.\n" +
-            s"required: Coroutine.Blueprint[${implicitly[WeakTypeTag[T]]}]\n" +
+            s"required: Coroutine[${implicitly[WeakTypeTag[T]]}]\n" +
             s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
         (r, args)
       case q"$r.apply[..$_](..$args)($_)" =>
-        if (!isCoroutineBlueprintSugar(r.tpe))
+        if (!isCoroutineDefSugar(r.tpe))
           c.abort(r.pos,
             s"Receiver must be a coroutine.\n" +
-            s"required: Coroutine.Blueprint[${implicitly[WeakTypeTag[T]]}]\n" +
+            s"required: Coroutine[${implicitly[WeakTypeTag[T]]}]\n" +
             s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
         (r, args)
       case _ =>

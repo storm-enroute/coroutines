@@ -32,7 +32,7 @@ package object coroutines {
   /* syntax sugar */
 
   class ~~~>[@specialized S] private[coroutines] (
-    val blueprint: Coroutine.Blueprint[S]
+    val blueprint: Coroutine[S]
   ) extends Coroutine.DefMarker[S] {
     def apply(): S =
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
@@ -43,7 +43,7 @@ package object coroutines {
   }
 
   class ~~>[T, @specialized S] private[coroutines] (
-    val blueprint: Coroutine.Blueprint[S]
+    val blueprint: Coroutine[S]
   ) extends Coroutine.DefMarker[S] {
     def apply(t: T): S =
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
@@ -54,7 +54,7 @@ package object coroutines {
   }
 
   class ~>[PS, @specialized S] private[coroutines] (
-    val blueprint: Coroutine.Blueprint[S]
+    val blueprint: Coroutine[S]
   ) extends Coroutine.DefMarker[S] {
     def apply[T1, T2](t1: T1, t2: T2)(
       implicit e: PS =:= Tuple2[T1, T2]

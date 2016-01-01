@@ -341,7 +341,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"new { ..$edefs } with ..$bases { $self => ..$stats }" =>
       // new
-      if (!isCoroutineBlueprint(typer.typeOf(tree))) {
+      if (!isCoroutineDef(typer.typeOf(tree))) {
         // if this class was not generated from a coroutine declaration, then validate
         // the nested context
         new NestedContextValidator().traverse(tree)

@@ -14,6 +14,43 @@ import scala.util.Try
 
 
 
+trait Coroutine[@specialized T] extends Coroutine.DefMarker[T] {
+  def $enter(c: Coroutine.Inst[T]): Unit
+  def $assignresult(c: Coroutine.Inst[T], v: T): Unit = c.$result = v
+  def $returnvalue(c: Coroutine.Inst[T], v: T): Unit
+  def $ep0(c: Coroutine.Inst[T]): Unit = {}
+  def $ep1(c: Coroutine.Inst[T]): Unit = {}
+  def $ep2(c: Coroutine.Inst[T]): Unit = {}
+  def $ep3(c: Coroutine.Inst[T]): Unit = {}
+  def $ep4(c: Coroutine.Inst[T]): Unit = {}
+  def $ep5(c: Coroutine.Inst[T]): Unit = {}
+  def $ep6(c: Coroutine.Inst[T]): Unit = {}
+  def $ep7(c: Coroutine.Inst[T]): Unit = {}
+  def $ep8(c: Coroutine.Inst[T]): Unit = {}
+  def $ep9(c: Coroutine.Inst[T]): Unit = {}
+  def $ep10(c: Coroutine.Inst[T]): Unit = {}
+  def $ep11(c: Coroutine.Inst[T]): Unit = {}
+  def $ep12(c: Coroutine.Inst[T]): Unit = {}
+  def $ep13(c: Coroutine.Inst[T]): Unit = {}
+  def $ep14(c: Coroutine.Inst[T]): Unit = {}
+  def $ep15(c: Coroutine.Inst[T]): Unit = {}
+  def $ep16(c: Coroutine.Inst[T]): Unit = {}
+  def $ep17(c: Coroutine.Inst[T]): Unit = {}
+  def $ep18(c: Coroutine.Inst[T]): Unit = {}
+  def $ep19(c: Coroutine.Inst[T]): Unit = {}
+  def $ep20(c: Coroutine.Inst[T]): Unit = {}
+  def $ep21(c: Coroutine.Inst[T]): Unit = {}
+  def $ep22(c: Coroutine.Inst[T]): Unit = {}
+  def $ep23(c: Coroutine.Inst[T]): Unit = {}
+  def $ep24(c: Coroutine.Inst[T]): Unit = {}
+  def $ep25(c: Coroutine.Inst[T]): Unit = {}
+  def $ep26(c: Coroutine.Inst[T]): Unit = {}
+  def $ep27(c: Coroutine.Inst[T]): Unit = {}
+  def $ep28(c: Coroutine.Inst[T]): Unit = {}
+  def $ep29(c: Coroutine.Inst[T]): Unit = {}
+}
+
+
 object Coroutine {
   private[coroutines] val INITIAL_COSTACK_SIZE = 4
 
@@ -38,7 +75,7 @@ object Coroutine {
 
   class Inst[@specialized T] {
     var $costackptr = 0
-    var $costack: Array[Blueprint[T]] = new Array[Blueprint[T]](INITIAL_COSTACK_SIZE)
+    var $costack: Array[Coroutine[T]] = new Array[Coroutine[T]](INITIAL_COSTACK_SIZE)
     var $pcstackptr = 0
     var $pcstack = new Array[Short](INITIAL_COSTACK_SIZE)
     var $refstackptr = 0
@@ -70,42 +107,6 @@ object Coroutine {
 
   trait DefMarker[@specialized T]
 
-  trait Blueprint[@specialized T] extends DefMarker[T] {
-    def $enter(c: Inst[T]): Unit
-    def $assignresult(c: Inst[T], v: T): Unit = c.$result = v
-    def $returnvalue(c: Inst[T], v: T): Unit
-    def $ep0(c: Inst[T]): Unit = {}
-    def $ep1(c: Inst[T]): Unit = {}
-    def $ep2(c: Inst[T]): Unit = {}
-    def $ep3(c: Inst[T]): Unit = {}
-    def $ep4(c: Inst[T]): Unit = {}
-    def $ep5(c: Inst[T]): Unit = {}
-    def $ep6(c: Inst[T]): Unit = {}
-    def $ep7(c: Inst[T]): Unit = {}
-    def $ep8(c: Inst[T]): Unit = {}
-    def $ep9(c: Inst[T]): Unit = {}
-    def $ep10(c: Inst[T]): Unit = {}
-    def $ep11(c: Inst[T]): Unit = {}
-    def $ep12(c: Inst[T]): Unit = {}
-    def $ep13(c: Inst[T]): Unit = {}
-    def $ep14(c: Inst[T]): Unit = {}
-    def $ep15(c: Inst[T]): Unit = {}
-    def $ep16(c: Inst[T]): Unit = {}
-    def $ep17(c: Inst[T]): Unit = {}
-    def $ep18(c: Inst[T]): Unit = {}
-    def $ep19(c: Inst[T]): Unit = {}
-    def $ep20(c: Inst[T]): Unit = {}
-    def $ep21(c: Inst[T]): Unit = {}
-    def $ep22(c: Inst[T]): Unit = {}
-    def $ep23(c: Inst[T]): Unit = {}
-    def $ep24(c: Inst[T]): Unit = {}
-    def $ep25(c: Inst[T]): Unit = {}
-    def $ep26(c: Inst[T]): Unit = {}
-    def $ep27(c: Inst[T]): Unit = {}
-    def $ep28(c: Inst[T]): Unit = {}
-    def $ep29(c: Inst[T]): Unit = {}
-  }
-
   def synthesize(c: Context)(f: c.Tree): c.Tree = {
     new Synthesizer[c.type](c).synthesize(f)
   }
@@ -114,25 +115,25 @@ object Coroutine {
     new Synthesizer[c.type](c).call(f)
   }
 
-  abstract class _0[@specialized T] extends Blueprint[T] {
+  abstract class _0[@specialized T] extends Coroutine[T] {
     def apply(): T
     def $call(): Inst[T]
     def $push(c: Inst[T]): Unit
   }
 
-  abstract class _1[A0, @specialized T] extends Blueprint[T] {
+  abstract class _1[A0, @specialized T] extends Coroutine[T] {
     def apply(a0: A0): T
     def $call(a0: A0): Inst[T]
     def $push(c: Inst[T], a0: A0): Unit
   }
 
-  abstract class _2[A0, A1, @specialized T] extends Blueprint[T] {
+  abstract class _2[A0, A1, @specialized T] extends Coroutine[T] {
     def apply(a0: A0, a1: A1): T
     def $call(a0: A0, a1: A1): Inst[T]
     def $push(c: Inst[T], a0: A0, a1: A1): Unit
   }
 
-  abstract class _3[A0, A1, A2, @specialized T] extends Blueprint[T] {
+  abstract class _3[A0, A1, A2, @specialized T] extends Coroutine[T] {
     def apply(a0: A0, a1: A1, a2: A2): T
     def $call(a0: A0, a1: A1, a2: A2): Inst[T]
     def $push(c: Inst[T], a0: A0, a1: A1, a2: A2): Unit
