@@ -392,7 +392,7 @@ trait Analyzer[C <: Context] {
       // case q"$co.apply[..$_](..$_)($_)" if isCoroutineDefSugar(co.tpe) =>
       //   coroutineTypeArgs(co.tpe)._1
     }
-    tq"${lub(body.tpe :: constraintTpes).widen}"
+    tq"${lub(constraintTpes).widen}"
   }
 
   def inferReturnType(body: Tree): Tree = tq"${lub(body.tpe :: Nil).widen}"

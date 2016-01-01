@@ -643,7 +643,7 @@ trait CfgGenerator[C <: Context] {
         val savestate = genSaveState(subgraph)
         val exittree = q"""
           ..$savestate
-          $$assignresult($cparam, ${table.untyper.untypecheck(x)})
+          $$assignyield($cparam, ${table.untyper.untypecheck(x)})
           return
         """
         val z1 = z.append(exittree)

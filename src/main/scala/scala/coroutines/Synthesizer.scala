@@ -316,7 +316,7 @@ with ThreeAddressFormTransformation[C] {
           $$push($valnme, ..$argidents)
           $valnme
         }
-        def apply(..$args): $yldtpt = {
+        def apply(..$args): $rettpt = {
           sys.error(scala.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
         }
         def $$push(
@@ -336,7 +336,7 @@ with ThreeAddressFormTransformation[C] {
         $returnvaluemethod
       }
     """
-    println(co)
+    //println(co)
     co
   }
 

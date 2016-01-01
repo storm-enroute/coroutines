@@ -16,8 +16,9 @@ import scala.util.Try
 
 trait Coroutine[@specialized T, R] extends Coroutine.DefMarker[T, R] {
   def $enter(c: Coroutine.Inst[T, R]): Unit
-  def $assignresult(c: Coroutine.Inst[T, R], v: T): Unit = c.$yield = v
-  def $returnvalue(c: Coroutine.Inst[T, R], v: T): Unit
+  def $assignyield(c: Coroutine.Inst[T, R], v: T): Unit = c.$yield = v
+  def $assignresult(c: Coroutine.Inst[T, R], v: R): Unit = c.$result = v
+  def $returnvalue(c: Coroutine.Inst[T, R], v: R): Unit
   def $ep0(c: Coroutine.Inst[T, R]): Unit = {}
   def $ep1(c: Coroutine.Inst[T, R]): Unit = {}
   def $ep2(c: Coroutine.Inst[T, R]): Unit = {}
@@ -55,21 +56,23 @@ object Coroutine {
   private[coroutines] val INITIAL_COSTACK_SIZE = 4
 
   @tailrec
-  private[coroutines] final def enter[T, R](c: Inst[T, R]): T = {
-    val cd = Stack.top(c.$costack)
-    cd.$enter(c.asInstanceOf[c.type])
-    if (c.$target ne null) {
-      val nc = c.$target
-      c.$target = null
-      enter(nc.asInstanceOf[c.type])
-    } else if (c.$exception ne null) {
-      val e = c.$exception
-      c.$exception = null
+  private[coroutines] final def resume[T, R](
+    callsite: Inst[T, R], actual: Inst[T, R]
+  ): Boolean = {
+    val cd = Stack.top(actual.$costack)
+    cd.$enter(actual)
+    val resumeStatus = actual.isLive
+    if (actual.$target ne null) {
+      val newactual = actual.$target
+      actual.$target = null
+      resume(callsite, newactual.asInstanceOf[callsite.type])
+    } else if (actual.$exception ne null) {
+      val e = actual.$exception
+      actual.$exception = null
       throw e
     } else {
-      val res = c.$yield
-      c.$yield = null.asInstanceOf[T]
-      res
+      if (resumeStatus) callsite.$yield = actual.$yield
+      resumeStatus
     }
   }
 
@@ -88,23 +91,39 @@ object Coroutine {
     var $yield: T = null.asInstanceOf[T]
     var $result: R = null.asInstanceOf[R]
 
-    def apply(): T = {
-      if (isAlive) Coroutine.enter[T, R](this)
+    def resume: Boolean = {
+      if (isLive) Coroutine.resume[T, R](this, this)
       else throw new CoroutineStoppedException
     }
 
-    def isAlive: Boolean = $costackptr > 0
-
-    def isStopped: Boolean = !isAlive
-
-    def get(): Option[T] = if (isAlive) Some(apply()) else None
-
-    def tryGet(): Try[T] = {
-      try Success(apply())
-      catch {
-        case t: Throwable => Failure(t)
-      }
+    def value: T = {
+      if (nonResumed)
+        sys.error("Coroutine has no value, because it was not resumed yet.")
+      if (!isLive)
+        sys.error("Coroutine has no value, because it is completed.")
+      $yield
     }
+
+    def getValue = if (!nonResumed && isLive) Some(value) else None
+
+    def tryValue = try { Success(value) } catch { case t: Throwable => Failure(t) }
+
+    def result: R = {
+      if (!isCompleted)
+        sys.error("Coroutine has no result, because it is not completed.")
+      $result
+    }
+
+    def getResult = if (isCompleted) Some(result) else None
+
+    def tryResult = try { Success(result) } catch { case t: Throwable => Failure(t) }
+
+    def nonResumed: Boolean =
+      $pcstackptr > 0 && scala.coroutines.common.Stack.top($pcstack) == 0
+
+    def isLive: Boolean = $costackptr > 0
+
+    def isCompleted: Boolean = !isLive
   }
 
   trait DefMarker[@specialized T, R]
@@ -118,25 +137,25 @@ object Coroutine {
   }
 
   abstract class _0[@specialized T, R] extends Coroutine[T, R] {
-    def apply(): T
+    def apply(): R
     def $call(): Inst[T, R]
     def $push(c: Inst[T, R]): Unit
   }
 
   abstract class _1[A0, @specialized T, R] extends Coroutine[T, R] {
-    def apply(a0: A0): T
+    def apply(a0: A0): R
     def $call(a0: A0): Inst[T, R]
     def $push(c: Inst[T, R], a0: A0): Unit
   }
 
   abstract class _2[A0, A1, @specialized T, R] extends Coroutine[T, R] {
-    def apply(a0: A0, a1: A1): T
+    def apply(a0: A0, a1: A1): R
     def $call(a0: A0, a1: A1): Inst[T, R]
     def $push(c: Inst[T, R], a0: A0, a1: A1): Unit
   }
 
   abstract class _3[A0, A1, A2, @specialized T, R] extends Coroutine[T, R] {
-    def apply(a0: A0, a1: A1, a2: A2): T
+    def apply(a0: A0, a1: A1, a2: A2): R
     def $call(a0: A0, a1: A1, a2: A2): Inst[T, R]
     def $push(c: Inst[T, R], a0: A0, a1: A1, a2: A2): Unit
   }
