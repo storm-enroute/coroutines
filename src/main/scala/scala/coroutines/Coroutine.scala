@@ -16,7 +16,7 @@ import scala.util.Try
 
 trait Coroutine[@specialized T] extends Coroutine.DefMarker[T] {
   def $enter(c: Coroutine.Inst[T]): Unit
-  def $assignresult(c: Coroutine.Inst[T], v: T): Unit = c.$result = v
+  def $assignresult(c: Coroutine.Inst[T], v: T): Unit = c.$yield = v
   def $returnvalue(c: Coroutine.Inst[T], v: T): Unit
   def $ep0(c: Coroutine.Inst[T]): Unit = {}
   def $ep1(c: Coroutine.Inst[T]): Unit = {}
@@ -67,8 +67,8 @@ object Coroutine {
       c.$exception = null
       throw e
     } else {
-      val res = c.$result
-      c.$result = null.asInstanceOf[T]
+      val res = c.$yield
+      c.$yield = null.asInstanceOf[T]
       res
     }
   }
@@ -84,7 +84,7 @@ object Coroutine {
     var $valstack: Array[Int] = _
     var $target: Inst[T] = null
     var $exception: Throwable = null
-    var $result: T = null.asInstanceOf[T]
+    var $yield: T = null.asInstanceOf[T]
 
     def apply(): T = {
       if (isAlive) Coroutine.enter[T](this)
