@@ -21,11 +21,11 @@ package object coroutines {
     sys.error("Yield allowed only inside coroutines.")
   }
 
-  def yieldto[T](f: Coroutine[T]): Unit = {
+  def yieldto[T](f: Coroutine.Inst[T]): Unit = {
     sys.error("Yield allowed only inside coroutines.")
   }
 
-  def call[T](f: T): Coroutine[T] = macro Coroutine.call[T]
+  def call[T](f: T): Coroutine.Inst[T] = macro Coroutine.call[T]
 
   def coroutine[T](f: Any): Any = macro Coroutine.synthesize
 
@@ -36,9 +36,9 @@ package object coroutines {
   ) extends Coroutine.BlueprintMarker[S] {
     def apply(): S =
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
-    def $call(): Coroutine[S] =
+    def $call(): Coroutine.Inst[S] =
       blueprint.asInstanceOf[Coroutine._0[S]].$call()
-    def $push(co: Coroutine[S]): Unit =
+    def $push(co: Coroutine.Inst[S]): Unit =
       blueprint.asInstanceOf[Coroutine._0[S]].$push(co)
   }
 
@@ -47,9 +47,9 @@ package object coroutines {
   ) extends Coroutine.BlueprintMarker[S] {
     def apply(t: T): S =
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
-    def $call(t: T): Coroutine[S] =
+    def $call(t: T): Coroutine.Inst[S] =
       blueprint.asInstanceOf[Coroutine._1[T, S]].$call(t)
-    def $push(co: Coroutine[S], t: T): Unit =
+    def $push(co: Coroutine.Inst[S], t: T): Unit =
       blueprint.asInstanceOf[Coroutine._1[T, S]].$push(co, t)
   }
 
@@ -63,10 +63,10 @@ package object coroutines {
     }
     def $call[T1, T2](t1: T1, t2: T2)(
       implicit e: PS =:= Tuple2[T1, T2]
-    ): Coroutine[S] = {
+    ): Coroutine.Inst[S] = {
       blueprint.asInstanceOf[Coroutine._2[T1, T2, S]].$call(t1, t2)
     }
-    def $push[T1, T2](co: Coroutine[S], t1: T1, t2: T2)(
+    def $push[T1, T2](co: Coroutine.Inst[S], t1: T1, t2: T2)(
       implicit e: PS =:= Tuple2[T1, T2]
     ): Unit = {
       blueprint.asInstanceOf[Coroutine._2[T1, T2, S]].$push(co, t1, t2)
@@ -78,10 +78,10 @@ package object coroutines {
     }
     def $call[T1, T2, T3](t1: T1, t2: T2, t3: T3)(
       implicit e: PS =:= Tuple3[T1, T2, T3]
-    ): Coroutine[S] = {
+    ): Coroutine.Inst[S] = {
       blueprint.asInstanceOf[Coroutine._3[T1, T2, T3, S]].$call(t1, t2, t3)
     }
-    def $push[T1, T2, T3](co: Coroutine[S], t1: T1, t2: T2, t3: T3)(
+    def $push[T1, T2, T3](co: Coroutine.Inst[S], t1: T1, t2: T2, t3: T3)(
       implicit e: PS =:= Tuple3[T1, T2, T3]
     ): Unit = {
       blueprint.asInstanceOf[Coroutine._3[T1, T2, T3, S]].$push(co, t1, t2, t3)

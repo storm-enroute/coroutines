@@ -26,11 +26,13 @@ with ThreeAddressFormTransformation[C] {
     val body = subgraph.emit(cfg)
     val defname = TermName(s"$$ep${subgraph.uid}")
     val defdef = if (subgraph.uid < NUM_PREDEFINED_ENTRY_STUBS) q"""
-      override def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {
+      override def $defname(
+        ${table.names.coroutineParam}: Coroutine.Inst[$rettpt]
+      ): Unit = {
         $body
       }
     """ else q"""
-      def $defname(${table.names.coroutineParam}: Coroutine[$rettpt]): Unit = {
+      def $defname(${table.names.coroutineParam}: Coroutine.Inst[$rettpt]): Unit = {
         $body
       }
     """
@@ -53,14 +55,14 @@ with ThreeAddressFormTransformation[C] {
       val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
 
       q"""
-        def $$enter(c: Coroutine[$tpt]): Unit = $ep0(c)
+        def $$enter(c: Coroutine.Inst[$tpt]): Unit = $ep0(c)
       """
     } else if (entrypoints.size == 2) {
       val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
       val q"$_ def $ep1($_): Unit = $_" = entrypoints(1)
 
       q"""
-        def $$enter(c: Coroutine[$tpt]): Unit = {
+        def $$enter(c: Coroutine.Inst[$tpt]): Unit = {
           val pc = scala.coroutines.common.Stack.top(c.$$pcstack)
           if (pc == 0) $ep0(c) else $ep1(c)
         }
@@ -72,7 +74,7 @@ with ThreeAddressFormTransformation[C] {
       }
 
       q"""
-        def $$enter(c: Coroutine[$tpt]): Unit = {
+        def $$enter(c: Coroutine.Inst[$tpt]): Unit = {
           val pc: Short = scala.coroutines.common.Stack.top(c.$$pcstack)
           (pc: @scala.annotation.switch) match {
             case ..$cases
@@ -122,7 +124,7 @@ with ThreeAddressFormTransformation[C] {
     }
 
     q"""
-      def $$returnvalue(c: scala.coroutines.Coroutine[$tpt], v: $tpt): Unit = {
+      def $$returnvalue(c: scala.coroutines.Coroutine.Inst[$tpt], v: $tpt): Unit = {
         $body
       }
     """
@@ -255,8 +257,8 @@ with ThreeAddressFormTransformation[C] {
   def synthesize(rawlambda: Tree): Tree = {
     // transform to two operand assignment form
     val typedtaflambda = transformToThreeAddressForm(rawlambda)
-    println(typedtaflambda)
-    println(typedtaflambda.tpe)
+    // println(typedtaflambda)
+    // println(typedtaflambda.tpe)
 
     implicit val table = new Table(typedtaflambda)
     
@@ -297,20 +299,20 @@ with ThreeAddressFormTransformation[C] {
     val valnme = TermName(c.freshName("c"))
     val co = q"""
       new $coroutinequal[..$tparams] {
-        def $$call(..$args): scala.coroutines.Coroutine[$rettpt] = {
-          val $valnme = new scala.coroutines.Coroutine[$rettpt]
+        def $$call(..$args): scala.coroutines.Coroutine.Inst[$rettpt] = {
+          val $valnme = new scala.coroutines.Coroutine.Inst[$rettpt]
           $$push($valnme, ..$argidents)
           $valnme
         }
         def apply(..$args): $rettpt = {
           sys.error(scala.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
         }
-        def $$push(c: scala.coroutines.Coroutine[$rettpt], ..$args): Unit = {
+        def $$push(c: scala.coroutines.Coroutine.Inst[$rettpt], ..$args): Unit = {
           scala.coroutines.common.Stack.push(c.$$costack, this, -1)
           scala.coroutines.common.Stack.push(c.$$pcstack, 0.toShort, -1)
           ..$varpushes
         }
-        def $$pop(c: scala.coroutines.Coroutine[$rettpt]): Unit = {
+        def $$pop(c: scala.coroutines.Coroutine.Inst[$rettpt]): Unit = {
           scala.coroutines.common.Stack.pop(c.$$pcstack)
           scala.coroutines.common.Stack.pop(c.$$costack)
           ..$varpops
@@ -320,7 +322,7 @@ with ThreeAddressFormTransformation[C] {
         $returnvaluemethod
       }
     """
-    println(co)
+    //println(co)
     co
   }
 

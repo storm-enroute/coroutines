@@ -76,7 +76,7 @@ class CoroutineTest extends FunSuite with Matchers {
     val wrapString = coroutine { (x: String) =>
       List(x.toString)
     }
-    val f: Coroutine[List[String]] = call(wrapString("ok"))
+    val f: Coroutine.Inst[List[String]] = call(wrapString("ok"))
     val wrapInt = coroutine { (x: Int) =>
       yieldto(f)
       Vector(x)

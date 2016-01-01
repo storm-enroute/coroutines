@@ -62,7 +62,6 @@ trait Analyzer[C <: Context] {
       tpe =:= typeOf[Double]
     }
     val defaultValue: Tree = {
-      println(tpe, typeOf[AnyVal], isValType)
       if (isRefType) q"null"
       else if (tpe =:= typeOf[Boolean]) q"false"
       else if (tpe =:= typeOf[Byte]) q"0.toByte"

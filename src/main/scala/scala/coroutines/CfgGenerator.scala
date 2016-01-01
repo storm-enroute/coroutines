@@ -511,7 +511,6 @@ trait CfgGenerator[C <: Context] {
 
         val endnode = ctx.allnodes(enduid)
         if (!seen.contains(endnode)) {
-          println("to endnode ----> " + nthis.chain)
           endnode.extract(nthis.chain, seen, ctx, subgraph)
         }
         nthis.endSuccessor = Some(seen(endnode))
@@ -616,7 +615,8 @@ trait CfgGenerator[C <: Context] {
         val untypedargs = for (a <- args) yield table.untyper.untypecheck(a)
         q"""
           ..$savestate
-          $untypedco.$$push($cparam.asInstanceOf[Coroutine[$coelemtpe]], ..$untypedargs)
+          $untypedco.$$push(
+            $cparam.asInstanceOf[Coroutine.Inst[$coelemtpe]], ..$untypedargs)
           $cparam.$$target = $cparam
         """
       }
@@ -688,7 +688,8 @@ trait CfgGenerator[C <: Context] {
         val savestate = genSaveState(subgraph)
         val exittree = q"""
           ..$savestate
-          $cparam.$$target = $untypedco.asInstanceOf[Coroutine[${table.returnType}]]
+          $cparam.$$target =
+            $untypedco.asInstanceOf[Coroutine.Inst[${table.returnType}]]
           return
         """
         z.append(exittree)
@@ -1134,7 +1135,7 @@ trait CfgGenerator[C <: Context] {
 
     // traverse tree to construct CFG and extract local variables
     val (head, last) = traverse(body, bodyChain)
-    println(head.prettyPrint)
+    //println(head.prettyPrint)
 
     // extract subgraphs in the control flow graph
     val subgraphs = extractSubgraphs(head, tpt)
@@ -1177,12 +1178,12 @@ trait CfgGenerator[C <: Context] {
       subgraph.exitSubgraphs(node) = startPoints(nextUid)
     }
 
-    println(ctx.subgraphs
-      .map({ case (k, v) => 
-        v.start.prettyPrint + "\n"
-      })
-      .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
-      .mkString("\n"))
+    // println(ctx.subgraphs
+    //   .map({ case (k, v) => 
+    //     v.start.prettyPrint + "\n"
+    //   })
+    //   .zipWithIndex.map(t => s"\n${t._2}:\n${t._1}")
+    //   .mkString("\n"))
     ctx.subgraphs
   } 
 }
