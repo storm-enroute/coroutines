@@ -12,16 +12,20 @@ object VowelCounts {
     yieldval(s.count(_ == 'e'))
     yieldval(s.count(_ == 'i'))
     yieldval(s.count(_ == 'o'))
-    s.count(_ == 'u')
+    yieldval(s.count(_ == 'u'))
   }
 
   def main(args: Array[String]) {
     val c = call(vowelcounts("this the season to be jolie"))
-    // assert(c() == 1)
-    // assert(c() == 4)
-    // assert(c() == 2)
-    // assert(c() == 3)
-    // assert(c() == 0)
-    // assert(c.isStopped)
+    assert(c.resume)
+    assert(c.value == 1)
+    assert(c.resume)
+    assert(c.value == 4)
+    assert(c.resume)
+    assert(c.value == 2)
+    assert(c.resume)
+    assert(c.value == 3)
+    assert(c.resume)
+    assert(c.value == 0)
   }
 }

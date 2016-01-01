@@ -616,7 +616,7 @@ trait CfgGenerator[C <: Context] {
         q"""
           ..$savestate
           $untypedco.$$push(
-            $cparam.asInstanceOf[Coroutine.Inst[$yldtpe, $rettpe]], ..$untypedargs)
+            $cparam.asInstanceOf[Coroutine.Frame[$yldtpe, $rettpe]], ..$untypedargs)
           $cparam.$$target = $cparam
         """
       }
@@ -689,7 +689,7 @@ trait CfgGenerator[C <: Context] {
         val exittree = q"""
           ..$savestate
           $cparam.$$target =
-            $untypedco.asInstanceOf[Coroutine.Inst[${t.yieldType}, ${t.returnType}]]
+            $untypedco.asInstanceOf[Coroutine.Frame[${t.yieldType}, ${t.returnType}]]
           return
         """
         z.append(exittree)
