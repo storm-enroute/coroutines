@@ -12,5 +12,6 @@ object Identity {
   def main(args: Array[String]) {
     val c = call(id(7))
     assert(c() == 7)
+    assert(c.isStopped)
   }
 }
