@@ -33,7 +33,7 @@ package object coroutines {
 
   class ~~~>[@specialized S] private[coroutines] (
     val blueprint: Coroutine.Blueprint[S]
-  ) extends Coroutine.BlueprintMarker[S] {
+  ) extends Coroutine.DefMarker[S] {
     def apply(): S =
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
     def $call(): Coroutine.Inst[S] =
@@ -44,7 +44,7 @@ package object coroutines {
 
   class ~~>[T, @specialized S] private[coroutines] (
     val blueprint: Coroutine.Blueprint[S]
-  ) extends Coroutine.BlueprintMarker[S] {
+  ) extends Coroutine.DefMarker[S] {
     def apply(t: T): S =
       sys.error(COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
     def $call(t: T): Coroutine.Inst[S] =
@@ -55,7 +55,7 @@ package object coroutines {
 
   class ~>[PS, @specialized S] private[coroutines] (
     val blueprint: Coroutine.Blueprint[S]
-  ) extends Coroutine.BlueprintMarker[S] {
+  ) extends Coroutine.DefMarker[S] {
     def apply[T1, T2](t1: T1, t2: T2)(
       implicit e: PS =:= Tuple2[T1, T2]
     ): S = {
@@ -101,7 +101,7 @@ package object coroutines {
     new ~>[Tuple3[T1, T2, T3], S](b)
 
   class coroutine2ops[T1, T2, @specialized S](val c: (T1, T2) ~> S)
-  extends Coroutine.BlueprintMarker[S] {
+  extends Coroutine.DefMarker[S] {
     
   }
 
@@ -109,7 +109,7 @@ package object coroutines {
     new coroutine2ops(c)
 
   class coroutine3ops[T1, T2, T3, @specialized S](val c: (T1, T2, T3) ~> S)
-  extends Coroutine.BlueprintMarker[S] {
+  extends Coroutine.DefMarker[S] {
     
   }
 

@@ -68,9 +68,9 @@ object Coroutine {
     }
   }
 
-  trait BlueprintMarker[@specialized T]
+  trait DefMarker[@specialized T]
 
-  trait Blueprint[@specialized T] extends BlueprintMarker[T] {
+  trait Blueprint[@specialized T] extends DefMarker[T] {
     def $enter(c: Inst[T]): Unit
     def $assignresult(c: Inst[T], v: T): Unit = c.$result = v
     def $returnvalue(c: Inst[T], v: T): Unit

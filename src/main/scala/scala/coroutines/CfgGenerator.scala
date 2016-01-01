@@ -1017,14 +1017,14 @@ trait CfgGenerator[C <: Context] {
           n.successor = Some(u)
           (n, u)
         case ValDecl(t @ q"$_ val $_ = $c.apply(..$_)")
-          if isCoroutineBlueprintMarker(c.tpe) =>
+          if isCoroutineDefMarker(c.tpe) =>
           val nch = ch.withDecl(t, false)
           val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
           val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
           n.successor = Some(u)
           (n, u)
         case ValDecl(t @ q"$_ var $_ = $c.apply(..$_)")
-          if isCoroutineBlueprintMarker(c.tpe) =>
+          if isCoroutineDefMarker(c.tpe) =>
           val nch = ch.withDecl(t, false)
           val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
           val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())

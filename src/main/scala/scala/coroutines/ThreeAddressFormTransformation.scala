@@ -45,7 +45,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
           "call statement or declare another coroutine.")
       case q"$qual.call($co.apply(..$args))" if isCoroutinesPkg(qual) =>
         // no need to check further, the call macro will validate the coroutine type
-      case q"$co.apply(..$args)" if isCoroutineBlueprintMarker(typer.typeOf(co)) =>
+      case q"$co.apply(..$args)" if isCoroutineDefMarker(typer.typeOf(co)) =>
         c.abort(
           tree.pos,
           "Coroutine blueprints can only be invoked directly inside the coroutine. " +

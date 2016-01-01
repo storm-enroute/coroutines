@@ -329,7 +329,7 @@ with ThreeAddressFormTransformation[C] {
   def call[T: WeakTypeTag](tree: Tree): Tree = {
     val (receiver, args) = tree match {
       case q"$r.apply(..$args)" =>
-        if (!isCoroutineBlueprintMarker(r.tpe))
+        if (!isCoroutineDefMarker(r.tpe))
           c.abort(r.pos,
             s"Receiver must be a coroutine.\n" +
             s"required: Coroutine.Blueprint[${implicitly[WeakTypeTag[T]]}]\n" +

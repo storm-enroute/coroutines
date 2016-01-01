@@ -331,8 +331,8 @@ trait Analyzer[C <: Context] {
     tpe.baseType(codefsym) != NoType
   }
 
-  def isCoroutineBlueprintMarker(tpe: Type) = {
-    val codefsym = typeOf[Coroutine.BlueprintMarker[_]].typeConstructor.typeSymbol
+  def isCoroutineDefMarker(tpe: Type) = {
+    val codefsym = typeOf[Coroutine.DefMarker[_]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) != NoType
   }
 
@@ -342,7 +342,7 @@ trait Analyzer[C <: Context] {
   }
 
   def coroutineElemType(tpe: Type) = {
-    val codefsym = typeOf[Coroutine.BlueprintMarker[_]].typeConstructor.typeSymbol
+    val codefsym = typeOf[Coroutine.DefMarker[_]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) match {
       case TypeRef(pre, sym, List(tpe)) => tpe
     }
@@ -363,7 +363,7 @@ trait Analyzer[C <: Context] {
         Some(t)
       case q"$qual.`package`.call($_.apply(..$_))" if isCoroutinesPkg(qual) =>
         Some(t)
-      case q"$co.apply(..$_)" if isCoroutineBlueprintMarker(co.tpe) =>
+      case q"$co.apply(..$_)" if isCoroutineDefMarker(co.tpe) =>
         Some(t)
       case q"$co.apply[..$_](..$_)($_)" if isCoroutineBlueprintSugar(co.tpe) =>
         Some(t)
@@ -387,7 +387,7 @@ trait Analyzer[C <: Context] {
         tpt.tpe
       case q"$qual.yieldto[$tpt]($_)" if isCoroutinesPkg(qual) =>
         tpt.tpe
-      case q"$co.apply(..$_)" if isCoroutineBlueprintMarker(co.tpe) =>
+      case q"$co.apply(..$_)" if isCoroutineDefMarker(co.tpe) =>
         coroutineElemType(co.tpe)
       case q"$co.apply[..$_](..$_)($_)" if isCoroutineBlueprintSugar(co.tpe) =>
         coroutineElemType(co.tpe)
