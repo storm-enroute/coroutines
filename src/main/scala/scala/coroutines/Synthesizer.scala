@@ -20,49 +20,51 @@ with ThreeAddressFormTransformation[C] {
 
   val NUM_PREDEFINED_ENTRY_STUBS = 40
 
-  private def genEntryPoint(cfg: Cfg, subgraph: SubCfg, rettpt: Tree)(
-    implicit table: Table
+  private def genEntryPoint(cfg: Cfg, subgraph: SubCfg)(
+    implicit t: Table
   ): Tree = {
     val body = subgraph.emit(cfg)
     val defname = TermName(s"$$ep${subgraph.uid}")
     val defdef = if (subgraph.uid < NUM_PREDEFINED_ENTRY_STUBS) q"""
       override def $defname(
-        ${table.names.coroutineParam}: Coroutine.Inst[$rettpt]
+        ${t.names.coroutineParam}: Coroutine.Inst[${t.yieldType}, ${t.returnType}]
       ): Unit = {
         $body
       }
     """ else q"""
-      def $defname(${table.names.coroutineParam}: Coroutine.Inst[$rettpt]): Unit = {
+      def $defname(
+        ${t.names.coroutineParam}: Coroutine.Inst[${t.yieldType}, ${t.returnType}]
+      ): Unit = {
         $body
       }
     """
     defdef
   }
 
-  private def genEntryPoints(
-    cfg: Cfg, rettpt: Tree
-  )(implicit table: Table): Map[Long, Tree] = {
+  private def genEntryPoints(cfg: Cfg)(implicit table: Table): Map[Long, Tree] = {
     val entrypoints = for ((orignode, subgraph) <- cfg.subgraphs) yield {
-      (subgraph.uid, genEntryPoint(cfg, subgraph, rettpt))
+      (subgraph.uid, genEntryPoint(cfg, subgraph))
     }
     mutable.LinkedHashMap() ++= entrypoints.toSeq.sortBy(_._1)
   }
 
-  private def genEnterMethod(
-    entrypoints: Map[Long, Tree], tpt: Tree
-  )(implicit table: Table): Tree = {
+  private def genEnterMethod(entrypoints: Map[Long, Tree])(
+    implicit table: Table
+  ): Tree = {
+    val rettpt = table.returnType
+    val yldtpt = table.yieldType
     if (entrypoints.size == 1) {
       val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
 
       q"""
-        def $$enter(c: Coroutine.Inst[$tpt]): Unit = $ep0(c)
+        def $$enter(c: Coroutine.Inst[$yldtpt, $rettpt]): Unit = $ep0(c)
       """
     } else if (entrypoints.size == 2) {
       val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
       val q"$_ def $ep1($_): Unit = $_" = entrypoints(1)
 
       q"""
-        def $$enter(c: Coroutine.Inst[$tpt]): Unit = {
+        def $$enter(c: Coroutine.Inst[$yldtpt, $rettpt]): Unit = {
           val pc = scala.coroutines.common.Stack.top(c.$$pcstack)
           if (pc == 0) $ep0(c) else $ep1(c)
         }
@@ -74,7 +76,7 @@ with ThreeAddressFormTransformation[C] {
       }
 
       q"""
-        def $$enter(c: Coroutine.Inst[$tpt]): Unit = {
+        def $$enter(c: Coroutine.Inst[$yldtpt, $rettpt]): Unit = {
           val pc: Short = scala.coroutines.common.Stack.top(c.$$pcstack)
           (pc: @scala.annotation.switch) match {
             case ..$cases
@@ -84,7 +86,7 @@ with ThreeAddressFormTransformation[C] {
     }
   }
 
-  private def genReturnValueMethod(cfg: Cfg, tpt: Tree)(implicit table: Table): Tree = {
+  private def genReturnValueMethod(cfg: Cfg)(implicit table: Table): Tree = {
     def genReturnValueStore(n: Node) = {
       val sub = cfg.subgraphs(n.successors.head)
       val pcvalue = sub.uid
@@ -124,7 +126,10 @@ with ThreeAddressFormTransformation[C] {
     }
 
     q"""
-      def $$returnvalue(c: scala.coroutines.Coroutine.Inst[$tpt], v: $tpt): Unit = {
+      def $$returnvalue(
+        c: scala.coroutines.Coroutine.Inst[${table.yieldType}, ${table.returnType}],
+        v: ${table.returnType}
+      ): Unit = {
         $body
       }
     """
@@ -160,97 +165,103 @@ with ThreeAddressFormTransformation[C] {
     (varpushes, varpops)
   }
 
-  def specArity1(argtpts: List[Tree], rettpt: Tree): (Tree, List[Tree]) = {
+  def specArity1(
+    argtpts: List[Tree], yldtpt: Tree, rettpt: Tree
+  ): (Tree, List[Tree]) = {
     argtpts(0) match {
       case tq"scala.Boolean" =>
-        (tq"scala.coroutines.Coroutine._1", argtpts :+ rettpt)
+        (tq"scala.coroutines.Coroutine._1", argtpts :+ yldtpt :+ rettpt)
       case tq"scala.Byte" =>
-        (tq"scala.coroutines.Coroutine._1", argtpts :+ rettpt)
+        (tq"scala.coroutines.Coroutine._1", argtpts :+ yldtpt :+ rettpt)
       case tq"scala.Short" =>
         val nme = TypeName(s"_1$$spec$$S")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case tq"scala.Char" =>
         val nme = TypeName(s"_1$$spec$$C")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case tq"scala.Int" =>
         val nme = TypeName(s"_1$$spec$$I")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case tq"scala.Float" =>
         val nme = TypeName(s"_1$$spec$$F")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case tq"scala.Long" =>
         val nme = TypeName(s"_1$$spec$$J")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case tq"scala.Double" =>
         val nme = TypeName(s"_1$$spec$$D")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case _ =>
         val nme = TypeName(s"_1$$spec$$L")
-        (tq"scala.coroutines.$nme", argtpts :+ rettpt)
+        (tq"scala.coroutines.$nme", argtpts :+ yldtpt :+ rettpt)
     }
   }
 
-  def specArity2(argtpts: List[Tree], rettpt: Tree): (Tree, List[Tree]) = {
+  def specArity2(
+    argtpts: List[Tree], yldtpt: Tree, rettpt: Tree
+  ): (Tree, List[Tree]) = {
     (argtpts(0), argtpts(1)) match {
       case (tq"scala.Int", tq"scala.Int") =>
         val nme = TypeName(s"_2$$spec$$II")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case (tq"scala.Long", tq"scala.Int") =>
         val nme = TypeName(s"_2$$spec$$JI")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case (tq"scala.Double", tq"scala.Int") =>
         val nme = TypeName(s"_2$$spec$$DI")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case (_, tq"scala.Int") =>
         val nme = TypeName(s"_2$$spec$$LI")
-        (tq"scala.coroutines.$nme", argtpts(0) :: rettpt :: Nil)
+        (tq"scala.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
       case (tq"scala.Int", tq"scala.Long") =>
         val nme = TypeName(s"_2$$spec$$IJ")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case (tq"scala.Long", tq"scala.Long") =>
         val nme = TypeName(s"_2$$spec$$JJ")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case (tq"scala.Double", tq"scala.Long") =>
         val nme = TypeName(s"_2$$spec$$DJ")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case (_, tq"scala.Long") =>
         val nme = TypeName(s"_2$$spec$$LJ")
-        (tq"scala.coroutines.$nme", argtpts(0) :: rettpt :: Nil)
+        (tq"scala.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
       case (tq"scala.Int", tq"scala.Double") =>
         val nme = TypeName(s"_2$$spec$$ID")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case (tq"scala.Long", tq"scala.Double") =>
         val nme = TypeName(s"_2$$spec$$JD")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case (tq"scala.Double", tq"scala.Double") =>
         val nme = TypeName(s"_2$$spec$$DD")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case (_, tq"scala.Double") =>
         val nme = TypeName(s"_2$$spec$$LD")
-        (tq"scala.coroutines.$nme", argtpts(0) :: rettpt :: Nil)
+        (tq"scala.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
       case (tq"scala.Int", _) =>
         val nme = TypeName(s"_2$$spec$$IL")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
       case (tq"scala.Long", _) =>
         val nme = TypeName(s"_2$$spec$$JL")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
       case (tq"scala.Double", _) =>
         val nme = TypeName(s"_2$$spec$$DL")
-        (tq"scala.coroutines.$nme", rettpt :: Nil)
+        (tq"scala.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
       case (_, _) =>
         val nme = TypeName(s"_2$$spec$$LL")
-        (tq"scala.coroutines.$nme", argtpts(0) :: rettpt :: Nil)
+        (tq"scala.coroutines.$nme", argtpts(0) :: argtpts(1) :: yldtpt :: rettpt :: Nil)
     }
   }
 
-  def genCoroutineTpe(argtpts: List[Tree], rettpt: Tree): (Tree, List[Tree]) = {
+  def genCoroutineTpe(
+    argtpts: List[Tree], yldtpt: Tree, rettpt: Tree
+  ): (Tree, List[Tree]) = {
     if (argtpts.length == 1) {
-      specArity1(argtpts, rettpt)
+      specArity1(argtpts, yldtpt, rettpt)
     } else if (argtpts.length == 2) {
-      specArity2(argtpts, rettpt)
+      specArity2(argtpts, yldtpt, rettpt)
     } else if (argtpts.length == 0 || argtpts.length > 2) {
       val nme = TypeName(s"_${argtpts.size}")
-      (tq"scala.coroutines.Coroutine.$nme", argtpts :+ rettpt)
+      (tq"scala.coroutines.Coroutine.$nme", argtpts :+ yldtpt :+ rettpt)
     } else sys.error("Unreachable case.")
   }
 
@@ -277,42 +288,45 @@ with ThreeAddressFormTransformation[C] {
 
     // infer coroutine return type
     val rettpt = table.returnType
+    val yldtpt = table.yieldType
 
     // generate control flow graph
     val cfg = genControlFlowGraph(args, body, rettpt)
 
     // generate entry points from yields and coroutine applications
-    val entrypoints = genEntryPoints(cfg, rettpt)
+    val entrypoints = genEntryPoints(cfg)
 
     // generate entry method
-    val entermethod = genEnterMethod(entrypoints, rettpt)
+    val entermethod = genEnterMethod(entrypoints)
 
     // generate return value method
-    val returnvaluemethod = genReturnValueMethod(cfg, rettpt)
+    val returnvaluemethod = genReturnValueMethod(cfg)
 
     // generate variable pushes and pops for stack variables
     val (varpushes, varpops) = genVarPushesAndPops(cfg)
 
     // emit coroutine instantiation
-    val (coroutinequal, tparams) = genCoroutineTpe(argtpts, rettpt)
+    val (coroutinequal, tparams) = genCoroutineTpe(argtpts, yldtpt, rettpt)
     val entrypointmethods = entrypoints.map(_._2)
     val valnme = TermName(c.freshName("c"))
     val co = q"""
       new $coroutinequal[..$tparams] {
-        def $$call(..$args): scala.coroutines.Coroutine.Inst[$rettpt] = {
-          val $valnme = new scala.coroutines.Coroutine.Inst[$rettpt]
+        def $$call(..$args): scala.coroutines.Coroutine.Inst[$yldtpt, $rettpt] = {
+          val $valnme = new scala.coroutines.Coroutine.Inst[$yldtpt, $rettpt]
           $$push($valnme, ..$argidents)
           $valnme
         }
-        def apply(..$args): $rettpt = {
+        def apply(..$args): $yldtpt = {
           sys.error(scala.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
         }
-        def $$push(c: scala.coroutines.Coroutine.Inst[$rettpt], ..$args): Unit = {
+        def $$push(
+          c: scala.coroutines.Coroutine.Inst[$yldtpt, $rettpt], ..$args
+        ): Unit = {
           scala.coroutines.common.Stack.push(c.$$costack, this, -1)
           scala.coroutines.common.Stack.push(c.$$pcstack, 0.toShort, -1)
           ..$varpushes
         }
-        def $$pop(c: scala.coroutines.Coroutine.Inst[$rettpt]): Unit = {
+        def $$pop(c: scala.coroutines.Coroutine.Inst[$yldtpt, $rettpt]): Unit = {
           scala.coroutines.common.Stack.pop(c.$$pcstack)
           scala.coroutines.common.Stack.pop(c.$$costack)
           ..$varpops
@@ -322,25 +336,25 @@ with ThreeAddressFormTransformation[C] {
         $returnvaluemethod
       }
     """
-    //println(co)
+    println(co)
     co
   }
 
-  def call[T: WeakTypeTag](tree: Tree): Tree = {
+  def call[R: WeakTypeTag](tree: Tree): Tree = {
     val (receiver, args) = tree match {
       case q"$r.apply(..$args)" =>
-        if (!isCoroutineDefMarker(r.tpe))
-          c.abort(r.pos,
-            s"Receiver must be a coroutine.\n" +
-            s"required: Coroutine[${implicitly[WeakTypeTag[T]]}]\n" +
-            s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
+        // if (!isCoroutineDefMarker(r.tpe))
+        //   c.abort(r.pos,
+        //     s"Receiver must be a coroutine.\n" +
+        //     s"required: Coroutine[${implicitly[WeakTypeTag[T]]}]\n" +
+        //     s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
         (r, args)
       case q"$r.apply[..$_](..$args)($_)" =>
-        if (!isCoroutineDefSugar(r.tpe))
-          c.abort(r.pos,
-            s"Receiver must be a coroutine.\n" +
-            s"required: Coroutine[${implicitly[WeakTypeTag[T]]}]\n" +
-            s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
+        // if (!isCoroutineDefSugar(r.tpe))
+        //   c.abort(r.pos,
+        //     s"Receiver must be a coroutine.\n" +
+        //     s"required: Coroutine[${implicitly[WeakTypeTag[T]]}]\n" +
+        //     s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
         (r, args)
       case _ =>
         c.abort(
@@ -349,7 +363,7 @@ with ThreeAddressFormTransformation[C] {
           "  call(<coroutine>.apply(<arg0>, ..., <argN>))")
     }
 
-    val tpe = implicitly[WeakTypeTag[T]]
+    //val tpe = implicitly[WeakTypeTag[T]]
     val t = q"""
       $receiver.$$call(..$args)
     """

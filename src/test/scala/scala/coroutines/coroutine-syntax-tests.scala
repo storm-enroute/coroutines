@@ -8,108 +8,108 @@ import scala.util.Failure
 
 
 class CoroutineSyntaxTest extends FunSuite with Matchers {
-  test("Coroutine._0 must be invoked") {
-    val rube = coroutine { () =>
-      yieldval(5)
-      yieldval(-5)
-      10
-    }
-    val co: ~~~>[Int] = rube
-    val c = call(co())
-    assert(c() == 5)
-    assert(c() == -5)
-    assert(c() == 10)
-    assert(c.isStopped)
-  }
+  // test("Coroutine._0 must be invoked") {
+  //   val rube = coroutine { () =>
+  //     yieldval(5)
+  //     yieldval(-5)
+  //     10
+  //   }
+  //   val co: ~~~>[Int] = rube
+  //   val c = call(co())
+  //   assert(c() == 5)
+  //   assert(c() == -5)
+  //   assert(c() == 10)
+  //   assert(c.isStopped)
+  // }
 
-  test("Coroutine._1 must be invoked") {
-    val rube = coroutine { (x: Int) =>
-      yieldval(x + x)
-      yieldval(x - 2 * x)
-      x
-    }
+  // test("Coroutine._1 must be invoked") {
+  //   val rube = coroutine { (x: Int) =>
+  //     yieldval(x + x)
+  //     yieldval(x - 2 * x)
+  //     x
+  //   }
 
-    val co: Int ~~> Int = rube
-    val c = call(co(7))
-    assert(c() == 14)
-    assert(c() == -7)
-    assert(c() == 7)
-    assert(c.isStopped)
-  }
+  //   val co: Int ~~> Int = rube
+  //   val c = call(co(7))
+  //   assert(c() == 14)
+  //   assert(c() == -7)
+  //   assert(c() == 7)
+  //   assert(c.isStopped)
+  // }
 
-  test("Coroutine._1 must be invoked for tuples with the quoting type") {
-    val rube = coroutine { (t: (Int, String)) =>
-      yieldval(t._1)
-      t._2
-    }
+  // test("Coroutine._1 must be invoked for tuples with the quoting type") {
+  //   val rube = coroutine { (t: (Int, String)) =>
+  //     yieldval(t._1)
+  //     t._2
+  //   }
 
-    val co: (Int, String) ~~> Any = rube
-    val c = call(co((7, "ok")))
-    assert(c() == 7)
-    assert(c() == "ok")
-    assert(c.isStopped)
-  }
+  //   val co: (Int, String) ~~> Any = rube
+  //   val c = call(co((7, "ok")))
+  //   assert(c() == 7)
+  //   assert(c() == "ok")
+  //   assert(c.isStopped)
+  // }
 
-  test("Coroutine._2 must be invoked") {
-    val rube = coroutine { (x: Int, y: Int) =>
-      yieldval(x + y)
-      yieldval(x - y)
-      x * y
-    }
+  // test("Coroutine._2 must be invoked") {
+  //   val rube = coroutine { (x: Int, y: Int) =>
+  //     yieldval(x + y)
+  //     yieldval(x - y)
+  //     x * y
+  //   }
 
-    val co: (Int, Int) ~> Int = rube
-    val c = call(co(7, 4))
-    assert(c() == 11)
-    assert(c() == 3)
-    assert(c() == 28)
-    assert(c.isStopped)
-  }
+  //   val co: (Int, Int) ~> Int = rube
+  //   val c = call(co(7, 4))
+  //   assert(c() == 11)
+  //   assert(c() == 3)
+  //   assert(c() == 28)
+  //   assert(c.isStopped)
+  // }
 
-  test("Coroutine._3 must be invoked") {
-    val rube = coroutine { (x: Int, y: Int, z: Int) =>
-      yieldval(x)
-      yieldval(y)
-      z
-    }
+  // test("Coroutine._3 must be invoked") {
+  //   val rube = coroutine { (x: Int, y: Int, z: Int) =>
+  //     yieldval(x)
+  //     yieldval(y)
+  //     z
+  //   }
 
-    val co: (Int, Int, Int) ~> Int = rube
-    val c = call(co(3, 5, 8))
-    assert(c() == 3)
-    assert(c() == 5)
-    assert(c() == 8)
-    assert(c.isStopped)
-  }
+  //   val co: (Int, Int, Int) ~> Int = rube
+  //   val c = call(co(3, 5, 8))
+  //   assert(c() == 3)
+  //   assert(c() == 5)
+  //   assert(c() == 8)
+  //   assert(c.isStopped)
+  // }
 
-  test("Another coroutine must be invoked without syntax sugar") {
-    val gimmeFive = coroutine { () => 5 }
-    val rube = coroutine { () =>
-      gimmeFive()
-    }
+  // test("Another coroutine must be invoked without syntax sugar") {
+  //   val gimmeFive = coroutine { () => 5 }
+  //   val rube = coroutine { () =>
+  //     gimmeFive()
+  //   }
 
-    val c = call(rube())
-    assert(c() == 5)
-    assert(c.isStopped)
-  }
+  //   val c = call(rube())
+  //   assert(c() == 5)
+  //   assert(c.isStopped)
+  // }
 
-  test("Another coroutine must be invoked with syntax sugar") {
-    val gimmeFive: ~~~>[Int] = coroutine { () => 5 }
-    val rube = coroutine { () =>
-      gimmeFive()
-    }
+  // test("Another coroutine must be invoked with syntax sugar") {
+  //   val gimmeFive: ~~~>[Int] = coroutine { () => 5 }
+  //   val rube = coroutine { () =>
+  //     gimmeFive()
+  //   }
 
-    val c = call(rube())
-    assert(c() == 5)
-    assert(c.isStopped)
-  }
+  //   val c = call(rube())
+  //   assert(c() == 5)
+  //   assert(c.isStopped)
+  // }
 
-  test("Another arity-2 coroutine must be invoked with syntax sugar") {
-    val mult: (Int, Int) ~> Int = coroutine { (x: Int, y: Int) => x * y }
-    val rube = coroutine { () =>
-      mult(3, 4)
-    }
+  // test("Another arity-2 coroutine must be invoked with syntax sugar") {
+  //   val mult: (Int, Int) ~> Int = coroutine { (x: Int, y: Int) => x * y }
+  //   val rube = coroutine { () =>
+  //     mult(3, 4)
+  //   }
 
-    val c = call(rube())
-    assert(c() == 12)
-    assert(c.isStopped)
-  }
+  //   val c = call(rube())
+  //   assert(c() == 12)
+  //   assert(c.isStopped)
+  // }
 }

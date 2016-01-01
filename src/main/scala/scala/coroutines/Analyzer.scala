@@ -192,6 +192,7 @@ trait Analyzer[C <: Context] {
 
   class Table(private val lambda: Tree) {
     val q"(..$args) => $body" = lambda
+    val yieldType = inferYieldType(body)
     val returnType = inferReturnType(body)
     private var varCount = 0
     private var nodeCount = 0L
@@ -327,29 +328,29 @@ trait Analyzer[C <: Context] {
   }
 
   def isCoroutineDef(tpe: Type) = {
-    val codefsym = typeOf[Coroutine[_]].typeConstructor.typeSymbol
+    val codefsym = typeOf[Coroutine[_, _]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) != NoType
   }
 
   def isCoroutineDefMarker(tpe: Type) = {
-    val codefsym = typeOf[Coroutine.DefMarker[_]].typeConstructor.typeSymbol
+    val codefsym = typeOf[Coroutine.DefMarker[_, _]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) != NoType
   }
 
-  def isCoroutineDefSugar(tpe: Type) = {
-    val codefsym = typeOf[~>[_, _]].typeConstructor.typeSymbol
-    tpe.baseType(codefsym) != NoType
-  }
+  // def isCoroutineDefSugar(tpe: Type) = {
+  //   val codefsym = typeOf[~>[_, _]].typeConstructor.typeSymbol
+  //   tpe.baseType(codefsym) != NoType
+  // }
 
-  def coroutineElemType(tpe: Type) = {
-    val codefsym = typeOf[Coroutine.DefMarker[_]].typeConstructor.typeSymbol
+  def coroutineTypeArgs(tpe: Type) = {
+    val codefsym = typeOf[Coroutine.DefMarker[_, _]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) match {
-      case TypeRef(pre, sym, List(tpe)) => tpe
+      case TypeRef(pre, sym, List(yldtpe, rettpe)) => (yldtpe, rettpe)
     }
   }
 
   def coroutineTypeFor(tpe: Type) = {
-    val codeftpe = typeOf[Coroutine[_]].typeConstructor
+    val codeftpe = typeOf[Coroutine[_, _]].typeConstructor
     appliedType(codeftpe, List(tpe))
   }
 
@@ -365,8 +366,8 @@ trait Analyzer[C <: Context] {
         Some(t)
       case q"$co.apply(..$_)" if isCoroutineDefMarker(co.tpe) =>
         Some(t)
-      case q"$co.apply[..$_](..$_)($_)" if isCoroutineDefSugar(co.tpe) =>
-        Some(t)
+      // case q"$co.apply[..$_](..$_)($_)" if isCoroutineDefSugar(co.tpe) =>
+      //   Some(t)
       case _ =>
         None
     }
@@ -379,19 +380,20 @@ trait Analyzer[C <: Context] {
     case t => false
   }
 
-  def inferReturnType(body: Tree): Tree = {
-    // return type must correspond to the return type of the function literal
-    val rettpe = body.tpe
+  def inferYieldType(body: Tree): Tree = {
+    // yield type must correspond to the `yieldval`, `yieldto` and coroutine-apply args
     val constraintTpes = body.collect {
       case q"$qual.yieldval[$tpt]($_)" if isCoroutinesPkg(qual) =>
         tpt.tpe
       case q"$qual.yieldto[$tpt]($_)" if isCoroutinesPkg(qual) =>
         tpt.tpe
       case q"$co.apply(..$_)" if isCoroutineDefMarker(co.tpe) =>
-        coroutineElemType(co.tpe)
-      case q"$co.apply[..$_](..$_)($_)" if isCoroutineDefSugar(co.tpe) =>
-        coroutineElemType(co.tpe)
+        coroutineTypeArgs(co.tpe)._1
+      // case q"$co.apply[..$_](..$_)($_)" if isCoroutineDefSugar(co.tpe) =>
+      //   coroutineTypeArgs(co.tpe)._1
     }
-    tq"${lub(rettpe :: constraintTpes).widen}"
+    tq"${lub(body.tpe :: constraintTpes).widen}"
   }
+
+  def inferReturnType(body: Tree): Tree = tq"${lub(body.tpe :: Nil).widen}"
 }
