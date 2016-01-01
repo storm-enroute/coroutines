@@ -15,4 +15,8 @@ class ExamplesTest extends FunSuite with Matchers {
   test("vowel counts") {
     VowelCounts.main(Array())
   }
+
+  test("datatypes") {
+    Datatypes.main(Array())
+  }
 }
