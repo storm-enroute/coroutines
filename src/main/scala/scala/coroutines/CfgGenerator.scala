@@ -571,7 +571,7 @@ trait CfgGenerator[C <: Context] {
     ) extends Node {
       val (co, args) = tree match {
         case q"$_ val $_: $_ = $co.apply(..$args)" => (co, args)
-        case q"$_ val $_: $_ = $co.apply[..$_](..$args)($_)" => (co, args)
+        case q"$_ val $_: $_ = $co.apply[..$_](..$args)(..$_)" => (co, args)
       }
       def successors = successor.toSeq
       def coroutine: Tree = co
@@ -608,14 +608,15 @@ trait CfgGenerator[C <: Context] {
       def genCoroutineCall(
         co: Tree, args: List[Tree], subgraph: SubCfg
       )(implicit table: Table): Tree = {
-        val (yldtpe, rettpe) = coroutineTypeArgs(co.tpe)
+        val (yldtpe, rettpe) = coroutineYieldReturnTypes(co.tpe)
         val cparam = table.names.coroutineParam
         val savestate = genSaveState(subgraph)
         val untypedco = table.untyper.untypecheck(co)
         val untypedargs = for (a <- args) yield table.untyper.untypecheck(a)
+        val tpargs = coroutineMethodArgs(co.tpe)
         q"""
           ..$savestate
-          $untypedco.$$push(
+          $untypedco.$$push[..$tpargs](
             $cparam.asInstanceOf[Coroutine.Frame[$yldtpe, $rettpe]], ..$untypedargs)
           $cparam.$$target = $cparam
         """
@@ -1030,20 +1031,20 @@ trait CfgGenerator[C <: Context] {
           val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
           n.successor = Some(u)
           (n, u)
-        // case ValDecl(t @ q"$_ val $_ = $c.apply[..$_](..$_)($_)")
-        //   if isCoroutineDefSugar(c.tpe) =>
-        //   val nch = ch.withDecl(t, false)
-        //   val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
-        //   val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
-        //   n.successor = Some(u)
-        //   (n, u)
-        // case ValDecl(t @ q"$_ var $_ = $c.apply[..$_](..$_)($_)")
-        //   if isCoroutineDefSugar(c.tpe) =>
-        //   val nch = ch.withDecl(t, false)
-        //   val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
-        //   val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
-        //   n.successor = Some(u)
-        //   (n, u)
+        case ValDecl(t @ q"$_ val $_ = $c.apply[..$_](..$_)(..$_)")
+          if isCoroutineDefSugar(c.tpe) =>
+          val nch = ch.withDecl(t, false)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
+          n.successor = Some(u)
+          (n, u)
+        case ValDecl(t @ q"$_ var $_ = $c.apply[..$_](..$_)(..$_)")
+          if isCoroutineDefSugar(c.tpe) =>
+          val nch = ch.withDecl(t, false)
+          val n = Node.ApplyCoroutine(t, ch, table.newNodeUid())
+          val u = Node.DefaultStatement(q"()", nch, table.newNodeUid())
+          n.successor = Some(u)
+          (n, u)
         case ValDecl(t) =>
           val nch = ch.withDecl(t, false)
           val n = Node.Decl(t, ch, table.newNodeUid())

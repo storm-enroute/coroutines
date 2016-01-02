@@ -336,25 +336,25 @@ with ThreeAddressFormTransformation[C] {
         $returnvaluemethod
       }
     """
-    //println(co)
+    // println(co)
     co
   }
 
   def call[R: WeakTypeTag](tree: Tree): Tree = {
     val (receiver, args) = tree match {
       case q"$r.apply(..$args)" =>
-        // if (!isCoroutineDefMarker(r.tpe))
-        //   c.abort(r.pos,
-        //     s"Receiver must be a coroutine.\n" +
-        //     s"required: Coroutine[${implicitly[WeakTypeTag[T]]}]\n" +
-        //     s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
+        if (!isCoroutineDefMarker(r.tpe))
+          c.abort(r.pos,
+            s"Receiver must be a coroutine.\n" +
+            s"required: Coroutine[_, ${implicitly[WeakTypeTag[R]]}]\n" +
+            s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
         (r, args)
-      case q"$r.apply[..$_](..$args)($_)" =>
-        // if (!isCoroutineDefSugar(r.tpe))
-        //   c.abort(r.pos,
-        //     s"Receiver must be a coroutine.\n" +
-        //     s"required: Coroutine[${implicitly[WeakTypeTag[T]]}]\n" +
-        //     s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
+      case q"$r.apply[..$_](..$args)(..$_)" =>
+        if (!isCoroutineDefSugar(r.tpe))
+          c.abort(r.pos,
+            s"Receiver must be a coroutine.\n" +
+            s"required: Coroutine[_, ${implicitly[WeakTypeTag[R]]}]\n" +
+            s"found:    ${r.tpe} (with underlying type ${r.tpe.widen})")
         (r, args)
       case _ =>
         c.abort(
@@ -363,7 +363,6 @@ with ThreeAddressFormTransformation[C] {
           "  call(<coroutine>.apply(<arg0>, ..., <argN>))")
     }
 
-    //val tpe = implicitly[WeakTypeTag[T]]
     val t = q"""
       $receiver.$$call(..$args)
     """

@@ -333,19 +333,59 @@ trait Analyzer[C <: Context] {
   }
 
   def isCoroutineDefMarker(tpe: Type) = {
-    val codefsym = typeOf[Coroutine.DefMarker[_, _]].typeConstructor.typeSymbol
+    val codefsym = typeOf[Coroutine.DefMarker[_]].typeConstructor.typeSymbol
     tpe.baseType(codefsym) != NoType
   }
 
-  // def isCoroutineDefSugar(tpe: Type) = {
-  //   val codefsym = typeOf[~>[_, _]].typeConstructor.typeSymbol
-  //   tpe.baseType(codefsym) != NoType
-  // }
+  def isCoroutineDefSugar0(tpe: Type) = {
+    val codefsym0 = typeOf[~~~>[_, _]].typeConstructor.typeSymbol
+    def hasBase(sym: Symbol) = tpe.baseType(sym) != NoType
+    hasBase(codefsym0)
+  }
 
-  def coroutineTypeArgs(tpe: Type) = {
-    val codefsym = typeOf[Coroutine.DefMarker[_, _]].typeConstructor.typeSymbol
+  def isCoroutineDefSugar(tpe: Type) = {
+    val codefsym0 = typeOf[~~~>[_, _]].typeConstructor.typeSymbol
+    val codefsym1 = typeOf[~~>[_, _]].typeConstructor.typeSymbol
+    val codefsym2 = typeOf[~>[_, _]].typeConstructor.typeSymbol
+    def hasBase(sym: Symbol) = tpe.baseType(sym) != NoType
+    hasBase(codefsym0) || hasBase(codefsym1) || hasBase(codefsym2)
+  }
+
+  def coroutineMethodArgs(tpe: Type): List[Type] =
+    if (!isCoroutineDefSugar(tpe)) Nil
+    else if (isCoroutineDefSugar0(tpe)) Nil
+    else {
+      val (ytpe, rtpe) = coroutineYieldReturnTypes(tpe)
+      val codefsym1 = typeOf[~~>[_, _]].typeConstructor.typeSymbol
+      tpe.baseType(codefsym1) match {
+        case TypeRef(_, _, List(_, _)) => return List(ytpe, rtpe)
+        case _ =>
+      }
+      val codefsym2 = typeOf[~>[_, _]].typeConstructor.typeSymbol
+      val tupletpe = tpe.baseType(codefsym2) match {
+        case TypeRef(_, _, List(tpe, _)) => tpe
+      }
+      val tuple2sym = typeOf[(_, _)].typeConstructor.typeSymbol
+      tupletpe.baseType(tuple2sym) match {
+        case TypeRef(_, _, tpargs) => return tpargs ++ List(ytpe, rtpe)
+        case _ =>
+      }
+      val tuple3sym = typeOf[(_, _, _)].typeConstructor.typeSymbol
+      tpe.baseType(tuple3sym) match {
+        case TypeRef(_, _, tpargs) => return tpargs ++ List(ytpe, rtpe)
+        case _ =>
+      }
+      sys.error(s"Not a coroutine sugar type with type params: $tpe")
+    }
+
+  def coroutineYieldReturnTypes(tpe: Type) = {
+    val codefsym = typeOf[Coroutine.DefMarker[_]].typeConstructor.typeSymbol
+    val tuplesym = typeOf[(_, _)].typeConstructor.typeSymbol
     tpe.baseType(codefsym) match {
-      case TypeRef(pre, sym, List(yldtpe, rettpe)) => (yldtpe, rettpe)
+      case TypeRef(_, sym, List(typetuple)) =>
+        typetuple.baseType(tuplesym) match {
+          case TypeRef(_, sym, List(yldtpe, rettpe)) => (yldtpe, rettpe)
+        }
     }
   }
 
@@ -366,8 +406,8 @@ trait Analyzer[C <: Context] {
         Some(t)
       case q"$co.apply(..$_)" if isCoroutineDefMarker(co.tpe) =>
         Some(t)
-      // case q"$co.apply[..$_](..$_)($_)" if isCoroutineDefSugar(co.tpe) =>
-      //   Some(t)
+      case q"$co.apply[..$_](..$_)(..$_)" if isCoroutineDefSugar(co.tpe) =>
+        Some(t)
       case _ =>
         None
     }
@@ -388,9 +428,9 @@ trait Analyzer[C <: Context] {
       case q"$qual.yieldto[$tpt]($_)" if isCoroutinesPkg(qual) =>
         tpt.tpe
       case q"$co.apply(..$_)" if isCoroutineDefMarker(co.tpe) =>
-        coroutineTypeArgs(co.tpe)._1
-      // case q"$co.apply[..$_](..$_)($_)" if isCoroutineDefSugar(co.tpe) =>
-      //   coroutineTypeArgs(co.tpe)._1
+        coroutineYieldReturnTypes(co.tpe)._1
+      case q"$co.apply[..$_](..$_)(..$_)" if isCoroutineDefSugar(co.tpe) =>
+        coroutineYieldReturnTypes(co.tpe)._1
     }
     tq"${lub(constraintTpes).widen}"
   }

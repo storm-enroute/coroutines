@@ -51,6 +51,13 @@ trait ThreeAddressFormTransformation[C <: Context] {
           "Coroutine blueprints can only be invoked directly inside the coroutine. " +
           "Nested classes, functions or for-comprehensions, should either use the " +
           "call statement or declare another coroutine.")
+      case q"$co.apply[..$_](..$args)(..$_)"
+        if isCoroutineDefMarker(typer.typeOf(co)) =>
+        c.abort(
+          tree.pos,
+          "Coroutine blueprints can only be invoked directly inside the coroutine. " +
+          "Nested classes, functions or for-comprehensions, should either use the " +
+          "call statement or declare another coroutine.")
       case _ =>
         super.traverse(tree)
     }

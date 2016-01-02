@@ -23,14 +23,17 @@ object Datatypes {
     } while (i < n)
   }
 
-  // def assertEqualsRange(n: Int, co: Int ~~> Int) {
-  //   val c = call(co(n))
-  //   for (i <- 0 until n) assert(c() == i)
-  //   assert(c.isStopped)
-  // }
+  def assertEqualsRange(n: Int, co: Int ~~> (Int, Unit)) {
+    val c = call(co(n))
+    for (i <- 0 until n) {
+      c.resume
+      assert(c.value == i)
+    }
+    assert(!c.resume)
+  }
 
   def main(args: Array[String]) {
-    // assertEqualsRange(5, whileRange)
-    // assertEqualsRange(5, doWhileRange)
+    assertEqualsRange(5, whileRange)
+    assertEqualsRange(5, doWhileRange)
   }
 }

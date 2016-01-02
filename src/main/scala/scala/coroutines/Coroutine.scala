@@ -14,7 +14,7 @@ import scala.util.Try
 
 
 
-trait Coroutine[@specialized T, R] extends Coroutine.DefMarker[T, R] {
+trait Coroutine[@specialized T, R] extends Coroutine.DefMarker[(T, R)] {
   def $enter(c: Coroutine.Frame[T, R]): Unit
   def $assignyield(c: Coroutine.Frame[T, R], v: T): Unit = {
     c.$hasYield = true
@@ -114,6 +114,7 @@ object Coroutine {
     def result: R = {
       if (!isCompleted)
         sys.error("Coroutine has no result, because it is not completed.")
+      if ($exception != null) throw $exception
       $result
     }
 
@@ -129,9 +130,11 @@ object Coroutine {
     def isLive: Boolean = $costackptr > 0
 
     def isCompleted: Boolean = !isLive
+
+    override def toString = s"Coroutine.Frame<depth: ${$costackptr}, live: $isLive>"
   }
 
-  trait DefMarker[@specialized T, R]
+  trait DefMarker[YR]
 
   def synthesize(c: Context)(f: c.Tree): c.Tree = {
     new Synthesizer[c.type](c).synthesize(f)
@@ -145,23 +148,27 @@ object Coroutine {
     def apply(): R
     def $call(): Frame[T, R]
     def $push(c: Frame[T, R]): Unit
+    override def toString = s"Coroutine._0@${System.identityHashCode(this)}"
   }
 
   abstract class _1[A0, @specialized T, R] extends Coroutine[T, R] {
     def apply(a0: A0): R
     def $call(a0: A0): Frame[T, R]
     def $push(c: Frame[T, R], a0: A0): Unit
+    override def toString = s"Coroutine._1@${System.identityHashCode(this)}"
   }
 
   abstract class _2[A0, A1, @specialized T, R] extends Coroutine[T, R] {
     def apply(a0: A0, a1: A1): R
     def $call(a0: A0, a1: A1): Frame[T, R]
     def $push(c: Frame[T, R], a0: A0, a1: A1): Unit
+    override def toString = s"Coroutine._2@${System.identityHashCode(this)}"
   }
 
   abstract class _3[A0, A1, A2, @specialized T, R] extends Coroutine[T, R] {
     def apply(a0: A0, a1: A1, a2: A2): R
     def $call(a0: A0, a1: A1, a2: A2): Frame[T, R]
     def $push(c: Frame[T, R], a0: A0, a1: A1, a2: A2): Unit
+    override def toString = s"Coroutine._3@${System.identityHashCode(this)}"
   }
 }
