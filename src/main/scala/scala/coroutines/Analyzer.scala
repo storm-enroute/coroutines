@@ -371,7 +371,7 @@ trait Analyzer[C <: Context] {
         case _ =>
       }
       val tuple3sym = typeOf[(_, _, _)].typeConstructor.typeSymbol
-      tpe.baseType(tuple3sym) match {
+      tupletpe.baseType(tuple3sym) match {
         case TypeRef(_, _, tpargs) => return tpargs ++ List(ytpe, rtpe)
         case _ =>
       }

@@ -102,6 +102,9 @@ package object coroutines {
   implicit def coroutine0[@specialized S, R](b: Coroutine._0[S, R]) =
     new ~~~>[S, R](b)
 
+  implicit def coroutine1nothing[T, R](b: Coroutine._1[T, Nothing, R]) =
+    new ~~>[T, (Nothing, R)](b)
+
   implicit def coroutine1[T, @specialized S, R](b: Coroutine._1[T, S, R]) =
     new ~~>[T, (S, R)](b)
 
@@ -113,6 +116,12 @@ package object coroutines {
 
   implicit def coroutine2[T1, T2, @specialized S, R](b: Coroutine._2[T1, T2, S, R]) =
     new ~>[Tuple2[T1, T2], (S, R)](b)
+
+  implicit def coroutine3nothing[T1, T2, T3, R](
+    b: Coroutine._3[T1, T2, T3, Nothing, R]
+  ) = {
+    new ~>[Tuple3[T1, T2, T3], (Nothing, R)](b)
+  }
 
   implicit def coroutine3[T1, T2, T3, @specialized S, R](
     b: Coroutine._3[T1, T2, T3, S, R]

@@ -118,6 +118,18 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
     assert(c.isCompleted)
   }
 
+  test("Another arity-1 coroutine must be invoked with syntax sugar") {
+    val neg: Int ~~> (Nothing, Int) = coroutine { (x: Int) => -x }
+    val rube = coroutine { () =>
+      neg(17)
+    }
+
+    val c = call(rube())
+    assert(!c.resume)
+    assert(c.result == -17)
+    assert(c.isCompleted)
+  }
+
   test("Another arity-2 coroutine must be invoked with syntax sugar") {
     val mult: (Int, Int) ~> (Nothing, Int) = coroutine { (x: Int, y: Int) => x * y }
     val rube = coroutine { () =>
@@ -127,6 +139,20 @@ class CoroutineSyntaxTest extends FunSuite with Matchers {
     val c = call(rube())
     assert(!c.resume)
     assert(c.result == 12)
+    assert(c.isCompleted)
+  }
+
+  test("Another arity-3 coroutine must be invoked with syntax sugar") {
+    val mult: (Int, Int, Int) ~> (Nothing, Int) = coroutine {
+      (x: Int, y: Int, z: Int) => x * y * z
+    }
+    val rube = coroutine { () =>
+      mult(3, 4, 5)
+    }
+
+    val c = call(rube())
+    assert(!c.resume)
+    assert(c.result == 60)
     assert(c.isCompleted)
   }
 }
