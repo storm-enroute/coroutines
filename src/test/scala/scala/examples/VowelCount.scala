@@ -17,15 +17,15 @@ object VowelCounts {
 
   def main(args: Array[String]) {
     val c = call(vowelcounts("this the season to be jolie"))
-    assert(c.resume)
+    c.resume
     assert(c.value == 1)
-    assert(c.resume)
+    c.resume
     assert(c.value == 4)
-    assert(c.resume)
+    c.resume
     assert(c.value == 2)
-    assert(c.resume)
+    c.resume
     assert(c.value == 3)
-    assert(c.resume)
+    c.resume
     assert(c.value == 0)
   }
 }
