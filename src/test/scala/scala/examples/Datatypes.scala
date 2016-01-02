@@ -29,7 +29,6 @@ object Datatypes {
       c.resume
       assert(c.value == i)
     }
-    assert(!c.resume)
   }
 
   def main(args: Array[String]) {

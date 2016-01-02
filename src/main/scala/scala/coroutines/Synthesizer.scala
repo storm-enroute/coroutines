@@ -362,9 +362,10 @@ with ThreeAddressFormTransformation[C] {
           "The call statement must take a coroutine invocation expression:\n" +
           "  call(<coroutine>.apply(<arg0>, ..., <argN>))")
     }
+    val tpargs = coroutineMethodArgs(receiver.tpe)
 
     val t = q"""
-      $receiver.$$call(..$args)
+      $receiver.$$call[..$tpargs](..$args)
     """
     t
   }

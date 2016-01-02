@@ -31,6 +31,8 @@ package object coroutines {
 
   /* syntax sugar */
 
+  type <~>[Y, R] = Coroutine.Frame[Y, R]
+
   class ~~~>[@specialized S, R] private[coroutines] (
     val blueprint: Coroutine[S, R]
   ) extends Coroutine.DefMarker[(S, R)] {

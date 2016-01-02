@@ -8,6 +8,14 @@ import scala.util.Failure
 
 
 class CoroutineSyntaxTest extends FunSuite with Matchers {
+  test("coroutine instance must have nicer syntax") {
+    val id: Int ~~> (Nothing, Int) = coroutine { (x: Int) => x }
+    val c: Nothing <~> Int = call(id(5))
+    assert(!c.resume)
+    assert(c.result == 5)
+    assert(c.isCompleted)
+  }
+
   test("Coroutine._0 must be invoked") {
     val rube = coroutine { () =>
       yieldval(5)
