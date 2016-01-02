@@ -23,4 +23,8 @@ class ExamplesTest extends FunSuite with Matchers {
   test("lifecycle") {
     Lifecycle.main(Array())
   }
+
+  test("exceptions") {
+    Exceptions.main(Array())
+  }
 }
