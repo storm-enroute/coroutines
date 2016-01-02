@@ -19,4 +19,8 @@ class ExamplesTest extends FunSuite with Matchers {
   test("datatypes") {
     Datatypes.main(Array())
   }
+
+  test("lifecycle") {
+    Lifecycle.main(Array())
+  }
 }
