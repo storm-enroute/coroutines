@@ -53,4 +53,19 @@ class RegressionTest extends FunSuite with Matchers {
       assert(c.value == -i)
     }
   }
+
+  test("coroutine should call a coroutine with a different return type") {
+    val stringer = coroutine { (x: Int) => x.toString }
+    val caller = coroutine { (x: Int) =>
+      val s = stringer(2 * x)
+      yieldval(s)
+      x * 3
+    }
+
+    val c = call(caller(5))
+    assert(c.resume)
+    assert(c.value == "10")
+    assert(!c.resume)
+    assert(c.result == 15)
+  }
 }
