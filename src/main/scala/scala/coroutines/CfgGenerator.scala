@@ -124,6 +124,7 @@ trait CfgGenerator[C <: Context] {
     protected def genExit(value: Tree, subgraph: SubCfg)(implicit t: Table): Tree = {
       val cparam = t.names.coroutineParam
       val untypedtree = t.untyper.untypecheck(value)
+      val returnvaluemethod = t.returnValueMethodName
       q"""
         $$pop($cparam)
         if (scala.coroutines.common.Stack.isEmpty($cparam.$$costack)) {
@@ -131,7 +132,7 @@ trait CfgGenerator[C <: Context] {
         } else {
           $cparam.$$target = $cparam
           scala.coroutines.common.Stack.top($cparam.$$costack)
-            .$$returnvalue($cparam, $untypedtree)
+            .$returnvaluemethod($cparam, $untypedtree)
         }
         return
       """

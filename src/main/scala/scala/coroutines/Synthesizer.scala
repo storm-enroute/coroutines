@@ -86,18 +86,41 @@ with ThreeAddressFormTransformation[C] {
     }
   }
 
-  private def genReturnValueMethod(cfg: Cfg)(implicit table: Table): Tree = {
+  private def genReturnValueMethods(cfg: Cfg)(implicit table: Table): List[Tree] = {
+    List(
+      genReturnValueMethod(cfg, typeOf[Boolean]),
+      genReturnValueMethod(cfg, typeOf[Byte]),
+      genReturnValueMethod(cfg, typeOf[Short]),
+      genReturnValueMethod(cfg, typeOf[Char]),
+      genReturnValueMethod(cfg, typeOf[Int]),
+      genReturnValueMethod(cfg, typeOf[Float]),
+      genReturnValueMethod(cfg, typeOf[Long]),
+      genReturnValueMethod(cfg, typeOf[Double]),
+      genReturnValueMethod(cfg, typeOf[Any])
+    )
+  }
+
+  private def genReturnValueMethod(cfg: Cfg, tpe: Type)(implicit table: Table): Tree = {
     def genReturnValueStore(n: Node) = {
       val sub = cfg.subgraphs(n.successors.head)
       val pcvalue = sub.uid
       val info = table(n.tree.symbol)
-      val rvset = info.storeTree(q"c", q"v")
-      (pcvalue, q"$rvset")
+      val eligible =
+        (isValType(info.tpe) && (info.tpe =:= tpe)) ||
+        (isRefType(info.tpe) && (tpe =:= typeOf[Any]))
+      if (eligible) {
+        val valuetree = if (tpe =:= typeOf[Any]) q"v.asInstanceOf[AnyRef]" else q"v"
+        val rvset = info.storeTree(q"c", valuetree)
+        (pcvalue, q"$rvset")
+      } else {
+        (pcvalue, q"""scala.sys.error("Return method called for incorrect type.")""")
+      }
     }
     val returnstores = cfg.start.dfs.collect {
       case n @ Node.ApplyCoroutine(_, _, _) => genReturnValueStore(n)
     }
 
+    val returnvaluemethod = returnValueMethodName(tpe)
     val body = {
       if (returnstores.size == 0) {
         q"()"
@@ -126,9 +149,9 @@ with ThreeAddressFormTransformation[C] {
     }
 
     q"""
-      def $$returnvalue(
+      def $returnvaluemethod(
         c: scala.coroutines.Coroutine.Frame[${table.yieldType}, ${table.returnType}],
-        v: ${table.returnType}
+        v: $tpe
       ): Unit = {
         $body
       }
@@ -300,7 +323,7 @@ with ThreeAddressFormTransformation[C] {
     val entermethod = genEnterMethod(entrypoints)
 
     // generate return value method
-    val returnvaluemethod = genReturnValueMethod(cfg)
+    val returnvaluemethods = genReturnValueMethods(cfg)
 
     // generate variable pushes and pops for stack variables
     val (varpushes, varpops) = genVarPushesAndPops(cfg)
@@ -333,10 +356,10 @@ with ThreeAddressFormTransformation[C] {
         }
         $entermethod
         ..$entrypointmethods
-        $returnvaluemethod
+        ..$returnvaluemethods
       }
     """
-    // println(co)
+    println(co)
     co
   }
 

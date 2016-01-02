@@ -49,18 +49,8 @@ trait Analyzer[C <: Context] {
     def stackpos_=(v: (Int, Int)) = rawstackpos = v
     def isUnitType = tpe =:= typeOf[Unit]
     def isAnyType = tpe =:= typeOf[Any]
-    def isRefType = !isValType
-    def isValType = {
-      tpe =:= typeOf[Boolean] ||
-      tpe =:= typeOf[Byte] ||
-      tpe =:= typeOf[Boolean] ||
-      tpe =:= typeOf[Short] ||
-      tpe =:= typeOf[Char] ||
-      tpe =:= typeOf[Int] ||
-      tpe =:= typeOf[Float] ||
-      tpe =:= typeOf[Long] ||
-      tpe =:= typeOf[Double]
-    }
+    def isRefType = Analyzer.this.isRefType(tpe)
+    def isValType = Analyzer.this.isValType(tpe)
     val defaultValue: Tree = {
       if (isRefType) q"null"
       else if (tpe =:= typeOf[Boolean]) q"false"
@@ -194,6 +184,7 @@ trait Analyzer[C <: Context] {
     val q"(..$args) => $body" = lambda
     val yieldType = inferYieldType(body)
     val returnType = inferReturnType(body)
+    val returnValueMethodName = Analyzer.this.returnValueMethodName(returnType.tpe)
     private var varCount = 0
     private var nodeCount = 0L
     private var subgraphCount = 0L
@@ -419,6 +410,34 @@ trait Analyzer[C <: Context] {
     case q"coroutines.this.`package`" => true
     case t => false
   }
+
+  def isRefType(tpe: Type) = !isValType(tpe)
+
+  def isValType(tpe: Type) = {
+    tpe =:= typeOf[Boolean] ||
+    tpe =:= typeOf[Byte] ||
+    tpe =:= typeOf[Short] ||
+    tpe =:= typeOf[Char] ||
+    tpe =:= typeOf[Int] ||
+    tpe =:= typeOf[Float] ||
+    tpe =:= typeOf[Long] ||
+    tpe =:= typeOf[Double]
+  }
+
+  def typeChar(tpe: Type): Char = {
+    if (isRefType(tpe)) 'L'
+    else if (tpe =:= typeOf[Boolean]) 'Z'
+    else if (tpe =:= typeOf[Byte]) 'B'
+    else if (tpe =:= typeOf[Short]) 'S'
+    else if (tpe =:= typeOf[Char]) 'C'
+    else if (tpe =:= typeOf[Int]) 'I'
+    else if (tpe =:= typeOf[Float]) 'F'
+    else if (tpe =:= typeOf[Long]) 'J'
+    else if (tpe =:= typeOf[Double]) 'D'
+    else sys.error("unreachable")
+  }
+
+  def returnValueMethodName(tpe: Type) = TermName("$returnvalue$" + typeChar(tpe))
 
   def inferYieldType(body: Tree): Tree = {
     // yield type must correspond to the `yieldval`, `yieldto` and coroutine-apply args

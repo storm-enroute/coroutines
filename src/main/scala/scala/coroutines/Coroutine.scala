@@ -14,44 +14,52 @@ import scala.util.Try
 
 
 
-trait Coroutine[@specialized T, R] extends Coroutine.DefMarker[(T, R)] {
-  def $enter(c: Coroutine.Frame[T, R]): Unit
-  def $assignyield(c: Coroutine.Frame[T, R], v: T): Unit = {
+trait Coroutine[@specialized Y, R] extends Coroutine.DefMarker[(Y, R)] {
+  def $enter(c: Coroutine.Frame[Y, R]): Unit
+  def $assignyield(c: Coroutine.Frame[Y, R], v: Y): Unit = {
     c.$hasYield = true
     c.$yield = v
   }
-  def $assignresult(c: Coroutine.Frame[T, R], v: R): Unit = c.$result = v
-  def $returnvalue(c: Coroutine.Frame[T, R], v: R): Unit
-  def $ep0(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep1(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep2(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep3(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep4(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep5(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep6(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep7(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep8(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep9(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep10(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep11(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep12(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep13(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep14(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep15(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep16(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep17(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep18(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep19(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep20(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep21(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep22(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep23(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep24(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep25(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep26(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep27(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep28(c: Coroutine.Frame[T, R]): Unit = {}
-  def $ep29(c: Coroutine.Frame[T, R]): Unit = {}
+  def $assignresult(c: Coroutine.Frame[Y, R], v: R): Unit = c.$result = v
+  def $returnvalue$Z(c: scala.coroutines.Coroutine.Frame[Y, R], v: Boolean): Unit
+  def $returnvalue$B(c: scala.coroutines.Coroutine.Frame[Y, R], v: Byte): Unit
+  def $returnvalue$S(c: scala.coroutines.Coroutine.Frame[Y, R], v: Short): Unit
+  def $returnvalue$C(c: scala.coroutines.Coroutine.Frame[Y, R], v: Char): Unit
+  def $returnvalue$I(c: scala.coroutines.Coroutine.Frame[Y, R], v: Int): Unit
+  def $returnvalue$F(c: scala.coroutines.Coroutine.Frame[Y, R], v: Float): Unit
+  def $returnvalue$J(c: scala.coroutines.Coroutine.Frame[Y, R], v: Long): Unit
+  def $returnvalue$D(c: scala.coroutines.Coroutine.Frame[Y, R], v: Double): Unit
+  def $returnvalue$L(c: scala.coroutines.Coroutine.Frame[Y, R], v: Any): Unit
+  def $ep0(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep1(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep2(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep3(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep4(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep5(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep6(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep7(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep8(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep9(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep10(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep11(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep12(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep13(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep14(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep15(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep16(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep17(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep18(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep19(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep20(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep21(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep22(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep23(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep24(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep25(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep26(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep27(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep28(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $ep29(c: Coroutine.Frame[Y, R]): Unit = {}
 }
 
 
