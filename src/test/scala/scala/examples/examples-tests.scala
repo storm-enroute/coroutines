@@ -27,4 +27,8 @@ class ExamplesTest extends FunSuite with Matchers {
   test("exceptions") {
     Exceptions.main(Array())
   }
+
+  test("composition") {
+    Composition.main(Array())
+  }
 }

@@ -244,7 +244,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
         val checkcases =
           if (isWildcard) List(cq"$pat => true")
           else List(cq"$pat => true", cq"_ => false")
-        val patdecl = q"val $pat: $exident = $exident"
+        val patdecl = q"val $pat: $exident @scala.unchecked = $exident"
         val body = q"""
           ..$patdecl
 
