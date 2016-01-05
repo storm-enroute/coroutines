@@ -31,4 +31,8 @@ class ExamplesTest extends FunSuite with Matchers {
   test("composition") {
     Composition.main(Array())
   }
+
+  test("composition call") {
+    CompositionCall.main(Array())
+  }
 }
