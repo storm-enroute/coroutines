@@ -620,6 +620,7 @@ trait CfgGenerator[C <: Context] {
           $untypedco.$$push[..$tpargs](
             $cparam.asInstanceOf[Coroutine.Frame[$yldtpe, $rettpe]], ..$untypedargs)
           $cparam.$$target = $cparam
+          return
         """
       }
     }

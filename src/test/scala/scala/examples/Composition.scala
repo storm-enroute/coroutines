@@ -25,5 +25,12 @@ object Composition {
   }
 
   def main(args: Array[String]) {
+    val xs = Some(1) :: None :: Some(3) :: Nil
+    val c = call(optionListElems(xs))
+    assert(c.resume)
+    assert(c.value == 1)
+    assert(c.resume)
+    assert(c.value == 3)
+    assert(!c.resume)
   }
 }
