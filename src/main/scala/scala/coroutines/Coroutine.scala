@@ -67,8 +67,8 @@ object Coroutine {
   private[coroutines] val INITIAL_COSTACK_SIZE = 4
 
   @tailrec
-  private[coroutines] final def resume[T, R](
-    callsite: Frame[T, R], actual: Frame[T, R]
+  private[coroutines] final def resume[Y, R](
+    callsite: Frame[Y, R], actual: Frame[Y, R]
   ): Boolean = {
     val cd = Stack.top(actual.$costack)
     cd.$enter(actual)
