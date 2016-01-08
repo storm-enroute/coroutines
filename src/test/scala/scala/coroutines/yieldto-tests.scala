@@ -29,4 +29,21 @@ class YieldToTest extends FunSuite with Matchers {
     assert(!c.hasValue)
     assert(c.isCompleted)
   }
+
+  test("yielding to a completed coroutine raises an error") {
+    val another = coroutine { () => "in and out" }
+    val anotherInstance = call(another())
+    assert(!anotherInstance.resume)
+
+    val rube = coroutine { () =>
+      yieldto(anotherInstance)
+      yieldval("some more")
+    }
+    val c = call(rube())
+    assert(!c.resume)
+    c.tryResult match {
+      case Failure(e: CoroutineStoppedException) =>
+      case _ => assert(false, "Should have thrown an exception.")
+    }
+  }
 }

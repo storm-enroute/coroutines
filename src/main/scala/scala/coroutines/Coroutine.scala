@@ -100,7 +100,7 @@ object Coroutine {
     var $yield: T = null.asInstanceOf[T]
     var $result: R = null.asInstanceOf[R]
 
-    def resume: Boolean = {
+    final def resume: Boolean = {
       if (isLive) {
         $hasYield = false
         $yield = null.asInstanceOf[T]
@@ -108,39 +108,39 @@ object Coroutine {
       } else throw new CoroutineStoppedException
     }
 
-    def value: T = {
+    final def value: T = {
       if (!hasValue)
-        sys.error("Coroutine has no value, because it did not yield yet.")
+        sys.error("Coroutine has no value, because it did not yield.")
       if (!isLive)
         sys.error("Coroutine has no value, because it is completed.")
       $yield
     }
 
-    def hasValue = $hasYield
+    final def hasValue = $hasYield
 
-    def getValue = if (hasValue) Some(value) else None
+    final def getValue = if (hasValue) Some(value) else None
 
-    def tryValue = try { Success(value) } catch { case t: Throwable => Failure(t) }
+    final def tryValue = try { Success(value) } catch { case t: Throwable => Failure(t) }
 
-    def result: R = {
+    final def result: R = {
       if (!isCompleted)
         sys.error("Coroutine has no result, because it is not completed.")
       if ($exception != null) throw $exception
       $result
     }
 
-    def hasResult = isCompleted && $exception == null
+    final def hasResult = isCompleted && $exception == null
 
-    def getResult = if (hasResult) Some(result) else None
+    final def getResult = if (hasResult) Some(result) else None
 
-    def tryResult = {
+    final def tryResult = {
       if ($exception != null) Failure($exception)
       else Try(result)
     }
 
-    def isLive: Boolean = $costackptr > 0
+    final def isLive: Boolean = $costackptr > 0
 
-    def isCompleted: Boolean = !isLive
+    final def isCompleted: Boolean = !isLive
 
     override def toString = s"Coroutine.Frame<depth: ${$costackptr}, live: $isLive>"
   }

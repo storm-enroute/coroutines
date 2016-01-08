@@ -691,6 +691,7 @@ trait CfgGenerator[C <: Context] {
         val savestate = genSaveState(subgraph)
         val exittree = q"""
           ..$savestate
+          if (!$untypedco.isLive) throw new CoroutineStoppedException
           $cparam.$$target =
             $untypedco.asInstanceOf[Coroutine.Frame[${t.yieldType}, ${t.returnType}]]
           return
