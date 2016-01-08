@@ -2,9 +2,7 @@ package scala.examples
 
 
 
-import scala.collection._
 import scala.coroutines._
-import scala.util.Failure
 
 
 
