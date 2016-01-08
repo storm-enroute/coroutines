@@ -444,8 +444,6 @@ trait Analyzer[C <: Context] {
     val constraintTpes = body.collect {
       case q"$qual.yieldval[$tpt]($_)" if isCoroutinesPkg(qual) =>
         tpt.tpe
-      case q"$qual.yieldto[$tpt]($_)" if isCoroutinesPkg(qual) =>
-        tpt.tpe
       case q"$co.apply(..$_)" if isCoroutineDefMarker(co.tpe) =>
         coroutineYieldReturnTypes(co.tpe)._1
       case q"$co.apply[..$_](..$_)(..$_)" if isCoroutineDefSugar(co.tpe) =>

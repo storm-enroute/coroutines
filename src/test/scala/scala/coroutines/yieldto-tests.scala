@@ -3,6 +3,7 @@ package scala.coroutines
 
 
 import org.scalatest._
+import scala.collection._
 import scala.util.Failure
 
 
@@ -49,13 +50,42 @@ class YieldToTest extends FunSuite with Matchers {
 
   test("should be able to yield to a differently typed coroutine") {
     val another: ~~~>[String, Unit] = coroutine { () =>
-      yieldval("String")
+      yieldval("hohoho")
     }
+    val anotherInstance = call(another())
 
     val rube: Int ~~> (Int, Int) = coroutine { (x: Int) =>
       yieldval(-x)
-      //yieldto(another)
+      yieldto(anotherInstance)
       x
     }
+    val c = call(rube(5))
+
+    assert(c.resume)
+    assert(c.value == -5)
+    assert(c.resume)
+    assert(!c.hasValue)
+    assert(!c.resume)
+    assert(c.result == 5)
+  }
+
+  test("should drain the coroutine instance that yields to another coroutine") {
+    val another: ~~~>[String, Unit] = coroutine { () =>
+      yieldval("uh-la-la")
+    }
+    val anotherInstance = call(another())
+
+    val rube: (Int, Int) ~> (Int, Unit) = coroutine { (x: Int, y: Int) =>
+      yieldval(x)
+      yieldval(y)
+      yieldto(anotherInstance)
+      yieldval(x * y)
+    }
+    val c = call(rube(5, 4))
+
+    val b = mutable.Buffer[Int]()
+    while (c.resume) if (c.hasValue) b += c.value
+
+    assert(b == Seq(5, 4, 20))
   }
 }
