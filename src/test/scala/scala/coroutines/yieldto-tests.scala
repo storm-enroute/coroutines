@@ -46,4 +46,16 @@ class YieldToTest extends FunSuite with Matchers {
       case _ => assert(false, "Should have thrown an exception.")
     }
   }
+
+  test("should be able to yield to a differently typed coroutine") {
+    val another: ~~~>[String, Unit] = coroutine { () =>
+      yieldval("String")
+    }
+
+    val rube: Int ~~> (Int, Int) = coroutine { (x: Int) =>
+      yieldval(-x)
+      //yieldto(another)
+      x
+    }
+  }
 }
