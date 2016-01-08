@@ -101,8 +101,11 @@ object Coroutine {
     var $result: R = null.asInstanceOf[R]
 
     def resume: Boolean = {
-      if (isLive) Coroutine.resume[T, R](this, this)
-      else throw new CoroutineStoppedException
+      if (isLive) {
+        $hasYield = false
+        $yield = null.asInstanceOf[T]
+        Coroutine.resume[T, R](this, this)
+      } else throw new CoroutineStoppedException
     }
 
     def value: T = {
@@ -113,7 +116,7 @@ object Coroutine {
       $yield
     }
 
-    def hasValue = $hasYield && isLive
+    def hasValue = $hasYield
 
     def getValue = if (hasValue) Some(value) else None
 
