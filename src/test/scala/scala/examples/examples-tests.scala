@@ -44,7 +44,7 @@ class ExamplesTest extends FunSuite with Matchers {
     ControlTransfer.main(Array())
   }
 
-  test("copy") {
-    Copy.main(Array())
+  test("snapshot") {
+    Snapshot.main(Array())
   }
 }

@@ -8,8 +8,8 @@ import scala.util.Failure
 
 
 
-class CopyTest extends FunSuite with Matchers {
-  test("coroutine instance should be copied and resumed as needed") {
+class SnapshotTest extends FunSuite with Matchers {
+  test("coroutine instance should be cloned and resumed as needed") {
     val countdown = coroutine { (n: Int) =>
       var i = n
       while (i >= 0) {
@@ -23,7 +23,7 @@ class CopyTest extends FunSuite with Matchers {
       assert(c.resume)
       assert(c.value == (10 - i))
     }
-    val c2 = c.copy
+    val c2 = c.snapshot
     for (i <- 5 to 10) {
       assert(c2.resume)
       assert(c2.value == (10 - i))

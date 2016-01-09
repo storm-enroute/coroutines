@@ -104,7 +104,7 @@ object Coroutine {
     var $yield: T = null.asInstanceOf[T]
     var $result: R = null.asInstanceOf[R]
 
-    final def copy: Frame[T, R] = {
+    final def snapshot: Frame[T, R] = {
       val frame = new Frame[T, R]
       Stack.copy(this.$costack, frame.$costack)
       Stack.copy(this.$pcstack, frame.$pcstack)
