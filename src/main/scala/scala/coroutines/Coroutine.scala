@@ -66,17 +66,21 @@ trait Coroutine[@specialized Y, R] extends Coroutine.DefMarker[(Y, R)] {
 object Coroutine {
   private[coroutines] val INITIAL_COSTACK_SIZE = 4
 
+  type SomeY
+
+  type SomeR
+
   @tailrec
   private[coroutines] final def resume[Y, R](
-    callsite: Frame[Y, R], actual: Frame[Y, R]
+    callsite: Frame[Y, R], actual: Frame[_, _]
   ): Boolean = {
-    val cd = Stack.top(actual.$costack)
-    cd.$enter(actual)
+    val cd = Stack.top(actual.$costack).asInstanceOf[Coroutine[SomeY, SomeR]]
+    cd.$enter(actual.asInstanceOf[Frame[SomeY, SomeR]])
     val resumeStatus = actual.isLive
     if (actual.$target ne null) {
       val newactual = actual.$target
       actual.$target = null
-      resume(callsite, newactual.asInstanceOf[callsite.type])
+      resume(callsite, newactual)
     } else if (actual.$exception ne null) {
       callsite.isLive
     } else {
