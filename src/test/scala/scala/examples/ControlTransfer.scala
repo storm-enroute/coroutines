@@ -9,8 +9,10 @@ import scala.util.Random
 
 
 object ControlTransfer {
+  var error: String = ""
   val check: ~~~>[Boolean, Unit] = coroutine { () =>
     yieldval(true)
+    error = "Total failure."
     yieldval(false)
   }
   val checker = call(check())
@@ -36,5 +38,6 @@ object ControlTransfer {
     val values = mutable.Buffer[Double]()
     while (r1.resume) if (r1.hasValue) values += r1.value
     assert(values.length == 2)
+    assert(error == "Total failure.")
   }
 }
