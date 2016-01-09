@@ -47,4 +47,8 @@ class ExamplesTest extends FunSuite with Matchers {
   test("snapshot") {
     Snapshot.main(Array())
   }
+
+  test("mock snapshot") {
+    MockSnapshot.main(Array())
+  }
 }

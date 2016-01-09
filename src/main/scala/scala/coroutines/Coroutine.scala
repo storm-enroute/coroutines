@@ -88,24 +88,24 @@ object Coroutine {
     }
   }
 
-  class Frame[@specialized T, R] {
+  class Frame[@specialized Y, R] {
     var $costackptr = 0
-    var $costack: Array[Coroutine[T, R]] =
-      new Array[Coroutine[T, R]](INITIAL_COSTACK_SIZE)
+    var $costack: Array[Coroutine[Y, R]] =
+      new Array[Coroutine[Y, R]](INITIAL_COSTACK_SIZE)
     var $pcstackptr = 0
     var $pcstack = new Array[Short](INITIAL_COSTACK_SIZE)
     var $refstackptr = 0
     var $refstack: Array[AnyRef] = _
     var $valstackptr = 0
     var $valstack: Array[Int] = _
-    var $target: Frame[T, _] = null
+    var $target: Frame[Y, _] = null
     var $exception: Throwable = null
     var $hasYield: Boolean = false
-    var $yield: T = null.asInstanceOf[T]
+    var $yield: Y = null.asInstanceOf[Y]
     var $result: R = null.asInstanceOf[R]
 
-    final def snapshot: Frame[T, R] = {
-      val frame = new Frame[T, R]
+    final def snapshot: Frame[Y, R] = {
+      val frame = new Frame[Y, R]
       Stack.copy(this.$costack, frame.$costack)
       Stack.copy(this.$pcstack, frame.$pcstack)
       Stack.copy(this.$refstack, frame.$refstack)
@@ -120,12 +120,12 @@ object Coroutine {
     final def resume: Boolean = {
       if (isLive) {
         $hasYield = false
-        $yield = null.asInstanceOf[T]
-        Coroutine.resume[T, R](this, this)
+        $yield = null.asInstanceOf[Y]
+        Coroutine.resume[Y, R](this, this)
       } else throw new CoroutineStoppedException
     }
 
-    final def value: T = {
+    final def value: Y = {
       if (!hasValue)
         sys.error("Coroutine has no value, because it did not yield.")
       if (!isLive)
@@ -137,7 +137,8 @@ object Coroutine {
 
     final def getValue = if (hasValue) Some(value) else None
 
-    final def tryValue = try { Success(value) } catch { case t: Throwable => Failure(t) }
+    final def tryValue =
+      try { Success(value) } catch { case t: Throwable => Failure(t) }
 
     final def result: R = {
       if (!isCompleted)
