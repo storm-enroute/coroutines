@@ -76,7 +76,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case q"$r.`package`" =>
       // package selection
       (Nil, tree)
-    case q"$r.$member" =>
+    case q"$r.$member" if !tree.symbol.isPackage =>
       // selection
       val (rdecls, rident) = threeAddressForm(r)
       val localvarname = TermName(c.freshName("x"))

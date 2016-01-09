@@ -39,4 +39,8 @@ class ExamplesTest extends FunSuite with Matchers {
   test("faq simple example") {
     FaqSimpleExample.main(Array())
   }
+
+  test("control transfer") {
+    ControlTransfer.main(Array())
+  }
 }
