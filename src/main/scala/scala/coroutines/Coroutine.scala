@@ -104,6 +104,19 @@ object Coroutine {
     var $yield: T = null.asInstanceOf[T]
     var $result: R = null.asInstanceOf[R]
 
+    final def copy: Frame[T, R] = {
+      val frame = new Frame[T, R]
+      Stack.copy(this.$costack, frame.$costack)
+      Stack.copy(this.$pcstack, frame.$pcstack)
+      Stack.copy(this.$refstack, frame.$refstack)
+      Stack.copy(this.$valstack, frame.$valstack)
+      frame.$exception = this.$exception
+      frame.$hasYield = this.$hasYield
+      frame.$yield = this.$yield
+      frame.$result = this.$result
+      frame
+    }
+
     final def resume: Boolean = {
       if (isLive) {
         $hasYield = false

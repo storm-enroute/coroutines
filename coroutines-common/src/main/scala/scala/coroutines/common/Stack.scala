@@ -19,6 +19,28 @@ object Stack {
     """
   }
 
+  def copy[T](src: Array[T], dest: Array[T]): Unit = macro copyMacro[T]
+
+  def copyMacro[T: c.WeakTypeTag](c: Context)(src: c.Tree, dest: c.Tree): c.Tree = {
+    import c.universe._
+
+    val q"$srcpath.${srcname: TermName}" = src
+    val srcptrname = TermName(s"${srcname}ptr")
+    val srcptr = q"$srcpath.$srcptrname"
+    val q"$destpath.${destname: TermName}" = dest
+    val destptrname = TermName(s"${destname}ptr")
+    val destptr = q"$destpath.$destptrname"
+    val tpe = implicitly[WeakTypeTag[T]]
+
+    q"""
+      $destptr = $srcptr
+      if ($src != null) {
+        $dest = new Array[$tpe]($src.length)
+        java.lang.System.arraycopy($src, 0, $dest, 0, $srcptr)
+      }
+    """
+  }
+
   def push[T](stack: Array[T], x: T, size: Int): Unit = macro pushMacro[T]
 
   def pushMacro[T: c.WeakTypeTag](c: Context)(
@@ -169,5 +191,6 @@ object Stack {
       $stackptr <= 0
     """
   }
+
 
 }
