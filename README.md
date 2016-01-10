@@ -7,6 +7,8 @@
 is a library-level extension for the Scala programming language
 that introduces first-class polymorphic coroutines.
 
+Check out the [website](http://storm-enroute.com/coroutines) for more info!
+
 CI service         | Status | Description
 -------------------|--------|------------
 Travis             | [![Build Status](https://travis-ci.org/storm-enroute/coroutines.png?branch=master)](https://travis-ci.org/storm-enroute/coroutines) | Testing only
