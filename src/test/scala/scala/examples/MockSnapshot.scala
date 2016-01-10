@@ -13,43 +13,36 @@ object MockSnapshot {
       var value = false
     }
 
-    class Mock {
-      val get = coroutine { () =>
-        val cell = new Cell
-        yieldval(cell)
-        cell.value
-      }
+    val mock: ~~~>[Cell, Boolean] = coroutine { () =>
+      val cell = new Cell
+      yieldval(cell)
+      cell.value
     }
 
-    def test[R](c: Cell <~> R): Try[R] = {
-      def test[R](c: Cell <~> R): Unit = {
-        if (c.resume) {
-          val cell = c.value
-          cell.value = true
-          test(c.snapshot)
-          cell.value = false
-          test(c)
-        }
-      }
-      test(c)
-      c.tryResult
+    def test[R](c: Cell <~> R): Boolean = {
+      if (c.resume) {
+        val cell = c.value
+        cell.value = true
+        val res0 = test(c.snapshot)
+        cell.value = false
+        val res1 = test(c)
+        res0 && res1
+      } else c.hasResult
     }
   }
 
   class MyTestSuite extends TestSuite {
-    val myMockCondition = new Mock
-
     val myAlgorithm = coroutine { (x: Int) =>
-      if (myMockCondition.get()) {
+      if (mock()) {
         assert(2 * x == x + x)
       } else {
         assert(x * x / x == x)
       }
     }
 
-    assert(test(call(myAlgorithm(5))).isSuccess)
+    assert(test(call(myAlgorithm(5))))
 
-    assert(test(call(myAlgorithm(0))).isFailure)
+    assert(!test(call(myAlgorithm(0))))
   }
 
   def main(args: Array[String]) {
