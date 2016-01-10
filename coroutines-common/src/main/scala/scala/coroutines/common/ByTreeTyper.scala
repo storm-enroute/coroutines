@@ -1,9 +1,8 @@
-package scala.coroutines.common
+package org.coroutines.common
 
 
 
 import scala.collection._
-import scala.coroutines.common._
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
 

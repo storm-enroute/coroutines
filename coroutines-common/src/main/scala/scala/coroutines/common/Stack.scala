@@ -1,4 +1,4 @@
-package scala.coroutines.common
+package org.coroutines.common
 
 
 
@@ -53,7 +53,7 @@ object Stack {
     val stackptr = q"$path.$stackptrname"
     val tpe = implicitly[WeakTypeTag[T]]
     q"""
-      scala.coroutines.common.Stack.init[$tpe]($stack, $size)
+      org.coroutines.common.Stack.init[$tpe]($stack, $size)
       if ($stackptr >= $stack.length) {
         val nstack = new Array[$tpe]($stack.length * 2)
         java.lang.System.arraycopy($stack, 0, nstack, 0, $stack.length)
@@ -77,7 +77,7 @@ object Stack {
     val tpe = implicitly[WeakTypeTag[T]]
     val valnme = TermName(c.freshName())
     q"""
-      scala.coroutines.common.Stack.init[$tpe]($stack, $size)
+      org.coroutines.common.Stack.init[$tpe]($stack, $size)
       $stackptr += $n
       while ($stackptr >= $stack.length) {
         val nstack = new Array[$tpe]($stack.length * 2)
