@@ -68,4 +68,81 @@ class RegressionTest extends FunSuite with Matchers {
     assert(!c.resume)
     assert(c.result == 15)
   }
+
+  test("issue #14 -- simple case") {
+    object Test {
+      val foo: Int ~~> (Int, Unit) = coroutine { (i: Int) =>
+        yieldval(i)
+        if (i > 0) {
+          foo(i - 1)
+          foo(i - 1)
+        }
+      }
+    }
+
+    val c = call(Test.foo(2))
+    assert(c.resume)
+    assert(c.value == 2)
+    assert(c.resume)
+    assert(c.value == 1)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 1)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(!c.resume)
+  }
+
+  test("issue #14 -- complex case") {
+    object Test {
+      val foo: Int ~~> (Int, Unit) = coroutine { (i: Int) =>
+        yieldval(i)
+        if (i > 0) {
+          foo(i - 1)
+          foo(i - 1)
+        }
+      }
+    }
+
+    val bar = coroutine { () =>
+      Test.foo(2)
+      Test.foo(2)
+    }
+
+    val c = call(bar())
+    assert(c.resume)
+    assert(c.value == 2)
+    assert(c.resume)
+    assert(c.value == 1)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 1)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 2)
+    assert(c.resume)
+    assert(c.value == 1)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 1)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(c.resume)
+    assert(c.value == 0)
+    assert(!c.resume)
+  }
 }

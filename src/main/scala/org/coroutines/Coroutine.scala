@@ -161,6 +161,26 @@ object Coroutine {
     final def isCompleted: Boolean = !isLive
 
     override def toString = s"Coroutine.Frame<depth: ${$costackptr}, live: $isLive>"
+
+    final def debugString: String = {
+      def toStackLength[T](stack: Array[T]) =
+        if (stack != null) "${stack.length}" else "<uninitialized>"
+      def toStackString[T](stack: Array[T]) =
+        if (stack != null) stack.mkString("[", ", ", "]") else "<uninitialized>"
+      s"Coroutine.Frame <\n" +
+      s"  costackptr:  ${$costackptr}\n" +
+      s"  costack sz:  ${toStackLength($costack)}\n" +
+      s"  pcstackptr:  ${$pcstackptr}\n" +
+      s"  pcstack:     ${toStackString($pcstack)}\n" +
+      s"  exception:   ${$exception}\n" +
+      s"  yield:       ${$yield}\n" +
+      s"  result:      ${$result}\n" +
+      s"  refstackptr: ${$refstackptr}\n" +
+      s"  refstack:    ${toStackString($refstack)}\n" +
+      s"  valstackptr: ${$valstackptr}\n" +
+      s"  valstack:    ${toStackString($valstack)}\n" +
+      s">"
+    }
   }
 
   trait DefMarker[YR]

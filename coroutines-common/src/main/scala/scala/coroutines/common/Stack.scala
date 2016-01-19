@@ -173,7 +173,7 @@ object Stack {
     val stackptr = q"$path.$stackptrname"
     val valnme = TermName(c.freshName())
     q"""
-      val $valnme = $stack($stackptr)
+      val $valnme = $stack($stackptr - 1)
       $stack($stackptr - 1) = $x
       $valnme
     """
