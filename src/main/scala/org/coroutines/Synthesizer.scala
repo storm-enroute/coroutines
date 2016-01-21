@@ -28,13 +28,13 @@ with ThreeAddressFormTransformation[C] {
     val defdef = if (subgraph.uid < NUM_PREDEFINED_ENTRY_STUBS) q"""
       override def $defname(
         ${t.names.coroutineParam}: Coroutine.Frame[${t.yieldType}, ${t.returnType}]
-      ): Unit = {
+      ): _root_.scala.Unit = {
         $body
       }
     """ else q"""
       def $defname(
         ${t.names.coroutineParam}: Coroutine.Frame[${t.yieldType}, ${t.returnType}]
-      ): Unit = {
+      ): _root_.scala.Unit = {
         $body
       }
     """
@@ -54,31 +54,31 @@ with ThreeAddressFormTransformation[C] {
     val rettpt = table.returnType
     val yldtpt = table.yieldType
     if (entrypoints.size == 1) {
-      val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
+      val q"$_ def $ep0($_): _root_.scala.Unit = $_" = entrypoints(0)
 
       q"""
-        def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): Unit = $ep0(c)
+        def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): _root_.scala.Unit = $ep0(c)
       """
     } else if (entrypoints.size == 2) {
-      val q"$_ def $ep0($_): Unit = $_" = entrypoints(0)
-      val q"$_ def $ep1($_): Unit = $_" = entrypoints(1)
+      val q"$_ def $ep0($_): _root_.scala.Unit = $_" = entrypoints(0)
+      val q"$_ def $ep1($_): _root_.scala.Unit = $_" = entrypoints(1)
 
       q"""
-        def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): Unit = {
+        def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): _root_.scala.Unit = {
           val pc = org.coroutines.common.Stack.top(c.$$pcstack)
           if (pc == 0) $ep0(c) else $ep1(c)
         }
       """
     } else {
       val cases = for ((index, defdef) <- entrypoints) yield {
-        val q"$_ def $ep($_): Unit = $rhs" = defdef
+        val q"$_ def $ep($_): _root_.scala.Unit = $rhs" = defdef
         cq"${index.toShort} => $ep(c)"
       }
 
       q"""
-        def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): Unit = {
+        def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): _root_.scala.Unit = {
           val pc: Short = org.coroutines.common.Stack.top(c.$$pcstack)
-          (pc: @scala.annotation.switch) match {
+          (pc: @_root_.scala.annotation.switch) match {
             case ..$cases
           }
         }
@@ -141,7 +141,7 @@ with ThreeAddressFormTransformation[C] {
         }
         q"""
           val pc = org.coroutines.common.Stack.top(c.$$pcstack)
-          (pc: @scala.annotation.switch) match {
+          (pc: @_root_.scala.annotation.switch) match {
             case ..$cases
           }
         """
@@ -152,7 +152,7 @@ with ThreeAddressFormTransformation[C] {
       def $returnvaluemethod(
         c: org.coroutines.Coroutine.Frame[${table.yieldType}, ${table.returnType}],
         v: $tpe
-      ): Unit = {
+      ): _root_.scala.Unit = {
         $body
       }
     """
@@ -192,31 +192,31 @@ with ThreeAddressFormTransformation[C] {
     argtpts: List[Tree], yldtpt: Tree, rettpt: Tree
   ): (Tree, List[Tree]) = {
     argtpts(0) match {
-      case tq"scala.Boolean" =>
+      case tq"_root_.scala.Boolean" =>
         (tq"org.coroutines.Coroutine._1", argtpts :+ yldtpt :+ rettpt)
-      case tq"scala.Byte" =>
+      case tq"_root_.scala.Byte" =>
         (tq"org.coroutines.Coroutine._1", argtpts :+ yldtpt :+ rettpt)
-      case tq"scala.Short" =>
+      case tq"_root_.scala.Short" =>
         val nme = TypeName(s"_1$$spec$$S")
         (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"scala.Char" =>
+      case tq"_root_.scala.Char" =>
         val nme = TypeName(s"_1$$spec$$C")
         (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"scala.Int" =>
+      case tq"_root_.scala.Int" =>
         val nme = TypeName(s"_1$$spec$$I")
         (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"scala.Float" =>
+      case tq"_root_.scala.Float" =>
         val nme = TypeName(s"_1$$spec$$F")
         (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"scala.Long" =>
+      case tq"_root_.scala.Long" =>
         val nme = TypeName(s"_1$$spec$$J")
         (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"scala.Double" =>
+      case tq"_root_.scala.Double" =>
         val nme = TypeName(s"_1$$spec$$D")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
       case _ =>
         val nme = TypeName(s"_1$$spec$$L")
-        (tq"org.coroutines.$nme", argtpts :+ yldtpt :+ rettpt)
+        (tq"_root_.org.coroutines.$nme", argtpts :+ yldtpt :+ rettpt)
     }
   }
 
@@ -224,54 +224,57 @@ with ThreeAddressFormTransformation[C] {
     argtpts: List[Tree], yldtpt: Tree, rettpt: Tree
   ): (Tree, List[Tree]) = {
     (argtpts(0), argtpts(1)) match {
-      case (tq"scala.Int", tq"scala.Int") =>
+      case (tq"_root_.scala.Int", tq"_root_.scala.Int") =>
         val nme = TypeName(s"_2$$spec$$II")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"scala.Long", tq"scala.Int") =>
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Long", tq"_root_.scala.Int") =>
         val nme = TypeName(s"_2$$spec$$JI")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"scala.Double", tq"scala.Int") =>
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Double", tq"_root_.scala.Int") =>
         val nme = TypeName(s"_2$$spec$$DI")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (_, tq"scala.Int") =>
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+      case (_, tq"_root_.scala.Int") =>
         val nme = TypeName(s"_2$$spec$$LI")
-        (tq"org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
-      case (tq"scala.Int", tq"scala.Long") =>
+        (tq"_root_.org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Int", tq"_root_.scala.Long") =>
         val nme = TypeName(s"_2$$spec$$IJ")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"scala.Long", tq"scala.Long") =>
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Long", tq"_root_.scala.Long") =>
         val nme = TypeName(s"_2$$spec$$JJ")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"scala.Double", tq"scala.Long") =>
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Double", tq"_root_.scala.Long") =>
         val nme = TypeName(s"_2$$spec$$DJ")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (_, tq"scala.Long") =>
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+      case (_, tq"_root_.scala.Long") =>
         val nme = TypeName(s"_2$$spec$$LJ")
-        (tq"org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
-      case (tq"scala.Int", tq"scala.Double") =>
+        (tq"_root_.org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Int", tq"_root_.scala.Double") =>
         val nme = TypeName(s"_2$$spec$$ID")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"scala.Long", tq"scala.Double") =>
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Long", tq"_root_.scala.Double") =>
         val nme = TypeName(s"_2$$spec$$JD")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"scala.Double", tq"scala.Double") =>
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Double", tq"_root_.scala.Double") =>
         val nme = TypeName(s"_2$$spec$$DD")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (_, tq"scala.Double") =>
+        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+      case (_, tq"_root_.scala.Double") =>
         val nme = TypeName(s"_2$$spec$$LD")
-        (tq"org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
-      case (tq"scala.Int", _) =>
+        (tq"_root_.org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Int", _) =>
         val nme = TypeName(s"_2$$spec$$IL")
-        (tq"org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
-      case (tq"scala.Long", _) =>
+        (tq"_root_.org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Long", _) =>
         val nme = TypeName(s"_2$$spec$$JL")
-        (tq"org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
-      case (tq"scala.Double", _) =>
+        (tq"_root_.org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
+      case (tq"_root_.scala.Double", _) =>
         val nme = TypeName(s"_2$$spec$$DL")
-        (tq"org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
+        (tq"_root_.org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
       case (_, _) =>
         val nme = TypeName(s"_2$$spec$$LL")
-        (tq"org.coroutines.$nme", argtpts(0) :: argtpts(1) :: yldtpt :: rettpt :: Nil)
+        (
+          tq"_root_.org.coroutines.$nme",
+          argtpts(0) :: argtpts(1) :: yldtpt :: rettpt :: Nil
+        )
     }
   }
 
@@ -284,7 +287,7 @@ with ThreeAddressFormTransformation[C] {
       specArity2(argtpts, yldtpt, rettpt)
     } else if (argtpts.length == 0 || argtpts.length > 2) {
       val nme = TypeName(s"_${argtpts.size}")
-      (tq"org.coroutines.Coroutine.$nme", argtpts :+ yldtpt :+ rettpt)
+      (tq"_root_.org.coroutines.Coroutine.$nme", argtpts :+ yldtpt :+ rettpt)
     } else sys.error("Unreachable case.")
   }
 
@@ -334,24 +337,26 @@ with ThreeAddressFormTransformation[C] {
     val valnme = TermName(c.freshName("c"))
     val co = q"""
       new $coroutinequal[..$tparams] {
-        def $$call(..$args): org.coroutines.Coroutine.Frame[$yldtpt, $rettpt] = {
-          val $valnme = new org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+        def $$call(..$args): _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt] = {
+          val $valnme = new _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
           $$push($valnme, ..$argidents)
           $valnme
         }
         def apply(..$args): $rettpt = {
-          sys.error(org.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
+          sys.error(_root_.org.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
         }
         def $$push(
-          c: org.coroutines.Coroutine.Frame[$yldtpt, $rettpt], ..$args
-        ): Unit = {
-          org.coroutines.common.Stack.push(c.$$costack, this, -1)
-          org.coroutines.common.Stack.push(c.$$pcstack, 0.toShort, -1)
+          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt], ..$args
+        ): _root_.scala.Unit = {
+          _root_.org.coroutines.common.Stack.push(c.$$costack, this, -1)
+          _root_.org.coroutines.common.Stack.push(c.$$pcstack, 0.toShort, -1)
           ..$varpushes
         }
-        def $$pop(c: org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]): Unit = {
-          org.coroutines.common.Stack.pop(c.$$pcstack)
-          org.coroutines.common.Stack.pop(c.$$costack)
+        def $$pop(
+          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+        ): _root_.scala.Unit = {
+          _root_.org.coroutines.common.Stack.pop(c.$$pcstack)
+          _root_.org.coroutines.common.Stack.pop(c.$$costack)
           ..$varpops
         }
         $entermethod

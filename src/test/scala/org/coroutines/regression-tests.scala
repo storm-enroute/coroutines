@@ -145,4 +145,13 @@ class RegressionTest extends FunSuite with Matchers {
     assert(c.value == 0)
     assert(!c.resume)
   }
+
+  test("issue #15 -- hygiene") {
+    val scala, Any, String, TypeTag, Unit = ()
+    trait scala; trait Any; trait String; trait TypeTag; trait Unit
+
+    val id = coroutine { (x: Int) =>
+      x
+    }
+  }
 }
