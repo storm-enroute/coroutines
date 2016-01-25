@@ -9,7 +9,7 @@
 is a library-level extension for the Scala programming language
 that introduces first-class polymorphic coroutines.
 
-Check out the [website](http://storm-enroute.com/coroutines) for more info!
+Check out the [Scala Coroutines website](http://storm-enroute.com/coroutines) for more info!
 
 CI service         | Status | Description
 -------------------|--------|------------
