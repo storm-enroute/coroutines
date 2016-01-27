@@ -107,9 +107,10 @@ with ThreeAddressFormTransformation[C] {
       val info = table(n.tree.symbol)
       val eligible =
         (isValType(info.tpe) && (info.tpe =:= tpe)) ||
-        (isRefType(info.tpe) && (tpe =:= typeOf[Any]))
+        (tpe =:= typeOf[Any])
       if (eligible) {
-        val valuetree = if (tpe =:= typeOf[Any]) q"v.asInstanceOf[AnyRef]" else q"v"
+        val valuetree =
+          if (tpe =:= typeOf[Any]) q"v.asInstanceOf[${info.tpe}]" else q"v"
         val rvset = info.storeTree(q"c", valuetree)
         (pcvalue, q"$rvset")
       } else {
