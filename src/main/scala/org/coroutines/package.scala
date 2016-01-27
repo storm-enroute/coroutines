@@ -3,6 +3,10 @@ package org
 
 
 import scala.annotation.implicitNotFound
+import scala.annotation.unchecked.uncheckedVariance
+import scala.concurrent._
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
 
@@ -28,6 +32,40 @@ package object coroutines {
   def call[R](f: R): Any = macro Coroutine.call[R]
 
   def coroutine[Y, R](f: R): Any = macro Coroutine.synthesize
+
+  def asyncCall[Y, R](body: Coroutine._0[(Future[Y], Cell[Y]), R]): Future[R] = {
+    val c = body.$call()
+    val p = Promise[R]
+    def loop() {
+      if (!c.resume) p.success(c.result)
+      else {
+        val (future, cell) = c.value
+        for (x <- future) {
+          cell.x = x
+          loop()
+        }
+      }
+    }
+    Future { loop() }
+    p.future
+  }
+
+  class Cell[+T] {
+    var x: T @uncheckedVariance = _
+  }
+
+  def async[Y, R](body: =>R): Future[R] = macro asyncMacro[Y, R]
+
+  def asyncMacro[Y, R](c: Context)(body: c.Tree): c.Tree = {
+    import c.universe._
+    
+    q"""
+      val c = coroutine { () =>
+        $body
+      }
+      _root_.org.coroutines.asyncCall(c)
+    """
+  }
 
   /* syntax sugar */
 
