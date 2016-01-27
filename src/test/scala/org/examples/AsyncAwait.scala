@@ -22,23 +22,21 @@ object AsyncAwait {
       cell.x
     }
 
-  object async {
-    def apply[Y, R](body: ~~~>[(Future[Y], Cell[Y]), R]): Future[R] = {
-      val c = call(body())
-      val p = Promise[R]
-      def loop() {
-        if (!c.resume) p.success(c.result)
-        else {
-          val (future, cell) = c.value
-          for (x <- future) {
-            cell.x = x
-            loop()
-          }
+  def async[Y, R](body: ~~~>[(Future[Y], Cell[Y]), R]): Future[R] = {
+    val c = call(body())
+    val p = Promise[R]
+    def loop() {
+      if (!c.resume) p.success(c.result)
+      else {
+        val (future, cell) = c.value
+        for (x <- future) {
+          cell.x = x
+          loop()
         }
       }
-      Future { loop() }
-      p.future
     }
+    Future { loop() }
+    p.future
   }
 
   def main(args: Array[String]) {
