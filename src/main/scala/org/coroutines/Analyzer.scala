@@ -69,14 +69,14 @@ trait Analyzer[C <: Context] {
       else if (tpe =:= typeOf[Short]) q"$t.toInt"
       else if (tpe =:= typeOf[Char]) q"$t.toInt"
       else if (tpe =:= typeOf[Int]) q"$t"
-      else if (tpe =:= typeOf[Float]) q"java.lang.Float.floatToIntBits($t)"
+      else if (tpe =:= typeOf[Float]) q"_root_.java.lang.Float.floatToIntBits($t)"
       else sys.error(s"Cannot encode type $tpe as Int.")
     }
     private def encodeWide(t: Tree): (Tree, Tree) = {
       val nme = TermName(c.freshName("v"))
       val enc =
         if (tpe =:= typeOf[Long]) q"$t"
-        else if (tpe =:= typeOf[Double]) q"java.lang.Double.doubleToLongBits($t)"
+        else if (tpe =:= typeOf[Double]) q"_root_.java.lang.Double.doubleToLongBits($t)"
         else sys.error(s"Cannot encode wide type $tpe.")
       (q"val $nme = $enc", q"$nme")
     }
@@ -86,12 +86,12 @@ trait Analyzer[C <: Context] {
       else if (tpe =:= typeOf[Short]) q"$t.toShort"
       else if (tpe =:= typeOf[Char]) q"$t.toChar"
       else if (tpe =:= typeOf[Int]) q"$t"
-      else if (tpe =:= typeOf[Float]) q"java.lang.Float.intBitsToFloat($t)"
+      else if (tpe =:= typeOf[Float]) q"_root_.java.lang.Float.intBitsToFloat($t)"
       else sys.error(s"Cannot decode type $tpe from Long.")
     }
     private def decodeWide(t: Tree): Tree = {
       if (tpe =:= typeOf[Long]) q"$t"
-      else if (tpe =:= typeOf[Double]) q"java.lang.Double.longBitsToDouble($t)"
+      else if (tpe =:= typeOf[Double]) q"_root_.java.lang.Double.longBitsToDouble($t)"
       else sys.error(s"Cannot decode wide type $tpe.")
     }
     val initialValue: Tree = {
@@ -111,22 +111,22 @@ trait Analyzer[C <: Context] {
         q"""
           $decl
 
-          org.coroutines.common.Stack.push[$stacktpe](
+          _root_.org.coroutines.common.Stack.push[$stacktpe](
             c.$stackname, ($ident & 0xffffffff).toInt, ${t.initialStackSize})
-          org.coroutines.common.Stack.push[$stacktpe](
+          _root_.org.coroutines.common.Stack.push[$stacktpe](
             c.$stackname, (($ident >>> 32) & 0xffffffff).toInt, ${t.initialStackSize})
         """
       } else q"""
-        org.coroutines.common.Stack.push[$stacktpe](
+        _root_.org.coroutines.common.Stack.push[$stacktpe](
           c.$stackname, ${encodeInt(initialValue)}, ${t.initialStackSize})
       """
     }
     def popTree = {
       if (isWide) q"""
-        org.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
-        org.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
+        _root_.org.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
+        _root_.org.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
       """ else q"""
-        org.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
+        _root_.org.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
       """
     }
     def storeTree(coroutine: Tree, x: Tree): Tree = {
@@ -135,9 +135,9 @@ trait Analyzer[C <: Context] {
         q"""
           $decl
 
-          org.coroutines.common.Stack.set[$stacktpe](
+          _root_.org.coroutines.common.Stack.set[$stacktpe](
             $coroutine.$stackname, ${stackpos._1 + 0}, ($v & 0xffffffff).toInt)
-          org.coroutines.common.Stack.set[$stacktpe](
+          _root_.org.coroutines.common.Stack.set[$stacktpe](
             $coroutine.$stackname, ${stackpos._1 + 1}, (($v >>> 32) & 0xffffffff).toInt)
         """
       } else {
@@ -148,7 +148,7 @@ trait Analyzer[C <: Context] {
           else encodeInt(x)
         }
         q"""
-          org.coroutines.common.Stack.set[$stacktpe](
+          _root_.org.coroutines.common.Stack.set[$stacktpe](
             $coroutine.$stackname, ${stackpos._1}, $encoded)
         """
       }
@@ -159,9 +159,9 @@ trait Analyzer[C <: Context] {
         val nme1 = TermName(c.freshName("v"))
         val decoded = decodeWide(q"($nme1.toLong << 32) | $nme0")
         q"""
-          val $nme0 = org.coroutines.common.Stack.get[$stacktpe](
+          val $nme0 = _root_.org.coroutines.common.Stack.get[$stacktpe](
             $coroutine.$stackname, ${stackpos._1 + 0})
-          val $nme1 = org.coroutines.common.Stack.get[$stacktpe](
+          val $nme1 = _root_.org.coroutines.common.Stack.get[$stacktpe](
             $coroutine.$stackname, ${stackpos._1 + 1})
           $decoded
         """
@@ -169,7 +169,7 @@ trait Analyzer[C <: Context] {
         if (isUnitType) q"()"
         else {
           val t = q"""
-            org.coroutines.common.Stack.get[$stacktpe](
+            _root_.org.coroutines.common.Stack.get[$stacktpe](
               $coroutine.$stackname, ${stackpos._1})
           """
           if (isRefType) q"$t.asInstanceOf[$tpe]"

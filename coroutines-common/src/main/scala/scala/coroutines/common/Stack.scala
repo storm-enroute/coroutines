@@ -15,7 +15,7 @@ object Stack {
 
     val tpe = implicitly[c.WeakTypeTag[T]]
     if (size == q"-1") q"" else q"""
-      if ($stack == null) $stack = new Array[$tpe]($size)
+      if ($stack == null) $stack = new _root_.scala.Array[$tpe]($size)
     """
   }
 
@@ -35,8 +35,8 @@ object Stack {
     q"""
       $destptr = $srcptr
       if ($src != null) {
-        $dest = new Array[$tpe]($src.length)
-        java.lang.System.arraycopy($src, 0, $dest, 0, $srcptr)
+        $dest = new _root_.scala.Array[$tpe]($src.length)
+        _root_.java.lang.System.arraycopy($src, 0, $dest, 0, $srcptr)
       }
     """
   }
@@ -53,10 +53,10 @@ object Stack {
     val stackptr = q"$path.$stackptrname"
     val tpe = implicitly[WeakTypeTag[T]]
     q"""
-      org.coroutines.common.Stack.init[$tpe]($stack, $size)
+      _root_.org.coroutines.common.Stack.init[$tpe]($stack, $size)
       if ($stackptr >= $stack.length) {
-        val nstack = new Array[$tpe]($stack.length * 2)
-        java.lang.System.arraycopy($stack, 0, nstack, 0, $stack.length)
+        val nstack = new _root_.scala.Array[$tpe]($stack.length * 2)
+        _root_.java.lang.System.arraycopy($stack, 0, nstack, 0, $stack.length)
         $stack = nstack
       }
       $stack($stackptr) = $x
@@ -77,11 +77,11 @@ object Stack {
     val tpe = implicitly[WeakTypeTag[T]]
     val valnme = TermName(c.freshName())
     q"""
-      org.coroutines.common.Stack.init[$tpe]($stack, $size)
+      _root_.org.coroutines.common.Stack.init[$tpe]($stack, $size)
       $stackptr += $n
       while ($stackptr >= $stack.length) {
-        val nstack = new Array[$tpe]($stack.length * 2)
-        java.lang.System.arraycopy($stack, 0, nstack, 0, $stack.length)
+        val nstack = new _root_.scala.Array[$tpe]($stack.length * 2)
+        _root_.java.lang.System.arraycopy($stack, 0, nstack, 0, $stack.length)
         $stack = nstack
       }
     """

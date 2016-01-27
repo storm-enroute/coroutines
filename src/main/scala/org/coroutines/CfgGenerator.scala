@@ -116,7 +116,7 @@ trait CfgGenerator[C <: Context] {
       // update pc state
       val pc = subgraph.exitSubgraphs(this).uid
       val pcstackset = q"""
-        org.coroutines.common.Stack.update($cparam.$$pcstack, $pc.toShort)
+        _root_.org.coroutines.common.Stack.update($cparam.$$pcstack, $pc.toShort)
       """
       pcstackset :: stackstores.toList
     }
@@ -127,11 +127,11 @@ trait CfgGenerator[C <: Context] {
       val returnvaluemethod = t.returnValueMethodName
       q"""
         $$pop($cparam)
-        if (org.coroutines.common.Stack.isEmpty($cparam.$$costack)) {
+        if (_root_.org.coroutines.common.Stack.isEmpty($cparam.$$costack)) {
           $$assignresult($cparam, $untypedtree)
         } else {
           $cparam.$$target = $cparam
-          org.coroutines.common.Stack.top($cparam.$$costack)
+          _root_.org.coroutines.common.Stack.top($cparam.$$costack)
             .$returnvaluemethod($cparam, $untypedtree)
         }
         return
@@ -618,7 +618,9 @@ trait CfgGenerator[C <: Context] {
         q"""
           ..$savestate
           $untypedco.$$push[..$tpargs](
-            $cparam.asInstanceOf[Coroutine.Frame[$yldtpe, $rettpe]], ..$untypedargs)
+            $cparam.asInstanceOf[
+              _root_.org.coroutines.Coroutine.Frame[$yldtpe, $rettpe]],
+            ..$untypedargs)
           $cparam.$$target = $cparam
           return
         """
@@ -691,9 +693,11 @@ trait CfgGenerator[C <: Context] {
         val savestate = genSaveState(subgraph)
         val exittree = q"""
           ..$savestate
-          if (!$untypedco.isLive) throw new CoroutineStoppedException
+          if (!$untypedco.isLive)
+            throw new _root_.org.coroutines.CoroutineStoppedException
           $cparam.$$target =
-            $untypedco.asInstanceOf[Coroutine.Frame[${t.yieldType}, ${t.returnType}]]
+            $untypedco.asInstanceOf[
+              _root_.org.coroutines.Coroutine.Frame[${t.yieldType}, ${t.returnType}]]
           return
         """
         z.append(exittree)
@@ -980,10 +984,10 @@ trait CfgGenerator[C <: Context] {
           $checkexception
           $body
         } catch {
-          case t: Throwable =>
+          case t: _root_.java.lang.Throwable =>
             $cparam.$$exception = t
             $$pop($cparam)
-            if (!org.coroutines.common.Stack.isEmpty($cparam.$$costack)) {
+            if (!_root_.org.coroutines.common.Stack.isEmpty($cparam.$$costack)) {
               $cparam.$$target = $cparam
             }
         }

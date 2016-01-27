@@ -65,7 +65,7 @@ with ThreeAddressFormTransformation[C] {
 
       q"""
         def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): _root_.scala.Unit = {
-          val pc = org.coroutines.common.Stack.top(c.$$pcstack)
+          val pc = _root_.org.coroutines.common.Stack.top(c.$$pcstack)
           if (pc == 0) $ep0(c) else $ep1(c)
         }
       """
@@ -77,7 +77,7 @@ with ThreeAddressFormTransformation[C] {
 
       q"""
         def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): _root_.scala.Unit = {
-          val pc: Short = org.coroutines.common.Stack.top(c.$$pcstack)
+          val pc: Short = _root_.org.coroutines.common.Stack.top(c.$$pcstack)
           (pc: @_root_.scala.annotation.switch) match {
             case ..$cases
           }
@@ -129,7 +129,7 @@ with ThreeAddressFormTransformation[C] {
         returnstores(0)._2
       } else if (returnstores.size == 2) {
         q"""
-          val pc = org.coroutines.common.Stack.top(c.$$pcstack)
+          val pc = _root_.org.coroutines.common.Stack.top(c.$$pcstack)
           if (pc == ${returnstores(0)._1.toShort}) {
             ${returnstores(0)._2}
           } else {
@@ -141,7 +141,7 @@ with ThreeAddressFormTransformation[C] {
           cq"${pcvalue.toShort} => $rvset"
         }
         q"""
-          val pc = org.coroutines.common.Stack.top(c.$$pcstack)
+          val pc = _root_.org.coroutines.common.Stack.top(c.$$pcstack)
           (pc: @_root_.scala.annotation.switch) match {
             case ..$cases
           }
@@ -169,7 +169,7 @@ with ThreeAddressFormTransformation[C] {
       val varsize = stackSize(vars)
       val stacksize = math.max(table.initialStackSize, varsize)
       val bulkpushes = if (vars.size == 0) Nil else List(q"""
-        org.coroutines.common.Stack.bulkPush($stack, $varsize, $stacksize)
+        _root_.org.coroutines.common.Stack.bulkPush($stack, $varsize, $stacksize)
       """)
       val args = vars.values.filter(_.isArg).toList
       val argstores = for (a <- args) yield a.storeTree(q"c", q"${a.name}")
@@ -183,7 +183,8 @@ with ThreeAddressFormTransformation[C] {
       info.popTree
     }) ++ (if (storedValVars.size == 0) Nil else List(
       q"""
-        org.coroutines.common.Stack.bulkPop(c.$$valstack, ${stackSize(storedValVars)})
+        _root_.org.coroutines.common.Stack.bulkPop(
+          c.$$valstack, ${stackSize(storedValVars)})
       """
     ))
     (varpushes, varpops)
