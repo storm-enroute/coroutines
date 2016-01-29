@@ -154,4 +154,11 @@ class RegressionTest extends FunSuite with Matchers {
       x
     }
   }
+
+  test("issue #15 -- more hygiene") {
+    val org, coroutines, Coroutine = ()
+    trait org; trait coroutines; trait Coroutine
+    
+    val id = coroutine { () => }
+  }
 }

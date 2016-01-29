@@ -27,13 +27,15 @@ with ThreeAddressFormTransformation[C] {
     val defname = TermName(s"$$ep${subgraph.uid}")
     val defdef = if (subgraph.uid < NUM_PREDEFINED_ENTRY_STUBS) q"""
       override def $defname(
-        ${t.names.coroutineParam}: Coroutine.Frame[${t.yieldType}, ${t.returnType}]
+        ${t.names.coroutineParam}:
+          _root_.org.coroutines.Coroutine.Frame[${t.yieldType}, ${t.returnType}]
       ): _root_.scala.Unit = {
         $body
       }
     """ else q"""
       def $defname(
-        ${t.names.coroutineParam}: Coroutine.Frame[${t.yieldType}, ${t.returnType}]
+        ${t.names.coroutineParam}:
+          _root_.org.coroutines.Coroutine.Frame[${t.yieldType}, ${t.returnType}]
       ): _root_.scala.Unit = {
         $body
       }
@@ -57,14 +59,18 @@ with ThreeAddressFormTransformation[C] {
       val q"$_ def $ep0($_): _root_.scala.Unit = $_" = entrypoints(0)
 
       q"""
-        def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): _root_.scala.Unit = $ep0(c)
+        def $$enter(
+          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+        ): _root_.scala.Unit = $ep0(c)
       """
     } else if (entrypoints.size == 2) {
       val q"$_ def $ep0($_): _root_.scala.Unit = $_" = entrypoints(0)
       val q"$_ def $ep1($_): _root_.scala.Unit = $_" = entrypoints(1)
 
       q"""
-        def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): _root_.scala.Unit = {
+        def $$enter(
+          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+        ): _root_.scala.Unit = {
           val pc = _root_.org.coroutines.common.Stack.top(c.$$pcstack)
           if (pc == 0) $ep0(c) else $ep1(c)
         }
@@ -76,7 +82,9 @@ with ThreeAddressFormTransformation[C] {
       }
 
       q"""
-        def $$enter(c: Coroutine.Frame[$yldtpt, $rettpt]): _root_.scala.Unit = {
+        def $$enter(
+          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+        ): _root_.scala.Unit = {
           val pc: Short = _root_.org.coroutines.common.Stack.top(c.$$pcstack)
           (pc: @_root_.scala.annotation.switch) match {
             case ..$cases
@@ -114,7 +122,8 @@ with ThreeAddressFormTransformation[C] {
         val rvset = info.storeTree(q"c", valuetree)
         (pcvalue, q"$rvset")
       } else {
-        (pcvalue, q"""scala.sys.error("Return method called for incorrect type.")""")
+        (pcvalue,
+          q"""_root_.scala.sys.error("Return method called for incorrect type.")""")
       }
     }
     val returnstores = cfg.start.dfs.collect {
@@ -151,7 +160,8 @@ with ThreeAddressFormTransformation[C] {
 
     q"""
       def $returnvaluemethod(
-        c: org.coroutines.Coroutine.Frame[${table.yieldType}, ${table.returnType}],
+        c: _root_.org.coroutines.Coroutine.Frame[
+          ${table.yieldType}, ${table.returnType}],
         v: $tpe
       ): _root_.scala.Unit = {
         $body
@@ -345,7 +355,8 @@ with ThreeAddressFormTransformation[C] {
           $valnme
         }
         def apply(..$args): $rettpt = {
-          sys.error(_root_.org.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
+          _root_.scala.sys.error(
+            _root_.org.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
         }
         def $$push(
           c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt], ..$args
