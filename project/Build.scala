@@ -147,6 +147,7 @@ object CoroutinesBuild extends MechaRepoBuild {
           <url>http://axel22.github.com/</url>
         </developer>
       </developers>,
+    mechaPublishKey <<= mechaPublishKey.dependsOn(publish),
     mechaDocsRepoKey := "git@github.com:storm-enroute/apidocs.git",
     mechaDocsBranchKey := "gh-pages",
     mechaDocsPathKey := "coroutines-common"
@@ -166,6 +167,8 @@ object CoroutinesBuild extends MechaRepoBuild {
     "coroutines",
     file("."),
     settings = coroutinesSettings
+  ) aggregate(
+    coroutinesCommon
   ) dependsOn(
     coroutinesCommon % "compile->compile;test->test"
   ) dependsOnSuperRepo
