@@ -7,7 +7,7 @@
 
 [Coroutines](http://storm-enroute.com/coroutines)
 is a library-level extension for the Scala programming language
-that introduces first-class polymorphic coroutines.
+that introduces first-class coroutines.
 
 Check out the [Scala Coroutines website](http://storm-enroute.com/coroutines) for more info!
 
