@@ -600,6 +600,28 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c.result == 0)
     assert(c.isCompleted)
   }
+
+  test("pull should always yield a value") {
+    val goldberg = coroutine { () =>
+      yieldval(())
+    }
+    val c0 = call(goldberg())
+    val rube = coroutine { (xs: List[Int]) =>
+      yieldto(c0)
+      var ys = xs
+      while (ys != Nil) {
+        yieldval(ys.head)
+        ys = ys.tail
+      }
+    }
+
+    val c1 = call(rube(1 :: 2 :: Nil))
+    assert(c1.pull)
+    assert(c1.value == 1)
+    assert(c1.pull)
+    assert(c1.value == 2)
+    assert(!c1.pull)
+  }
 }
 
 

@@ -125,6 +125,15 @@ object Coroutine {
       } else throw new CoroutineStoppedException
     }
 
+    @tailrec
+    final def pull: Boolean = {
+      if (isLive) {
+        if (!resume) false
+        else if (hasValue) true
+        else pull
+      } else throw new CoroutineStoppedException
+    }
+
     final def value: Y = {
       if (!hasValue)
         sys.error("Coroutine has no value, because it did not yield.")
