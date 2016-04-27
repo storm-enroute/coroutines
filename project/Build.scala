@@ -90,7 +90,7 @@ object CoroutinesBuild extends MechaRepoBuild {
   def dependencies(scalaVersion: String) =
     CrossVersion.partialVersion(scalaVersion) match {
     case Some((2, major)) if major >= 11 => Seq(
-      "org.scalatest" % "scalatest_2.11" % "2.1.7" % "test",
+      "org.scalatest" % "scalatest_2.11" % "2.2.6" % "test",
       "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.2",
       "org.scala-lang" % "scala-reflect" % "2.11.4"
     )
@@ -156,7 +156,7 @@ object CoroutinesBuild extends MechaRepoBuild {
   def commonDependencies(scalaVersion: String) =
     CrossVersion.partialVersion(scalaVersion) match {
     case Some((2, major)) if major >= 11 => Seq(
-      "org.scalatest" % "scalatest_2.11" % "2.1.7" % "test",
+      "org.scalatest" % "scalatest_2.11" % "2.2.6" % "test",
       "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.2",
       "org.scala-lang" % "scala-reflect" % "2.11.4"
     )
