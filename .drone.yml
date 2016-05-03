@@ -35,7 +35,7 @@ build:
         fi
       done <cross.conf
     - git clone https://github.com/storm-enroute/dev-tools.git ~/.dev-tools
-    - ~/.dev-tools .
+    - ~/.dev-tools/lint .
 notify:
   irc:
     prefix: storm-enroute build
