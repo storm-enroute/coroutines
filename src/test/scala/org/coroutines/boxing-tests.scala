@@ -32,23 +32,28 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
 
   val sizes = Gen.single("size")(1000)
 
-  val idCtx = Context(
-    reports.validation.predicate -> { (n: Any) => n == 0 }
+  val rangeCtx = Context(
+    reports.validation.predicate -> { (n: Any) => n == 1001 }
   )
 
   @gen("sizes")
-  @benchmark("Coroutine.id")
-  @curve("Id")
-  @ctx("idCtx")
-  def identity(sz: Int) {
+  @benchmark("coroutines.range")
+  @curve("Range")
+  @ctx("rangeCtx")
+  def range(sz: Int) {
     val id = coroutine { (n: Int) =>
-      n
+      var i = 0
+      while (i < n) {
+        yieldval(i)
+        i += 1
+      }
     }
 
     var i = 0
+    val c = call(id(sz))
     while (i < sz) {
-      // val c = call(id(i))
-      // while (c.pull) c.value
+      c.resume
+      //c.value
       i += 1
     }
   }
