@@ -33,7 +33,7 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
   val sizes = Gen.single("size")(1000)
 
   val rangeCtx = Context(
-    reports.validation.predicate -> { (n: Any) => n == 1001 }
+    reports.validation.predicate -> { (n: Any) => n == 1 }
   )
 
   @gen("sizes")
@@ -53,7 +53,7 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
     val c = call(id(sz))
     while (i < sz) {
       c.resume
-      //c.value
+      c.value
       i += 1
     }
   }
