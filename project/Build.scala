@@ -168,10 +168,16 @@ object CoroutinesBuild extends MechaRepoBuild {
     case _ => Nil
   }
 
+  lazy val Benchmarks = config("bench") extend (Test)
+
   lazy val coroutines: Project = Project(
     "coroutines",
     file("."),
     settings = coroutinesSettings
+  ) configs(
+    Benchmarks
+  ) settings(
+    inConfig(Benchmarks)(Defaults.testSettings): _*
   ) aggregate(
     coroutinesCommon
   ) dependsOn(
