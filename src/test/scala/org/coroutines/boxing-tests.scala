@@ -36,9 +36,11 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
     reports.validation.predicate -> { (n: Any) => n == 1 }
   )
 
+  /* range iterator */
+
   @gen("sizes")
-  @benchmark("coroutines.range")
-  @curve("Range")
+  @benchmark("coroutines.boxing.range")
+  @curve("Coroutine")
   @ctx("rangeCtx")
   def range(sz: Int) {
     val id = coroutine { (n: Int) =>
@@ -56,5 +58,47 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
       c.value
       i += 1
     }
+  }
+
+  /* tree iterator */
+
+  val treeCtx = Context(
+    reports.validation.predicate -> { (n: Any) => n == 1000 }
+  )
+
+  sealed trait Tree
+  case class Node(x: Int, left: Tree, right: Tree) extends Tree
+  case object Empty extends Tree
+
+  var iterator: Coroutine._1[Tree, Int, Unit] = _
+
+  @gen("sizes")
+  @benchmark("coroutines.boxing.tree-iterator")
+  @curve("Coroutine")
+  @ctx("treeCtx")
+  def tree(sz: Int) {
+    def gen(sz: Int): Tree = {
+      if (sz == 0) Empty
+      else {
+        val rem = sz - 1
+        val left = gen(rem / 2)
+        val right = gen(rem - rem / 2)
+        Node(sz, left, right)
+      }
+    }
+    val tree = gen(sz)
+
+    iterator = coroutine { (t: Tree) =>
+      t match {
+        case Node(x, left, right) =>
+          iterator(left)
+          yieldval(x)
+          iterator(right)
+        case Empty =>
+      }
+    }
+
+    val c = call(iterator(tree))
+    while (c.pull) c.value
   }
 }

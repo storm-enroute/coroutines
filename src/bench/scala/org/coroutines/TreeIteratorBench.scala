@@ -13,7 +13,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
   override def defaultConfig = Context(
     exec.minWarmupRuns -> 20,
     exec.maxWarmupRuns -> 40,
-    exec.benchRuns -> 32,
+    exec.benchRuns -> 24,
     exec.independentSamples -> 4,
     verbose -> true
   )
@@ -60,30 +60,6 @@ class TreeIteratorBench extends JBench.OfflineReport {
       x
     }
   }
-
-  assert({
-    def leaf(x: Int) = Node(x, Empty, Empty)
-    val tree = Node(1,
-      Node(19, leaf(21), leaf(23)),
-      Node(3,
-        leaf(11),
-        Node(9,
-          leaf(5),
-          leaf(17))))
-    val a = mutable.Buffer[Int]()
-    def rec(tree: Tree): Unit = tree match {
-      case Empty =>
-      case Node(x, l, r) =>
-        rec(l)
-        a += x
-        rec(r)
-    }
-    rec(tree)
-    val b = mutable.Buffer[Int]()
-    val it = new TreeIterator(tree)
-    while (it.hasNext) b += it.next()
-    a == b
-  })
 
   val sizes = Gen.range("size")(50000, 250000, 50000)
   val trees = for (sz <- sizes) yield {
@@ -218,5 +194,31 @@ class TreeIteratorBench extends JBench.OfflineReport {
     }
     recurse(tree)
   }
+
+  /* tests */
+
+  assert({
+    def leaf(x: Int) = Node(x, Empty, Empty)
+    val tree = Node(1,
+      Node(19, leaf(21), leaf(23)),
+      Node(3,
+        leaf(11),
+        Node(9,
+          leaf(5),
+          leaf(17))))
+    val a = mutable.Buffer[Int]()
+    def rec(tree: Tree): Unit = tree match {
+      case Empty =>
+      case Node(x, l, r) =>
+        rec(l)
+        a += x
+        rec(r)
+    }
+    rec(tree)
+    val b = mutable.Buffer[Int]()
+    val it = new TreeIterator(tree)
+    while (it.hasNext) b += it.next()
+    a == b
+  })
 
 }
