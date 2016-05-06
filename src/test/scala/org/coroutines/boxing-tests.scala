@@ -32,11 +32,11 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
 
   val sizes = Gen.single("size")(1000)
 
-  val rangeCtx = Context(
-    reports.validation.predicate -> { (n: Any) => n == 1 }
-  )
-
   /* range iterator */
+
+  val rangeCtx = Context(
+    reports.validation.predicate -> { (n: Any) => n == 0 }
+  )
 
   @gen("sizes")
   @benchmark("coroutines.boxing.range")
@@ -79,7 +79,7 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
   def tree(sz: Int) {
     def gen(sz: Int): Tree = {
       if (sz == 0) Empty
-      else {
+      else { 
         val rem = sz - 1
         val left = gen(rem / 2)
         val right = gen(rem - rem / 2)

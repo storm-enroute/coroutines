@@ -203,90 +203,88 @@ with ThreeAddressFormTransformation[C] {
   def specArity1(
     argtpts: List[Tree], yldtpt: Tree, rettpt: Tree
   ): (Tree, List[Tree]) = {
-    argtpts(0) match {
-      case tq"_root_.scala.Boolean" =>
-        (tq"org.coroutines.Coroutine._1", argtpts :+ yldtpt :+ rettpt)
-      case tq"_root_.scala.Byte" =>
-        (tq"org.coroutines.Coroutine._1", argtpts :+ yldtpt :+ rettpt)
-      case tq"_root_.scala.Short" =>
-        val nme = TypeName(s"_1$$spec$$S")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"_root_.scala.Char" =>
-        val nme = TypeName(s"_1$$spec$$C")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"_root_.scala.Int" =>
-        val nme = TypeName(s"_1$$spec$$I")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"_root_.scala.Float" =>
-        val nme = TypeName(s"_1$$spec$$F")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"_root_.scala.Long" =>
-        val nme = TypeName(s"_1$$spec$$J")
-        (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case tq"_root_.scala.Double" =>
-        val nme = TypeName(s"_1$$spec$$D")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case _ =>
-        val nme = TypeName(s"_1$$spec$$L")
-        (tq"_root_.org.coroutines.$nme", argtpts :+ yldtpt :+ rettpt)
+    val tpe = argtpts(0).tpe
+    if (tpe == typeOf[scala.Boolean]) {
+      (tq"org.coroutines.Coroutine._1", argtpts :+ yldtpt :+ rettpt)
+    } else if (tpe == typeOf[scala.Byte]) {
+      (tq"org.coroutines.Coroutine._1", argtpts :+ yldtpt :+ rettpt)
+    } else if (tpe == typeOf[scala.Short]) {
+      val nme = TypeName(s"_1$$spec$$S")
+      (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tpe == typeOf[scala.Char]) {
+      val nme = TypeName(s"_1$$spec$$C")
+      (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tpe == typeOf[scala.Int]) {
+      val nme = TypeName(s"_1$$spec$$I")
+      (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tpe == typeOf[scala.Float]) {
+      val nme = TypeName(s"_1$$spec$$F")
+      (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tpe == typeOf[scala.Long]) {
+      val nme = TypeName(s"_1$$spec$$J")
+      (tq"org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tpe == typeOf[scala.Double]) {
+      val nme = TypeName(s"_1$$spec$$D")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else {
+      val nme = TypeName(s"_1$$spec$$L")
+      (tq"_root_.org.coroutines.$nme", argtpts :+ yldtpt :+ rettpt)
     }
   }
 
   def specArity2(
     argtpts: List[Tree], yldtpt: Tree, rettpt: Tree
   ): (Tree, List[Tree]) = {
-    (argtpts(0), argtpts(1)) match {
-      case (tq"_root_.scala.Int", tq"_root_.scala.Int") =>
-        val nme = TypeName(s"_2$$spec$$II")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Long", tq"_root_.scala.Int") =>
-        val nme = TypeName(s"_2$$spec$$JI")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Double", tq"_root_.scala.Int") =>
-        val nme = TypeName(s"_2$$spec$$DI")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (_, tq"_root_.scala.Int") =>
-        val nme = TypeName(s"_2$$spec$$LI")
-        (tq"_root_.org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Int", tq"_root_.scala.Long") =>
-        val nme = TypeName(s"_2$$spec$$IJ")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Long", tq"_root_.scala.Long") =>
-        val nme = TypeName(s"_2$$spec$$JJ")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Double", tq"_root_.scala.Long") =>
-        val nme = TypeName(s"_2$$spec$$DJ")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (_, tq"_root_.scala.Long") =>
-        val nme = TypeName(s"_2$$spec$$LJ")
-        (tq"_root_.org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Int", tq"_root_.scala.Double") =>
-        val nme = TypeName(s"_2$$spec$$ID")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Long", tq"_root_.scala.Double") =>
-        val nme = TypeName(s"_2$$spec$$JD")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Double", tq"_root_.scala.Double") =>
-        val nme = TypeName(s"_2$$spec$$DD")
-        (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
-      case (_, tq"_root_.scala.Double") =>
-        val nme = TypeName(s"_2$$spec$$LD")
-        (tq"_root_.org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Int", _) =>
-        val nme = TypeName(s"_2$$spec$$IL")
-        (tq"_root_.org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Long", _) =>
-        val nme = TypeName(s"_2$$spec$$JL")
-        (tq"_root_.org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
-      case (tq"_root_.scala.Double", _) =>
-        val nme = TypeName(s"_2$$spec$$DL")
-        (tq"_root_.org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
-      case (_, _) =>
-        val nme = TypeName(s"_2$$spec$$LL")
-        (
-          tq"_root_.org.coroutines.$nme",
-          argtpts(0) :: argtpts(1) :: yldtpt :: rettpt :: Nil
-        )
+    val (tp0, tp1) = (argtpts(0).tpe, argtpts(1).tpe)
+    if (tp0 == typeOf[scala.Int] && tp1 == typeOf[scala.Int]) {
+      val nme = TypeName(s"_2$$spec$$II")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Long] && tp1 == typeOf[Int]) {
+      val nme = TypeName(s"_2$$spec$$JI")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Double] && tp1 == typeOf[Int]) {
+      val nme = TypeName(s"_2$$spec$$DI")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tp1 == typeOf[Int]) {
+      val nme = TypeName(s"_2$$spec$$LI")
+      (tq"_root_.org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Int] && tp1 == typeOf[Long]) {
+      val nme = TypeName(s"_2$$spec$$IJ")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Long] && tp1 == typeOf[Long]) {
+      val nme = TypeName(s"_2$$spec$$JJ")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Double] && tp1 == typeOf[Long]) {
+      val nme = TypeName(s"_2$$spec$$DJ")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tp1 == typeOf[Long]) {
+      val nme = TypeName(s"_2$$spec$$LJ")
+      (tq"_root_.org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Int] && tp1 == typeOf[Double]) {
+      val nme = TypeName(s"_2$$spec$$ID")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Long] && tp1 == typeOf[Double]) {
+      val nme = TypeName(s"_2$$spec$$JD")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Double] && tp1 == typeOf[Double]) {
+      val nme = TypeName(s"_2$$spec$$DD")
+      (tq"_root_.org.coroutines.$nme", yldtpt :: rettpt :: Nil)
+    } else if (tp1 == typeOf[Double]) {
+      val nme = TypeName(s"_2$$spec$$LD")
+      (tq"_root_.org.coroutines.$nme", argtpts(0) :: yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Int]) {
+      val nme = TypeName(s"_2$$spec$$IL")
+      (tq"_root_.org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Long]) {
+      val nme = TypeName(s"_2$$spec$$JL")
+      (tq"_root_.org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
+    } else if (tp0 == typeOf[Double]) {
+      val nme = TypeName(s"_2$$spec$$DL")
+      (tq"_root_.org.coroutines.$nme", argtpts(1) :: yldtpt :: rettpt :: Nil)
+    } else {
+      val nme = TypeName(s"_2$$spec$$LL")
+      val tpes = argtpts(0) :: argtpts(1) :: yldtpt :: rettpt :: Nil
+      (tq"_root_.org.coroutines.$nme", tpes)
     }
   }
 
