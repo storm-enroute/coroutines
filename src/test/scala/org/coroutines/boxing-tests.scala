@@ -63,7 +63,7 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
   /* tree iterator */
 
   val treeCtx = Context(
-    reports.validation.predicate -> { (n: Any) => n == 1000 }
+    reports.validation.predicate -> { (n: Any) => n == 0 }
   )
 
   sealed trait Tree
@@ -90,12 +90,12 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
 
     iterator = coroutine { (t: Tree) =>
       t match {
-        case Node(x, left, right) =>
-          iterator(left)
-          yieldval(x)
-          iterator(right)
+        case n: Node =>
+          iterator(n.left)
+          yieldval(n.x)
+          iterator(n.right)
         case Empty =>
-      }
+      } 
     }
 
     val c = call(iterator(tree))

@@ -11,8 +11,8 @@ import scala.collection._
 class TreeIteratorBench extends JBench.OfflineReport {
 
   override def defaultConfig = Context(
-    exec.minWarmupRuns -> 20,
-    exec.maxWarmupRuns -> 40,
+    exec.minWarmupRuns -> 40,
+    exec.maxWarmupRuns -> 80,
     exec.benchRuns -> 24,
     exec.independentSamples -> 4,
     verbose -> true
@@ -86,10 +86,10 @@ class TreeIteratorBench extends JBench.OfflineReport {
     var max = Int.MinValue
     treeIterator = coroutine { (t: Tree) =>
       t match {
-        case Node(x, left, right) =>
-          treeIterator(left)
-          yieldval(x)
-          treeIterator(right)
+        case n: Node =>
+          if (n.left != Empty) treeIterator(n.left)
+          yieldval(n.x)
+          if (n.right != Empty) treeIterator(n.right)
         case Empty =>
       }
     }
@@ -153,9 +153,9 @@ class TreeIteratorBench extends JBench.OfflineReport {
     treeIterator = coroutine { (t: Tree) =>
       t match {
         case Node(x, left, right) =>
-          treeIterator(left)
+          if (left != Empty) treeIterator(left)
           yieldval(x)
-          treeIterator(right)
+          if (right != Empty) treeIterator(right)
         case Empty =>
       }
     }
