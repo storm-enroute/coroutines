@@ -101,4 +101,35 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
     val c = call(iterator(tree))
     while (c.pull) c.value
   }
+
+  /* Fibonacci */
+
+  val fibCtx = Context(
+    reports.validation.predicate -> { (n: Any) => n == 356 }
+  )
+
+  val fibSizes = Gen.single("size")(10)
+
+  @gen("fibSizes")
+  @benchmark("coroutines.boxing.fibonacci")
+  @curve("Coroutine")
+  @ctx("treeCtx")
+  def fibonacci(sz: Int) {
+    var fib: Coroutine._1[Int, Unit, Int] = null
+    fib = coroutine { (n: Int) =>
+      if (n <= 1) 1
+      else fib(n - 1) + fib(n - 2)
+    }
+    val c = call(fib(sz))
+    while (c.pull) c.value
+
+    var fibsugar: Int ~~> (Unit, Int) = null
+    fibsugar = coroutine { (n: Int) =>
+      if (n <= 1) 1
+      else fibsugar(n - 1) + fibsugar(n - 2)
+    }
+    val cs = call(fibsugar(sz))
+    while (cs.pull) cs.value
+  }
+
 }

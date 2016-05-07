@@ -13,8 +13,8 @@ class TreeIteratorBench extends JBench.OfflineReport {
   override def defaultConfig = Context(
     exec.minWarmupRuns -> 40,
     exec.maxWarmupRuns -> 80,
-    exec.benchRuns -> 24,
-    exec.independentSamples -> 4,
+    exec.benchRuns -> 30,
+    exec.independentSamples -> 5,
     verbose -> true
   )
 
@@ -111,7 +111,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
       if (x > max) max = x
     }
   }
- 
+
   @gen("trees")
   @benchmark("coroutines.tree-iterator.max")
   @curve("recursion")
