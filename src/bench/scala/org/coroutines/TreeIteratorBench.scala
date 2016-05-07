@@ -81,7 +81,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
 
   @gen("trees")
   @benchmark("coroutines.tree-iterator.max")
-  @curve("Coroutine")
+  @curve("coroutine")
   def coroutineMax(tree: Tree) {
     var max = Int.MinValue
     treeIterator = coroutine { (t: Tree) =>
@@ -102,7 +102,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
 
   @gen("trees")
   @benchmark("coroutines.tree-iterator.max")
-  @curve("Iterator")
+  @curve("iterator")
   def iteratorMax(tree: Tree) {
     var max = Int.MinValue
     val iter = new TreeIterator(tree)
@@ -147,7 +147,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
 
   @gen("trees")
   @benchmark("coroutines.tree-iterator.to-array")
-  @curve("Coroutine")
+  @curve("coroutine")
   def coroutineToArray(tree: Tree) {
     val a = new GrowingArray
     treeIterator = coroutine { (t: Tree) =>
@@ -168,7 +168,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
 
   @gen("trees")
   @benchmark("coroutines.tree-iterator.to-array")
-  @curve("Iterator")
+  @curve("iterator")
   def iteratorToArray(tree: Tree) {
     val a = new GrowingArray
     val iter = new TreeIterator(tree)
