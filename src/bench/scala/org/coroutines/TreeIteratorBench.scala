@@ -152,10 +152,10 @@ class TreeIteratorBench extends JBench.OfflineReport {
     val a = new GrowingArray
     treeIterator = coroutine { (t: Tree) =>
       t match {
-        case Node(x, left, right) =>
-          if (left != Empty) treeIterator(left)
-          yieldval(x)
-          if (right != Empty) treeIterator(right)
+        case n: Node =>
+          if (n.left != Empty) treeIterator(n.left)
+          yieldval(n.x)
+          if (n.right != Empty) treeIterator(n.right)
         case Empty =>
       }
     }

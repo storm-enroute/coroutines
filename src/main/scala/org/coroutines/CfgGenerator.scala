@@ -604,8 +604,11 @@ trait CfgGenerator[C <: Context] {
         nthis
       }
       def copyWithoutSuccessors(nch: Chain) = ApplyCoroutine(tree, nch, uid)
-      override def stackVars(sub: SubCfg) =
-        tree.symbol :: storePointVarsInChain(sub).map(_._1)
+      override def stackVars(sub: SubCfg) = {
+        val chainVars = storePointVarsInChain(sub).map(_._1)
+        if (tree.symbol.info != typeOf[Unit]) tree.symbol :: chainVars
+        else chainVars
+      }
       def genCoroutineCall(
         co: Tree, args: List[Tree], subgraph: SubCfg
       )(implicit table: Table): Tree = {
@@ -895,13 +898,18 @@ trait CfgGenerator[C <: Context] {
 
     val mustStoreVar: Cache._2[Node, Symbol, Boolean] = cached {
       (n, sym) =>
-      val chain = n.chain
-      val block = declarationBlockFrom(sym, chain)
-      val isVisible = chain.contains(sym)
-      val isAssigned = isAssignedInBlockDescendants(sym, block)
-      val isDeclared = chain.isDeclaredInAncestors(sym)
-      val isNeeded = isLoadedInReachableSubgraphs(n, sym)
-      isVisible && (isAssigned || isDeclared) && isNeeded
+      if (sym.info == typeOf[Unit]) {
+        // No need to store the Unit type, since it carries no information.
+        false
+      } else {
+        val chain = n.chain
+        val block = declarationBlockFrom(sym, chain)
+        val isVisible = chain.contains(sym)
+        val isAssigned = isAssignedInBlockDescendants(sym, block)
+        val isDeclared = chain.isDeclaredInAncestors(sym)
+        val isNeeded = isLoadedInReachableSubgraphs(n, sym)
+        isVisible && (isAssigned || isDeclared) && isNeeded
+      }
     }
 
     val mustLoadVar: Cache._2[Symbol, Chain, Boolean] = cached {

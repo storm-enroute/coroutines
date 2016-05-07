@@ -117,10 +117,14 @@ with ThreeAddressFormTransformation[C] {
         (isValType(info.tpe) && (info.tpe =:= tpe)) ||
         (tpe =:= typeOf[Any])
       if (eligible) {
-        val valuetree =
-          if (tpe =:= typeOf[Any]) q"v.asInstanceOf[${info.tpe}]" else q"v"
-        val rvset = info.storeTree(q"c", valuetree)
-        (pcvalue, q"$rvset")
+        if (info.tpe =:= typeOf[Unit]) {
+          (pcvalue, q"()")
+        } else {
+          val valuetree =
+            if (tpe =:= typeOf[Any]) q"v.asInstanceOf[${info.tpe}]" else q"v"
+          val rvset = info.storeTree(q"c", valuetree)
+          (pcvalue, q"$rvset")
+        }
       } else {
         (pcvalue,
           q"""_root_.scala.sys.error("Return method called for incorrect type.")""")
@@ -375,7 +379,7 @@ with ThreeAddressFormTransformation[C] {
         ..$returnvaluemethods
       }
     """
-    // println(co)
+    //println(co)
     co
   }
 

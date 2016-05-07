@@ -95,7 +95,7 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
           yieldval(n.x)
           iterator(n.right)
         case Empty =>
-      } 
+      }
     }
 
     val c = call(iterator(tree))
