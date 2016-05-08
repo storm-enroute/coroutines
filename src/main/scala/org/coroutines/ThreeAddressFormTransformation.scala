@@ -120,13 +120,20 @@ trait ThreeAddressFormTransformation[C <: Context] {
         """
       )
       (decls, q"$localvarname")
-    case q"$r.$method[..$tpts](...$paramss)" if tpts.length > 0 || paramss.length > 0 =>
+    case q"$selector[..$tpts](...$paramss)" if tpts.length > 0 || paramss.length > 0 =>
       // application
+      val (rdecls, newselector) = selector match {
+        case q"$r.$method" =>
+          val (rdecls, rident) = threeAddressForm(r)
+          (rdecls, q"$rident.$method")
+        case q"${method: TermName}" =>
+          println("apply-only! " + tree)
+          (Nil, q"$method")
+      }
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
-      val (rdecls, rident) = threeAddressForm(r)
       val (pdeclss, pidents) = paramss.map(_.map(threeAddressForm).unzip).unzip
       val localvarname = TermName(c.freshName("x"))
-      val localvartree = q"val $localvarname = $rident.$method[..$tpts](...$pidents)"
+      val localvartree = q"val $localvarname = $newselector[..$tpts](...$pidents)"
       (rdecls ++ pdeclss.flatten.flatten ++ List(localvartree), q"$localvarname")
     case q"$r[..$tpts]" if tpts.length > 0 =>
       // type application
