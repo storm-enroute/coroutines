@@ -15,7 +15,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
     exec.maxWarmupRuns -> 80,
     exec.benchRuns -> 30,
     exec.independentSamples -> 5,
-    verbose -> true
+    verbose -> false
   )
 
   sealed trait Tree

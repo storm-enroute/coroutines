@@ -16,7 +16,7 @@ class HashSetIteratorBench extends JBench.OfflineReport {
     exec.benchRuns -> 60,
     exec.independentSamples -> 6,
     exec.reinstantiation.frequency -> 1,
-    verbose -> true
+    verbose -> false
   )
 
   val sizes = Gen.range("size")(50000, 250000, 50000)
