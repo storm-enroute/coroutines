@@ -14,7 +14,7 @@ class GraphIteratorBench extends JBench.OfflineReport {
     exec.minWarmupRuns -> 50,
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 36,
-    exec.independentSamples -> 1,
+    exec.independentSamples -> 4,
     verbose -> true
   )
 
