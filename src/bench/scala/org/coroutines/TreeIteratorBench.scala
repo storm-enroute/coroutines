@@ -62,6 +62,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
   }
 
   val sizes = Gen.range("size")(50000, 250000, 50000)
+
   val trees = for (sz <- sizes) yield {
     def gen(sz: Int): Tree = {
       if (sz == 0) Empty
