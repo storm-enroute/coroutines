@@ -34,7 +34,7 @@ class HashSetIteratorBench extends JBench.OfflineReport {
   @curve("coroutine")
   def coroutineLongest(set: mutable.HashSet[String]) = {
     var longest = ""
-    val hashIterator = Backdoor.hashSetIterator
+    val hashIterator = Backdoor.hashSetEnumerator
     val table = Backdoor.hashSet(set)
     val c = call(hashIterator(table))
     while (c.pull) {

@@ -16,26 +16,26 @@ object Backdoor {
     f.get(set).asInstanceOf[immutable.RedBlackTree.Tree[T, Unit]]
   }
 
-  val redBlackIteratorInlined: Coroutine._1[RBTree[String], String, Unit] =
+  val redBlackEnumeratorInlined: Coroutine._1[RBTree[String], String, Unit] =
     coroutine { (tree: RBTree[String]) =>
       if (tree.left != null) {
-        if (tree.left.left != null) redBlackIterator(tree.left.left)
+        if (tree.left.left != null) redBlackEnumerator(tree.left.left)
         yieldval(tree.left.key)
-        if (tree.left.right != null) redBlackIterator(tree.left.right)
+        if (tree.left.right != null) redBlackEnumerator(tree.left.right)
       }
       yieldval(tree.key)
       if (tree.right != null) {
-        if (tree.right.left != null) redBlackIterator(tree.right.left)
+        if (tree.right.left != null) redBlackEnumerator(tree.right.left)
         yieldval(tree.right.key)
-        if (tree.right.right != null) redBlackIterator(tree.right.right)
+        if (tree.right.right != null) redBlackEnumerator(tree.right.right)
       }
     }
 
-  val redBlackIterator: Coroutine._1[RBTree[String], String, Unit] =
+  val redBlackEnumerator: Coroutine._1[RBTree[String], String, Unit] =
     coroutine { (tree: RBTree[String]) =>
-      if (tree.left != null) redBlackIterator(tree.left)
+      if (tree.left != null) redBlackEnumerator(tree.left)
       yieldval(tree.key)
-      if (tree.right != null) redBlackIterator(tree.right)
+      if (tree.right != null) redBlackEnumerator(tree.right)
     }
 
   def hashSet[T](set: mutable.HashSet[T]): Array[AnyRef] = {
@@ -44,7 +44,7 @@ object Backdoor {
     f.get(set).asInstanceOf[Array[AnyRef]]
   }
 
-  val hashSetIterator: Coroutine._1[Array[AnyRef], String, Unit] =
+  val hashSetEnumerator: Coroutine._1[Array[AnyRef], String, Unit] =
     coroutine { (table: Array[AnyRef]) =>
       var i = 0
       while (i < table.length) {

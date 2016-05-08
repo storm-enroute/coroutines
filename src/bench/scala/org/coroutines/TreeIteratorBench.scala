@@ -76,7 +76,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
     gen(sz)
   }
 
-  var treeIterator: Coroutine._1[Tree, Int, Unit] = null
+  var treeEnumerator: Coroutine._1[Tree, Int, Unit] = null
 
   /* max int */
 
@@ -85,16 +85,16 @@ class TreeIteratorBench extends JBench.OfflineReport {
   @curve("coroutine")
   def coroutineMax(tree: Tree) {
     var max = Int.MinValue
-    treeIterator = coroutine { (t: Tree) =>
+    treeEnumerator = coroutine { (t: Tree) =>
       t match {
         case n: Node =>
-          if (n.left != Empty) treeIterator(n.left)
+          if (n.left != Empty) treeEnumerator(n.left)
           yieldval(n.x)
-          if (n.right != Empty) treeIterator(n.right)
+          if (n.right != Empty) treeEnumerator(n.right)
         case Empty =>
       }
     }
-    val c = call(treeIterator(tree))
+    val c = call(treeEnumerator(tree))
     while (c.pull) {
       val x = c.value
       if (x > max) max = x
@@ -132,35 +132,21 @@ class TreeIteratorBench extends JBench.OfflineReport {
 
   /* growing array */
 
-  class GrowingArray {
-    private var array = new Array[Int](8)
-    private var size = 0
-    def add(x: Int) = {
-      if (size == array.length) {
-        val narray = new Array[Int](size * 2)
-        System.arraycopy(array, 0, narray, 0, size)
-        array = narray
-      }
-      array(size) = x
-      size += 1
-    }
-  }
-
   @gen("trees")
   @benchmark("coroutines.tree-iterator.to-array")
   @curve("coroutine")
   def coroutineToArray(tree: Tree) {
-    val a = new GrowingArray
-    treeIterator = coroutine { (t: Tree) =>
+    val a = new IntArray
+    treeEnumerator = coroutine { (t: Tree) =>
       t match {
         case n: Node =>
-          if (n.left != Empty) treeIterator(n.left)
+          if (n.left != Empty) treeEnumerator(n.left)
           yieldval(n.x)
-          if (n.right != Empty) treeIterator(n.right)
+          if (n.right != Empty) treeEnumerator(n.right)
         case Empty =>
       }
     }
-    val c = call(treeIterator(tree))
+    val c = call(treeEnumerator(tree))
     while (c.pull) {
       val x = c.value
       a.add(x)
@@ -171,7 +157,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
   @benchmark("coroutines.tree-iterator.to-array")
   @curve("iterator")
   def iteratorToArray(tree: Tree) {
-    val a = new GrowingArray
+    val a = new IntArray
     val iter = new TreeIterator(tree)
     while (iter.hasNext) {
       val x = iter.next()
@@ -183,7 +169,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
   @benchmark("coroutines.tree-iterator.to-array")
   @curve("recursion")
   def recursiveToArray(tree: Tree) {
-    val a = new GrowingArray
+    val a = new IntArray
     def recurse(tree: Tree) {
       tree match {
         case Node(x, left, right) =>

@@ -127,7 +127,6 @@ trait ThreeAddressFormTransformation[C <: Context] {
           val (rdecls, rident) = threeAddressForm(r)
           (rdecls, q"$rident.$method")
         case q"${method: TermName}" =>
-          println("apply-only! " + tree)
           (Nil, q"$method")
       }
       for (tpt <- tpts) disallowCoroutinesIn(tpt)

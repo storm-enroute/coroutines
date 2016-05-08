@@ -34,7 +34,7 @@ class RedBlackIteratorBench extends JBench.OfflineReport {
   @curve("coroutine")
   def coroutineLongest(set: immutable.TreeSet[String]) = {
     var longest = ""
-    val treeIterator = Backdoor.redBlackIterator
+    val treeIterator = Backdoor.redBlackEnumerator
     val tree = Backdoor.redBlack(set)
     val c = call(treeIterator(tree))
     while (c.pull) {
