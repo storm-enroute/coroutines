@@ -47,12 +47,15 @@ class StreamBench extends JBench.OfflineReport {
   def coroutineFibonacciToBuffer(sz: Int) = {
     val buffer = mutable.Buffer[BigInt]()
     val fibs = coroutine { () =>
-      var (prev, curr) = (BigInt(0), BigInt(1))
-      yieldval(prev); yieldval(curr)
+      var prev = BigInt(0)
+      var curr = BigInt(1)
+      yieldval(prev)
+      yieldval(curr)
       while (true) {
         val x = curr + prev
         yieldval(x)
-        prev = curr; curr = x
+        prev = curr
+        curr = x
       }
     }
     var i = 0

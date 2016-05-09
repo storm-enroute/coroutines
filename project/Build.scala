@@ -95,7 +95,8 @@ object CoroutinesBuild extends MechaRepoBuild {
     case Some((2, major)) if major >= 11 => Seq(
       "org.scalatest" % "scalatest_2.11" % "2.2.6" % "test",
       "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.2",
-      "org.scala-lang" % "scala-reflect" % "2.11.4"
+      "org.scala-lang" % "scala-reflect" % "2.11.4",
+      "org.scala-lang.modules" % "scala-async_2.11" % "0.9.5" % "bench"
     )
     case _ => Nil
   }

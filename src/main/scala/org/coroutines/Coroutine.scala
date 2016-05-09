@@ -76,7 +76,6 @@ object Coroutine {
   ): Boolean = {
     val cd = Stack.top(actual.$costack).asInstanceOf[Coroutine[SomeY, SomeR]]
     cd.$enter(actual.asInstanceOf[Frame[SomeY, SomeR]])
-    val resumeStatus = actual.isLive
     if (actual.$target ne null) {
       val newactual = actual.$target
       actual.$target = null
