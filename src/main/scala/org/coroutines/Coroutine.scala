@@ -141,11 +141,11 @@ object Coroutine {
       $yield
     }
 
-    final def hasValue = $hasYield
+    final def hasValue: Boolean = $hasYield
 
-    final def getValue = if (hasValue) Some(value) else None
+    final def getValue: Option[Y] = if (hasValue) Some(value) else None
 
-    final def tryValue =
+    final def tryValue: Try[Y] =
       try { Success(value) } catch { case t: Throwable => Failure(t) }
 
     final def result: R = {
@@ -155,11 +155,11 @@ object Coroutine {
       $result
     }
 
-    final def hasResult = isCompleted && $exception == null
+    final def hasResult: Boolean = isCompleted && $exception == null
 
-    final def getResult = if (hasResult) Some(result) else None
+    final def getResult: Option[R] = if (hasResult) Some(result) else None
 
-    final def tryResult = {
+    final def tryResult: Try[R] = {
       if ($exception != null) Failure($exception)
       else Try(result)
     }
