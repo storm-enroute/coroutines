@@ -161,4 +161,16 @@ class RegressionTest extends FunSuite with Matchers {
     
     val id = coroutine { () => }
   }
+
+  test("should use c as an argument name") {
+    val nuthin = coroutine { () => }
+    val resumer = coroutine { (c: Nothing <~> Unit) =>
+      c.resume
+    }
+    val c = call(nuthin())
+    val r = call(resumer(c))
+    assert(!r.resume)
+    assert(!r.hasException)
+    assert(r.hasResult)
+  }
 }
