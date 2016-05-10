@@ -4,12 +4,12 @@ package org.coroutines
 
 import org.scalameter.api._
 import org.scalameter.japi.JBench
+import scala.async.Async.async
+import scala.async.Async.await
 import scala.collection._
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.async.Async.async
-import scala.async.Async.await
 
 
 
