@@ -16,17 +16,19 @@ class ScalaCheckBench extends JBench.OfflineReport {
 
   override def defaultConfig = Context(
     exec.minWarmupRuns -> 100,
-    exec.maxWarmupRuns -> 100,
+    exec.maxWarmupRuns -> 200,
     exec.benchRuns -> 36,
     exec.independentSamples -> 4,
     verbose -> true
   )
 
-  val sizes = Gen.range("size")(5000, 25000, 5000)
+  val fractNumTests = Gen.range("size")(5000, 25000, 5000)
 
-  case class Fract(num: Int, den: Int)
+  val listNumTests = Gen.range("size")(100, 500, 100)
 
   val max = 1000
+
+  case class Fract(num: Int, den: Int)
 
   def add(a: Fract, b: Fract) = Fract(a.num * b.den + a.den * b.num, a.den * b.den)
 
@@ -42,11 +44,11 @@ class ScalaCheckBench extends JBench.OfflineReport {
   }
 
   def ints(from: Int, until: Int) = new Gen[Int] {
-    val random = new Random
+    val random = new Random(111)
     def sample = from + random.nextInt(until - from)
   }
 
-  @gen("sizes")
+  @gen("fractNumTests")
   @benchmark("coroutines.scalacheck.fractions")
   @curve("scalacheck")
   def scalacheckTestFraction(numTests: Int) = {
@@ -65,8 +67,25 @@ class ScalaCheckBench extends JBench.OfflineReport {
     }
   }
 
+  @gen("listNumTests")
+  @benchmark("coroutines.scalacheck.lists")
+  @curve("scalacheck")
+  def scalacheckTestList(numTests: Int) = {
+    val lists = for {
+      x <- ints(0, max)
+    } yield List.fill(max)(x)
+    val pairs = for {
+      a <- lists
+      b <- lists
+    } yield (a, b)
+    for (i <- 0 until numTests) {
+      val (xs, ys) = pairs.sample
+      assert(xs.size + ys.size == (xs ::: ys).size, (xs, ys))
+    }
+  }
+
   class Backtracker {
-    val random = new Random
+    val random = new Random(111)
 
     val recurse: (Unit <~> Unit) ~~> (Unit, Unit) = coroutine { (c: Unit <~> Unit) =>
       if (c.resume) {
@@ -97,7 +116,7 @@ class ScalaCheckBench extends JBench.OfflineReport {
     }
   }
 
-  @gen("sizes")
+  @gen("fractNumTests")
   @benchmark("coroutines.scalacheck.fractions")
   @curve("coroutine")
   def coroutineTestFraction(numTests: Int) = {
@@ -107,13 +126,29 @@ class ScalaCheckBench extends JBench.OfflineReport {
       val num = b.int(0, den)
       Fract(num, den)
     }
-    var i = 0
     val test = coroutine { () =>
       val a = fract()
       val b = fract()
       val c = add(a, b)
-      i += 1
       assert(c.num < 2 * c.den)
+    }
+    b.backtrack(test, numTests)
+  }
+
+  @gen("listNumTests")
+  @benchmark("coroutines.scalacheck.lists")
+  @curve("coroutine")
+  def coroutineTestList(numTests: Int) = {
+    val b = new Backtracker
+    val list = coroutine { () =>
+      val x = b.int(1, max)
+      List.fill(max)(x)
+    }
+    val test = coroutine { () =>
+      val a = list()
+      val b = list()
+      val c = a ::: b
+      assert(a.size + b.size == c.size)
     }
     b.backtrack(test, numTests)
   }
