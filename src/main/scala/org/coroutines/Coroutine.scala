@@ -164,6 +164,8 @@ object Coroutine {
       else Try(result)
     }
 
+    final def hasException: Boolean = isCompleted && $exception != null
+
     final def isLive: Boolean = $costackptr > 0
 
     final def isCompleted: Boolean = !isLive

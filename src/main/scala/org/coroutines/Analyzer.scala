@@ -112,21 +112,21 @@ trait Analyzer[C <: Context] {
           $decl
 
           _root_.org.coroutines.common.Stack.push[$stacktpe](
-            c.$stackname, ($ident & 0xffffffff).toInt, ${t.initialStackSize})
+            $$c.$stackname, ($ident & 0xffffffff).toInt, ${t.initialStackSize})
           _root_.org.coroutines.common.Stack.push[$stacktpe](
-            c.$stackname, (($ident >>> 32) & 0xffffffff).toInt, ${t.initialStackSize})
+            $$c.$stackname, (($ident >>> 32) & 0xffffffff).toInt, ${t.initialStackSize})
         """
       } else q"""
         _root_.org.coroutines.common.Stack.push[$stacktpe](
-          c.$stackname, ${encodeInt(initialValue)}, ${t.initialStackSize})
+          $$c.$stackname, ${encodeInt(initialValue)}, ${t.initialStackSize})
       """
     }
     def popTree = {
       if (isWide) q"""
-        _root_.org.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
-        _root_.org.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
+        _root_.org.coroutines.common.Stack.pop[$stacktpe]($$c.$stackname)
+        _root_.org.coroutines.common.Stack.pop[$stacktpe]($$c.$stackname)
       """ else q"""
-        _root_.org.coroutines.common.Stack.pop[$stacktpe](c.$stackname)
+        _root_.org.coroutines.common.Stack.pop[$stacktpe]($$c.$stackname)
       """
     }
     def storeTree(coroutine: Tree, x: Tree): Tree = {

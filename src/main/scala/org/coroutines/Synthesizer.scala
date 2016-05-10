@@ -186,19 +186,19 @@ with ThreeAddressFormTransformation[C] {
         _root_.org.coroutines.common.Stack.bulkPush($stack, $varsize, $stacksize)
       """)
       val args = vars.values.filter(_.isArg).toList
-      val argstores = for (a <- args) yield a.storeTree(q"c", q"${a.name}")
+      val argstores = for (a <- args) yield a.storeTree(q"$$c", q"${a.name}")
       bulkpushes ::: argstores
     }
     val varpushes = {
-      genVarPushes(storedRefVars, q"c.$$refstack") ++
-      genVarPushes(storedValVars, q"c.$$valstack")
+      genVarPushes(storedRefVars, q"$$c.$$refstack") ++
+      genVarPushes(storedValVars, q"$$c.$$valstack")
     }
     val varpops = (for ((sym, info) <- storedRefVars.toList) yield {
       info.popTree
     }) ++ (if (storedValVars.size == 0) Nil else List(
       q"""
         _root_.org.coroutines.common.Stack.bulkPop(
-          c.$$valstack, ${stackSize(storedValVars)})
+          $$c.$$valstack, ${stackSize(storedValVars)})
       """
     ))
     (varpushes, varpops)
@@ -361,17 +361,17 @@ with ThreeAddressFormTransformation[C] {
             _root_.org.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
         }
         def $$push(
-          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt], ..$args
+          $$c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt], ..$args
         ): _root_.scala.Unit = {
-          _root_.org.coroutines.common.Stack.push(c.$$costack, this, -1)
-          _root_.org.coroutines.common.Stack.push(c.$$pcstack, 0.toShort, -1)
+          _root_.org.coroutines.common.Stack.push($$c.$$costack, this, -1)
+          _root_.org.coroutines.common.Stack.push($$c.$$pcstack, 0.toShort, -1)
           ..$varpushes
         }
         def $$pop(
-          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+          $$c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
         ): _root_.scala.Unit = {
-          _root_.org.coroutines.common.Stack.pop(c.$$pcstack)
-          _root_.org.coroutines.common.Stack.pop(c.$$costack)
+          _root_.org.coroutines.common.Stack.pop($$c.$$pcstack)
+          _root_.org.coroutines.common.Stack.pop($$c.$$costack)
           ..$varpops
         }
         $entermethod
