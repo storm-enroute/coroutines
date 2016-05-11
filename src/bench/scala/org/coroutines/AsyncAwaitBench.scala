@@ -20,7 +20,7 @@ class AsyncAwaitBench extends JBench.OfflineReport {
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 36,
     exec.independentSamples -> 4,
-    verbose -> true
+    verbose -> false
   )
 
   val sizes = Gen.range("size")(5000, 25000, 5000)

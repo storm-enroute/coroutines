@@ -15,7 +15,7 @@ class StreamBench extends JBench.OfflineReport {
     exec.maxWarmupRuns -> 100,
     exec.benchRuns -> 36,
     exec.independentSamples -> 4,
-    verbose -> true
+    verbose -> false
   )
 
   val fibSizes = Gen.range("size")(5000, 25000, 5000)
