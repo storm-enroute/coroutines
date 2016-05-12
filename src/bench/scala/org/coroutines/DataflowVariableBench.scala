@@ -38,8 +38,9 @@ class DataflowVariableBench extends JBench.OfflineReport {
     def :=(x: T): Unit = p.success(x)
   }
 
-  class FutureDataflowStream[T](val head: T)
-  extends FutureDataflowVar[FutureDataflowStream[T]]
+  class FutureDataflowStream[T](val head: T) {
+    val tail = new FutureDataflowVar[FutureDataflowStream[T]]
+  }
 
   @gen("sizes")
   @benchmark("coroutines.dataflow.producer-consumer")
@@ -49,12 +50,12 @@ class DataflowVariableBench extends JBench.OfflineReport {
     def producer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
       val s = new FutureDataflowStream("")
       tail := s
-      if (left > 0) producer(left - 1, s)
+      if (left > 0) producer(left - 1, s.tail)
     }
     val done = Promise[Boolean]()
     def consumer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
       if (left == 0) done.success(true)
-      else tail(s => consumer(left - 1, s))
+      else tail(s => consumer(left - 1, s.tail))
     }
 
     val p = Future {
@@ -113,8 +114,9 @@ class DataflowVariableBench extends JBench.OfflineReport {
     override def toString = s"DataflowVar${this.get}"
   }
 
-  class DataflowStream[T](val x: T)
-  extends DataflowVar[DataflowStream[T]]
+  class DataflowStream[T](val head: T) {
+    val tail = new DataflowVar[DataflowStream[T]]
+  }
 
   @gen("sizes")
   @benchmark("coroutines.dataflow.producer-consumer")
@@ -127,7 +129,7 @@ class DataflowVariableBench extends JBench.OfflineReport {
       var tail = root
       while (left > 0) {
         tail := new DataflowStream("")
-        tail = tail.apply()
+        tail = tail.apply().tail
         left -= 1
       }
     }
@@ -135,7 +137,7 @@ class DataflowVariableBench extends JBench.OfflineReport {
       var left = sz
       var tail = root
       while (left > 0) {
-        tail = tail.apply()
+        tail = tail.apply().tail
         left -= 1
       }
       done.success(true)
