@@ -14,7 +14,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 
 class AsyncAwaitBench extends JBench.OfflineReport {
-
   override def defaultConfig = Context(
     exec.minWarmupRuns -> 100,
     exec.maxWarmupRuns -> 100,

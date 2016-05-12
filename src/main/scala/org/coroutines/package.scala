@@ -27,7 +27,7 @@ package object coroutines {
 
   def call[R](f: R): Any = macro Coroutine.call[R]
 
-  def coroutine[Y, R](f: R): Any = macro Coroutine.synthesize
+  def coroutine[Y, R](f: Any): Any = macro Coroutine.synthesize
 
   /* syntax sugar */
 

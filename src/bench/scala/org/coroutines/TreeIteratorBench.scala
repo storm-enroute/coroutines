@@ -9,7 +9,6 @@ import scala.collection._
 
 
 class TreeIteratorBench extends JBench.OfflineReport {
-
   override def defaultConfig = Context(
     exec.minWarmupRuns -> 40,
     exec.maxWarmupRuns -> 80,
