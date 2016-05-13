@@ -7,8 +7,6 @@ import java.util.concurrent.atomic._
 import org.scalameter.api._
 import org.scalameter.japi.JBench
 import scala.annotation.tailrec
-import scala.async.Async.async
-import scala.async.Async.await
 import scala.collection._
 import scala.concurrent._
 import scala.concurrent.duration._
@@ -20,8 +18,8 @@ import scala.util.Failure
 
 class DataflowVariableBench extends JBench.OfflineReport {
   override def defaultConfig = Context(
-    exec.minWarmupRuns -> 100,
-    exec.maxWarmupRuns -> 100,
+    exec.minWarmupRuns -> 80,
+    exec.maxWarmupRuns -> 120,
     exec.benchRuns -> 36,
     exec.independentSamples -> 4,
     verbose -> true
