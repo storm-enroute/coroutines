@@ -62,7 +62,6 @@ trait Coroutine[@specialized Y, R] extends Coroutine.DefMarker[(Y, R)] {
   def $ep29(c: Coroutine.Frame[Y, R]): Unit = {}
 }
 
-
 object Coroutine {
   private[coroutines] val INITIAL_COSTACK_SIZE = 4
 
@@ -103,6 +102,11 @@ object Coroutine {
     var $yield: Y = null.asInstanceOf[Y]
     var $result: R = null.asInstanceOf[R]
 
+    /**
+      * 
+      * @return A new frame with the same type arguments, stacks, and internal
+      *         values
+      */
     final def snapshot: Frame[Y, R] = {
       val frame = new Frame[Y, R]
       Stack.copy(this.$costack, frame.$costack)
@@ -116,6 +120,12 @@ object Coroutine {
       frame
     }
 
+    /**
+      * Advances the coroutine to the next yielding point
+      * @return Whether or not the coroutine successfully advanced to the next
+      *         yield point
+      * @throws CoroutineStoppedException if the coroutine is not live 
+      */
     final def resume: Boolean = {
       if (isLive) {
         $hasYield = false
@@ -124,6 +134,14 @@ object Coroutine {
       } else throw new CoroutineStoppedException
     }
 
+    /**
+      * Usage:
+      * {{{
+      * while (c.pull) c.value
+      * }}}
+      * @return Whether or not the coroutine has a next value that is defined
+      * @throws CoroutineStoppedException if the coroutine is not live 
+      */
     @tailrec
     final def pull: Boolean = {
       if (isLive) {
