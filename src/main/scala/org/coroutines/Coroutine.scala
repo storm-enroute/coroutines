@@ -15,51 +15,51 @@ import scala.util.Try
 
 
 trait Coroutine[@specialized Y, R] extends Coroutine.DefMarker[(Y, R)] {
-  def $enter(c: Coroutine.Frame[Y, R]): Unit
-  def $assignyield(c: Coroutine.Frame[Y, R], v: Y): Unit = {
+  def $enter(c: Coroutine.Instance[Y, R]): Unit
+  def $assignyield(c: Coroutine.Instance[Y, R], v: Y): Unit = {
     c.$hasYield = true
     c.$yield = v
   }
-  def $assignresult(c: Coroutine.Frame[Y, R], v: R): Unit = c.$result = v
-  def $returnvalue$Z(c: Coroutine.Frame[Y, R], v: Boolean): Unit
-  def $returnvalue$B(c: Coroutine.Frame[Y, R], v: Byte): Unit
-  def $returnvalue$S(c: Coroutine.Frame[Y, R], v: Short): Unit
-  def $returnvalue$C(c: Coroutine.Frame[Y, R], v: Char): Unit
-  def $returnvalue$I(c: Coroutine.Frame[Y, R], v: Int): Unit
-  def $returnvalue$F(c: Coroutine.Frame[Y, R], v: Float): Unit
-  def $returnvalue$J(c: Coroutine.Frame[Y, R], v: Long): Unit
-  def $returnvalue$D(c: Coroutine.Frame[Y, R], v: Double): Unit
-  def $returnvalue$L(c: Coroutine.Frame[Y, R], v: Any): Unit
-  def $ep0(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep1(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep2(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep3(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep4(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep5(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep6(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep7(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep8(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep9(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep10(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep11(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep12(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep13(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep14(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep15(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep16(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep17(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep18(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep19(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep20(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep21(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep22(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep23(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep24(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep25(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep26(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep27(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep28(c: Coroutine.Frame[Y, R]): Unit = {}
-  def $ep29(c: Coroutine.Frame[Y, R]): Unit = {}
+  def $assignresult(c: Coroutine.Instance[Y, R], v: R): Unit = c.$result = v
+  def $returnvalue$Z(c: Coroutine.Instance[Y, R], v: Boolean): Unit
+  def $returnvalue$B(c: Coroutine.Instance[Y, R], v: Byte): Unit
+  def $returnvalue$S(c: Coroutine.Instance[Y, R], v: Short): Unit
+  def $returnvalue$C(c: Coroutine.Instance[Y, R], v: Char): Unit
+  def $returnvalue$I(c: Coroutine.Instance[Y, R], v: Int): Unit
+  def $returnvalue$F(c: Coroutine.Instance[Y, R], v: Float): Unit
+  def $returnvalue$J(c: Coroutine.Instance[Y, R], v: Long): Unit
+  def $returnvalue$D(c: Coroutine.Instance[Y, R], v: Double): Unit
+  def $returnvalue$L(c: Coroutine.Instance[Y, R], v: Any): Unit
+  def $ep0(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep1(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep2(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep3(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep4(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep5(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep6(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep7(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep8(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep9(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep10(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep11(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep12(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep13(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep14(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep15(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep16(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep17(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep18(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep19(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep20(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep21(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep22(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep23(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep24(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep25(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep26(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep27(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep28(c: Coroutine.Instance[Y, R]): Unit = {}
+  def $ep29(c: Coroutine.Instance[Y, R]): Unit = {}
 }
 
 
@@ -72,10 +72,10 @@ object Coroutine {
 
   @tailrec
   private[coroutines] final def resume[Y, R](
-    callsite: Frame[Y, R], actual: Frame[_, _]
+    callsite: Instance[Y, R], actual: Instance[_, _]
   ): Boolean = {
     val cd = Stack.top(actual.$costack).asInstanceOf[Coroutine[SomeY, SomeR]]
-    cd.$enter(actual.asInstanceOf[Frame[SomeY, SomeR]])
+    cd.$enter(actual.asInstanceOf[Instance[SomeY, SomeR]])
     if (actual.$target ne null) {
       val newactual = actual.$target
       actual.$target = null
@@ -87,7 +87,7 @@ object Coroutine {
     }
   }
 
-  class Frame[@specialized Y, R] {
+  class Instance[@specialized Y, R] {
     var $costackptr = 0
     var $costack: Array[Coroutine[Y, R]] =
       new Array[Coroutine[Y, R]](INITIAL_COSTACK_SIZE)
@@ -97,14 +97,14 @@ object Coroutine {
     var $refstack: Array[AnyRef] = _
     var $valstackptr = 0
     var $valstack: Array[Int] = _
-    var $target: Frame[Y, _] = null
+    var $target: Instance[Y, _] = null
     var $exception: Throwable = null
     var $hasYield: Boolean = false
     var $yield: Y = null.asInstanceOf[Y]
     var $result: R = null.asInstanceOf[R]
 
-    final def snapshot: Frame[Y, R] = {
-      val frame = new Frame[Y, R]
+    final def snapshot: Instance[Y, R] = {
+      val frame = new Instance[Y, R]
       Stack.copy(this.$costack, frame.$costack)
       Stack.copy(this.$pcstack, frame.$pcstack)
       Stack.copy(this.$refstack, frame.$refstack)
@@ -170,14 +170,14 @@ object Coroutine {
 
     final def isCompleted: Boolean = !isLive
 
-    override def toString = s"Coroutine.Frame<depth: ${$costackptr}, live: $isLive>"
+    override def toString = s"Coroutine.Instance<depth: ${$costackptr}, live: $isLive>"
 
     final def debugString: String = {
       def toStackLength[T](stack: Array[T]) =
         if (stack != null) "${stack.length}" else "<uninitialized>"
       def toStackString[T](stack: Array[T]) =
         if (stack != null) stack.mkString("[", ", ", "]") else "<uninitialized>"
-      s"Coroutine.Frame <\n" +
+      s"Coroutine.Instance <\n" +
       s"  costackptr:  ${$costackptr}\n" +
       s"  costack sz:  ${toStackLength($costack)}\n" +
       s"  pcstackptr:  ${$pcstackptr}\n" +
@@ -205,29 +205,29 @@ object Coroutine {
 
   abstract class _0[@specialized T, R] extends Coroutine[T, R] {
     def apply(): R
-    def $call(): Frame[T, R]
-    def $push(c: Frame[T, R]): Unit
+    def $call(): Instance[T, R]
+    def $push(c: Instance[T, R]): Unit
     override def toString = s"Coroutine._0@${System.identityHashCode(this)}"
   }
 
   abstract class _1[A0, @specialized T, R] extends Coroutine[T, R] {
     def apply(a0: A0): R
-    def $call(a0: A0): Frame[T, R]
-    def $push(c: Frame[T, R], a0: A0): Unit
+    def $call(a0: A0): Instance[T, R]
+    def $push(c: Instance[T, R], a0: A0): Unit
     override def toString = s"Coroutine._1@${System.identityHashCode(this)}"
   }
 
   abstract class _2[A0, A1, @specialized T, R] extends Coroutine[T, R] {
     def apply(a0: A0, a1: A1): R
-    def $call(a0: A0, a1: A1): Frame[T, R]
-    def $push(c: Frame[T, R], a0: A0, a1: A1): Unit
+    def $call(a0: A0, a1: A1): Instance[T, R]
+    def $push(c: Instance[T, R], a0: A0, a1: A1): Unit
     override def toString = s"Coroutine._2@${System.identityHashCode(this)}"
   }
 
   abstract class _3[A0, A1, A2, @specialized T, R] extends Coroutine[T, R] {
     def apply(a0: A0, a1: A1, a2: A2): R
-    def $call(a0: A0, a1: A1, a2: A2): Frame[T, R]
-    def $push(c: Frame[T, R], a0: A0, a1: A1, a2: A2): Unit
+    def $call(a0: A0, a1: A1, a2: A2): Instance[T, R]
+    def $push(c: Instance[T, R], a0: A0, a1: A1, a2: A2): Unit
     override def toString = s"Coroutine._3@${System.identityHashCode(this)}"
   }
 }
