@@ -15,7 +15,7 @@ import scala.reflect.macros.whitebox.Context
 private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C]
 with CfgGenerator[C]
-with ThreeAddressFormTransformation[C] {
+with ASTCanonicalization[C] {
   import c.universe._
 
   val NUM_PREDEFINED_ENTRY_STUBS = 40
@@ -307,7 +307,7 @@ with ThreeAddressFormTransformation[C] {
 
   def synthesize(rawlambda: Tree): Tree = {
     // transform to two operand assignment form
-    val typedtaflambda = transformToThreeAddressForm(rawlambda)
+    val typedtaflambda = canonicalizeTree(rawlambda)
     // println(typedtaflambda)
     // println(typedtaflambda.tpe)
 
