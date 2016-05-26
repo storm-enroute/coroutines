@@ -14,7 +14,13 @@ object AsyncAwait {
   class Cell[+T] {
     var x: T @uncheckedVariance = _
   }
- 
+
+  /**
+    * The future should be computed after the pair is yielded. The result of
+    * this future can be used to assign a value to cell.x.
+    * Note that Cell is used in order to give users the option to not directly
+    * return the result of the future.
+    */
   def await[R]: Future[R] ~~> ((Future[R], Cell[R]), R) =
     coroutine { (f: Future[R]) =>
       val cell = new Cell[R]
@@ -42,6 +48,8 @@ object AsyncAwait {
   def main(args: Array[String]) {
     val f = Future { math.sqrt(121) }
     val g = Future { math.abs(-15) }
+    // Calls to yieldval inside an inner coroutine are yield points inside the
+    // outer coroutine
     val h = async(coroutine { () =>
       val x = await { f }
       val y = await { g }

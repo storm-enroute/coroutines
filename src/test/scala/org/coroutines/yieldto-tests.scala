@@ -29,6 +29,8 @@ class YieldToTest extends FunSuite with Matchers {
     assert(!c.resume)
     assert(!c.hasValue)
     assert(c.isCompleted)
+    assert(anotherInstance.hasValue)
+    assert(anotherInstance.value == "Yohaha")
   }
 
   test("yielding to a completed coroutine raises an error") {
@@ -67,6 +69,8 @@ class YieldToTest extends FunSuite with Matchers {
     assert(!c.hasValue)
     assert(!c.resume)
     assert(c.result == 5)
+    assert(anotherInstance.hasValue)
+    assert(anotherInstance.value == "hohoho")
   }
 
   test("should drain the coroutine instance that yields to another coroutine") {

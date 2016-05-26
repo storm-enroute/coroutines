@@ -103,8 +103,9 @@ object Coroutine {
     var $result: R = null.asInstanceOf[R]
 
     /**
+      * Clones the coroutine that this frame is a part of
       * @return A new frame with the same type arguments, stacks, and internal
-      *         values
+      *         values. 
       */
     final def snapshot: Frame[Y, R] = {
       val frame = new Frame[Y, R]
