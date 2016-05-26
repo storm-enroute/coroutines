@@ -103,7 +103,6 @@ object Coroutine {
     var $result: R = null.asInstanceOf[R]
 
     /**
-      * 
       * @return A new frame with the same type arguments, stacks, and internal
       *         values
       */
@@ -122,9 +121,9 @@ object Coroutine {
 
     /**
       * Advances the coroutine to the next yielding point
-      * @return Whether or not the coroutine successfully advanced to the next
-      *         yield point
-      * @throws CoroutineStoppedException if the coroutine is not live 
+      * @return If resume can be called again
+      * @throws CoroutineStoppedException if the coroutine is not live (cannot
+      *                                   be resumed)
       */
     final def resume: Boolean = {
       if (isLive) {
@@ -151,6 +150,11 @@ object Coroutine {
       } else throw new CoroutineStoppedException
     }
 
+    /**
+      * @return The yield value of the coroutine, if there is one
+      * @throws RuntimeException If the coroutine doesn't have a value or if it
+      *                         is not live
+      */
     final def value: Y = {
       if (!hasValue)
         sys.error("Coroutine has no value, because it did not yield.")
@@ -166,6 +170,11 @@ object Coroutine {
     final def tryValue: Try[Y] =
       try { Success(value) } catch { case t: Throwable => Failure(t) }
 
+    /**
+      * @return The return value of the coroutine, if it is completed.
+      * @throws RuntimeException If the coroutine has not been completed
+      * @throws Exception        If <code>\$exception</code> is not null
+      */
     final def result: R = {
       if (!isCompleted)
         sys.error("Coroutine has no result, because it is not completed.")
@@ -184,10 +193,21 @@ object Coroutine {
 
     final def hasException: Boolean = isCompleted && $exception != null
 
+    /**
+      * @return If <code>resume</code> can be called without an exception being
+      *         thrown
+      */
     final def isLive: Boolean = $costackptr > 0
 
+    /**
+      * @return The inverse of <code>isLive</code>
+      */
     final def isCompleted: Boolean = !isLive
 
+    /**
+      * @return A string containing the values of <code>\$costackptr</code> and
+      *         and <code>\$isLive</code>
+      */
     override def toString = s"Coroutine.Frame<depth: ${$costackptr}, live: $isLive>"
 
     final def debugString: String = {
