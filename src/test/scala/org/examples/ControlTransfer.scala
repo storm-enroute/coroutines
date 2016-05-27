@@ -17,11 +17,10 @@ object ControlTransfer {
   }
   val checker = call(check())
 
-  /**
-    * From within a coroutine c1, the call yieldto(c2) will evaluate the 
-    * coroutine c2 until c2 releases control. Then, c1 will release control.
-    * After this happens, c1.hasValue will be false; yielded values won't
-    * propagate upwards because of calls to yieldto.
+  /** From within `r1`, the call `yieldto(checker)` will evaluate `checker`
+    * until `checker` releases control. Then, `r1` will release control.
+    * After this happens, `r1.hasValue` will be false; yielded values won't
+    * propagate upwards because of calls to `yieldto`.
     */
   val random: ~~~>[Double, Unit] = coroutine { () =>
     yieldval(Random.nextDouble())

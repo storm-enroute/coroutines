@@ -19,9 +19,9 @@ object MockSnapshot {
       cell.value
     }
 
-    /**
-      * Returns true if either c has finished and has a result or if the rest
-      * of the coroutine after c is true regardless of the veracity of c.value
+    /** Returns true if either `c.isCompleted && c.hasResult` or if the rest
+      * of the coroutine is satisfied `test` regardless of the veracity of
+      * `c.value`.
       */
     def test[R](c: Cell <~> R): Boolean = {
       if (c.resume) {
@@ -46,7 +46,7 @@ object MockSnapshot {
 
     assert(test(call(myAlgorithm(5))))
 
-    // False because there is division by zero
+    // False because there is division by zero.
     assert(!test(call(myAlgorithm(0))))
   }
 

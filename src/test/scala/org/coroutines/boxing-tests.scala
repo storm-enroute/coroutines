@@ -32,12 +32,9 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
 
   val sizes = Gen.single("size")(1000)
 
-  /**
-    * Range Iterator
-    * No values should be boxed because Synthesizer.specArity1 automatically
-    * specializes the coroutine on the yield type. In addition, Coroutine._1 is
-    * specialized on the input argument type. 
-    */
+  /* range iterator */
+
+
   val rangeCtx = Context(
     reports.validation.predicate -> { (n: Any) => n == 0 }
   )
@@ -64,11 +61,9 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
     }
   }
 
-  /**
-    * Tree Iterator
-    * Ensures that no values are boxed when they are put inside a binary tree
-    * and traversed in-order 
-    */
+  /* tree iterator */
+
+
   val treeCtx = Context(
     reports.validation.predicate -> { (n: Any) => n == 0 }
   )
@@ -109,12 +104,9 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
     while (c.pull) c.value
   }
 
-  /**
-    * Fibonacci
-    * There should be only one boxing call made. It comes from the final
-    * return value because _1$spec$I is not specialized on the coroutine return
-    * type.
-    */
+  /* Fibonacci */
+
+
   val fibCtx = Context(
     reports.validation.predicate -> { (n: Any) => n == 1 }
   )
@@ -134,13 +126,6 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
     val c = call(fib(sz))
     while (c.pull) c.value
   }
-
-  /**
-    * Fibonnaci Sugar
-    * There should boxing call made for each instantiation of fibsugar. It 
-    * happens because the type Int ~~> (Unit, Int) is not specialized on the
-    * argument type. In addition, there is one boxing call for the final return.
-    */
 
   val fibSugarCtx = Context(
     reports.validation.predicate -> { (n: Any) => n == 178 }
