@@ -21,7 +21,7 @@ object ControlTransfer {
     * From within a coroutine c1, the call yieldto(c2) will evaluate the 
     * coroutine c2 until c2 releases control. Then, c1 will release control.
     * After this happens, c1.hasValue will be false; yielded values won't
-    * propagate upwards with calls to yieldto.
+    * propagate upwards because of calls to yieldto.
     */
   val random: ~~~>[Double, Unit] = coroutine { () =>
     yieldval(Random.nextDouble())
