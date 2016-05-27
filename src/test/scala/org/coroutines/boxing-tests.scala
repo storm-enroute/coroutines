@@ -34,7 +34,6 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
 
   /* range iterator */
 
-
   val rangeCtx = Context(
     reports.validation.predicate -> { (n: Any) => n == 0 }
   )
@@ -62,7 +61,6 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
   }
 
   /* tree iterator */
-
 
   val treeCtx = Context(
     reports.validation.predicate -> { (n: Any) => n == 0 }
@@ -105,7 +103,6 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
   }
 
   /* Fibonacci */
-
 
   val fibCtx = Context(
     reports.validation.predicate -> { (n: Any) => n == 1 }
