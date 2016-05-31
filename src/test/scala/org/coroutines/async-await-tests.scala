@@ -70,14 +70,13 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   // Source: https://git.io/vrHtj
   test("propagates tough types") {
     val fut = org.coroutines.AsyncAwaitTest.ToughTypeObject.m2
-    val res: (List[_], org.coroutines.AsyncAwaitTest.ToughTypeObject.Inner) =
+    val result: (List[_], org.coroutines.AsyncAwaitTest.ToughTypeObject.Inner) =
       Await.result(fut, 2 seconds)
-    assert(res._1 == Nil)
+    assert(result._1 == Nil)
   }
 
   // Source: https://git.io/vrHmG
-  // NOTE: Currently fails compilation
-  /*
+  /** NOTE: Currently fails compilation.
   test("pattern matching partial function") {
     val c = AsyncAwaitTest.async(coroutine { () =>
       AsyncAwaitTest.await(Future(1))
@@ -91,8 +90,7 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   */
 
   // Source: https://git.io/vr79k
-  // NOTE: Currently fails compilation
-  /*
+  /** NOTE: Currently fails compilation.
   test("pattern matching partial function nested") {
     val c = AsyncAwaitTest.async(coroutine { () =>
       AsyncAwaitTest.await(Future(1))
@@ -149,8 +147,7 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   }
 
   // Source: https://git.io/vr7FE
-  // NOTE: Currently fails compilation
-  /**
+  /** NOTE: Currently fails compilation.
   test("singleton type") {
     class A { class B }
     AsyncAwaitTest.async(coroutine { () =>
@@ -163,8 +160,7 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   
 
   // Source: https://git.io/vr7F6
-  // NOTE: Currently fails compilation
-  /**
+  /** NOTE: Currently fails compilation.
   test("existential match") {
     trait Container[+A]
     case class ContainerImpl[A](value: A) extends Container[A]
@@ -198,8 +194,7 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   }
 
   // Source: https://git.io/vr7bJ
-  // NOTE: Currently fails compilation
-  /**
+  /** NOTE: Currently fails compilation
   test("nested method with inconsistency") {
     import language.{reflectiveCalls, postfixOps}
 
@@ -364,10 +359,87 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   }
 
   // Source: https://git.io/vr7NB
-  /** NOTE: Ignoring this test until I find the correct implementation of
-    * `IntWrapper`.
+  /** NOTE: Currently fails compilation
   test("ticket 106 in scala/async-- value class") {
-
+    AsyncAwaitTest.async(coroutine { () =>
+      "whatever value" match {
+        case _ =>
+          AsyncAwaitTest.await(Future("whatever return type"))
+          new IntWrapper("value case matters")
+      }
+      "whatever return type"
+    })
   }
   */
+  
+
+  // Source: https://git.io/vrFQt
+  /** NOTE: Currently fails compilation.
+  test("Inlining block does not produce duplicate definition") {
+    AsyncAwaitTest.async(coroutine { () =>
+      val f = 12
+      val x = AsyncAwaitTest.await(Future(f))
+      {
+        type X = Int
+        val x: X = 42
+        println(x)
+      }
+      type X = Int
+      x: X
+    })
+  }
+  */
+
+  // Source: https://git.io/vrF5X
+  /** NOTE: Currently fails compilation.
+  test("Inlining block in tail position does not produce duplication definition") {
+    val c = AsyncAwaitTest.async(coroutine { () =>
+      val f = 12
+      val x = AsyncAwaitTest.await(Future(f))
+      {
+        val x = 42
+        x
+      }
+    })
+    val res = Await.result(c, 5 seconds)
+    assert(res == 42)
+  }
+  */
+
+  // Source: https://git.io/vrFp5
+  test("match as expression 1") {
+    val c = AsyncAwaitTest.async(coroutine { () =>
+      val x = "" match {
+        case _ => AsyncAwaitTest.await(Future(1)) + 1
+      }
+      x
+    })
+    val result = Await.result(c, 5 seconds)
+    assert(result == 2)
+  }
+
+  // Source: https://git.io/vrFhh
+  test("match as expression 2") {
+    val c = AsyncAwaitTest.async(coroutine { () =>
+      val x = "" match {
+        case "" if false => AsyncAwaitTest.await(Future(1)) + 1
+        case _           => 2 + AsyncAwaitTest.await(Future(1))
+      }
+      val y = x
+      "" match {
+        case _ => AsyncAwaitTest.await(Future(y)) + 100
+      }
+    })
+    val result = Await.result(c, 5 seconds)
+    assert(result == 103)
+  }
+
+  // Source: https://git.io/vrFj3
+  test("nested await as bare expression") {
+    val c = AsyncAwaitTest.async(coroutine { () =>
+      AsyncAwaitTest.await(Future(AsyncAwaitTest.await(Future("")).isEmpty))
+    })
+    val result = Await.result(c, 5 seconds)
+    assert(result == true)
+  }
 }
