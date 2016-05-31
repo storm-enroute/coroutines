@@ -6,7 +6,7 @@ import scala.annotation.unchecked.uncheckedVariance
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-
+import scala.util.Success
 
 
 object AsyncAwaitTest {
@@ -50,7 +50,20 @@ object AsyncAwaitTest {
 }
 
 
-class IntWrapper(val value: String) extends AnyVal
+class IntWrapper(val value: String) extends AnyVal {
+  def plusStr(): IntWrapper = new IntWrapper(value + "!")
+}
+
+
+class ParamWrapper[T](val value: T) extends AnyVal 
+
+
+private class PrivateWrapper(val value: String) extends AnyVal
+
+
+private object PrivateWrapper {
+  def Instance() = new PrivateWrapper("Thugga")
+}
 
 
 class AsyncAwaitTest extends FunSuite with Matchers {
@@ -259,8 +272,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   }
 
   // Source: https://git.io/vr7Nf
-  /** NOTE: Ignoring this test until I find the correct implementation of
-    * `IntWrapper`.
   test("ticket 83 in scala/async-- using value class") {
     val f = AsyncAwaitTest.async(coroutine { () =>
       val uid = new IntWrapper("foo")
@@ -270,26 +281,20 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     val inner = Await.result(outer, 5 seconds)
     assert(inner == new IntWrapper("foo"))
   }
-  */
-
 
   // Source: https://git.io/vr7NJ
-  /** NOTE: Ignoring this test until I find the correct implementation of
-    * `IntWrapper`.
+  /** NOTE: This test currently fails compilation.
   test("ticket 86 in scala/async-- using nested value class") {
-    val f = AsyncAwaitTest.async(coroutine { () =>
+    val f = AsyncAwaitTest.async[Nothing, IntWrapper](coroutine { () =>
       val a = Future.successful(new IntWrapper("42"))
-      AsyncAwaitTest.await(AsyncAwaitTest.await(a).plusStr)
+      AsyncAwaitTest.await(Future(AsyncAwaitTest.await(a).plusStr))
     })
-    val outer = Await.result(f, 5 seconds)
-    val inner = Await.result(outer, 5 seconds)
-    assert(inner == "42!")
+    val res = Await.result(f, 5 seconds)
+    assert(res == "42!")
   }
   */
 
   // Source: https://git.io/vr7Nk
-  /** NOTE: Ignoring this test until I find the correct implementation of
-    * `IntWrapper`.
   test("ticket 86 in scala/async-- using matched value class") {
     def doAThing(param: IntWrapper) = Future(None)
 
@@ -302,25 +307,45 @@ class AsyncAwaitTest extends FunSuite with Matchers {
       }
     })
 
-    val result = Await.result(fut, 5.seconds)
-    result mustBe None
+    val result = Await.result(fut, 5 seconds)
+    assert(result.asInstanceOf[Future[IntWrapper]].value == Some(Success(None)))
   }
-  */
 
   // Source: https://git.io/vr7NZ
-  /** NOTE: Ignoring this test until I find the correct implementation of
-    * `ParamWrapper`.
+  // NOTE: Need to look at this test's implementation. Might be done incorrectly.
   test("ticket 86 in scala/async-- using matched parameterized value class") {
+    def doAThing(param: ParamWrapper[String]) = Future(None)
+
+    val fut = AsyncAwaitTest.async(coroutine { () =>
+      Option(new ParamWrapper("value!")) match {
+        case Some(valueHolder) =>
+          AsyncAwaitTest.await(Future(doAThing(valueHolder)))
+        case None =>
+          None
+      }
+    })
+
+    val result = Await.result(fut, 5 seconds)
+    assert(result.asInstanceOf[Future[ParamWrapper[String]]].value ==
+      Some(Success(None)))
   }
-  */
 
   // Source: https://git.io/vr7NW
-  /** NOTE: Ignoring this test until I find the correct implementation of
-    * `ParamWrapper`.
   test("ticket 86 in scala/async-- using private value class") {
+    def doAThing(param: PrivateWrapper) = Future(None)
 
+    val fut = AsyncAwaitTest.async(coroutine { () => 
+      Option(PrivateWrapper.Instance) match {
+        case Some(valueHolder) =>
+          AsyncAwaitTest.await(doAThing(valueHolder))
+        case None =>
+          None
+      }
+    })
+
+    val result = Await.result(fut, 5 seconds)
+    assert(result == None)
   }
-  */
 
   // Source: https://git.io/vr7N8
   test("await of abstract type") {
