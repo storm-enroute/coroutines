@@ -13,8 +13,8 @@ class TreeIteratorBench extends JBench.OfflineReport {
     exec.minWarmupRuns -> 40,
     exec.maxWarmupRuns -> 80,
     exec.benchRuns -> 30,
-    exec.independentSamples -> 5,
-    verbose -> false
+    exec.independentSamples -> 1,
+    verbose -> true
   )
 
   sealed trait Tree
@@ -22,7 +22,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
   case object Empty extends Tree
 
   class TreeIterator(val tree: Tree) {
-    var stack = new Array[Tree](20)
+    var stack = new Array[Tree](30)
     var stackpos = -1
     var current: Int = _
 
@@ -41,9 +41,12 @@ class TreeIteratorBench extends JBench.OfflineReport {
     def moveToNext() {
       if (stackpos != -1) stack(stackpos) match {
         case Empty =>
+          stack(stackpos) = null
           stackpos -= 1
+          if (stackpos > -1) assert(stack(stackpos) != Empty)
           moveToNext()
         case Node(x, _, right) =>
+          stack(stackpos) = null
           stackpos -= 1
           current = x
           goLeft(right)
@@ -54,6 +57,7 @@ class TreeIteratorBench extends JBench.OfflineReport {
       stackpos != -1
     }
     def next(): Int = {
+      if (!hasNext) throw new NoSuchElementException
       val x = current
       moveToNext()
       x
@@ -62,17 +66,22 @@ class TreeIteratorBench extends JBench.OfflineReport {
 
   val sizes = Gen.range("size")(50000, 250000, 50000)
 
-  val trees = for (sz <- sizes) yield {
-    def gen(sz: Int): Tree = {
-      if (sz == 0) Empty
-      else {
-        val rem = sz - 1
-        val left = gen(rem / 2)
-        val right = gen(rem - rem / 2)
-        Node(sz, left, right)
-      }
+  def genTree(sz: Int): Tree = {
+    if (sz == 0) Empty
+    else {
+      val rem = sz - 1
+      val left = genTree(rem / 2)
+      val right = genTree(rem - rem / 2)
+      Node(sz, left, right)
     }
-    gen(sz)
+  }
+
+  val trees = for (sz <- sizes) yield {
+    genTree(sz)
+  }
+
+  val treePairs = for (sz <- sizes) yield {
+    (genTree(sz), genTree(sz))
   }
 
   var treeEnumerator: Coroutine._1[Tree, Int, Unit] = null
@@ -179,6 +188,95 @@ class TreeIteratorBench extends JBench.OfflineReport {
       }
     }
     recurse(tree)
+  }
+
+  /* samefringe */
+
+  @volatile var isSame = true
+
+  @gen("treePairs")
+  @benchmark("coroutines.tree-iterator.same-fringe")
+  @curve("coroutine")
+  def coroutineSameFringe(p: (Tree, Tree)) {
+    val (t1, t2) = p
+    treeEnumerator = coroutine { (t: Tree) =>
+      t match {
+        case n: Node =>
+          if (n.left != Empty) treeEnumerator(n.left)
+          yieldval(n.x)
+          if (n.right != Empty) treeEnumerator(n.right)
+        case Empty =>
+      }
+    }
+    val c1 = call(treeEnumerator(t1))
+    val c2 = call(treeEnumerator(t2))
+    var same = true
+    while (c1.pull && c2.pull) {
+      val x = c1.value
+      val y = c2.value
+      if (x != y) same = false
+    }
+    isSame = same
+  }
+
+  @gen("treePairs")
+  @benchmark("coroutines.tree-iterator.same-fringe")
+  @curve("iterator")
+  def iteratorSameFringe(p: (Tree, Tree)) {
+    val (t1, t2) = p
+    val iter1 = new TreeIterator(t1)
+    val iter2 = new TreeIterator(t2)
+    var same = true
+    while (iter1.hasNext && iter2.hasNext) {
+      val x = iter1.next()
+      val y = iter2.next()
+      if (x != y) same = false
+    }
+    if (iter1.hasNext != iter2.hasNext) same = false
+    isSame = same
+  }
+
+  @gen("treePairs")
+  @benchmark("coroutines.tree-iterator.same-fringe")
+  @curve("iterator")
+  def iteratorSameFringe(p: (Tree, Tree)) {
+    val (t1, t2) = p
+    val iter1 = new TreeIterator(t1)
+    val iter2 = new TreeIterator(t2)
+    var same = true
+    while (iter1.hasNext && iter2.hasNext) {
+      val x = iter1.next()
+      val y = iter2.next()
+      if (x != y) same = false
+    }
+    if (iter1.hasNext != iter2.hasNext) same = false
+    isSame = same
+  }
+
+  def treeStream(tree: Tree): Stream[Int] = {
+    tree match {
+      case Empty => Stream()
+      case Node(x, left, right) => treeStream(left) #::: (x #:: treeStream(right))
+    }
+  }
+
+  @gen("treePairs")
+  @benchmark("coroutines.tree-iterator.same-fringe")
+  @curve("stream")
+  def streamSameFringe(p: (Tree, Tree)) {
+    val (t1, t2) = p
+    var s1 = treeStream(t1)
+    var s2 = treeStream(t2)
+    var same = true
+    while (s1.nonEmpty && s2.nonEmpty) {
+      val x = s1.head
+      val y = s2.head
+      if (x != y) same = false
+      s1 = s1.tail
+      s2 = s2.tail
+    }
+    if (s1.nonEmpty != s2.nonEmpty) same = false
+    isSame = same
   }
 
   /* tests */
