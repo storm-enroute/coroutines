@@ -236,23 +236,6 @@ class TreeIteratorBench extends JBench.OfflineReport {
     isSame = same
   }
 
-  @gen("treePairs")
-  @benchmark("coroutines.tree-iterator.same-fringe")
-  @curve("iterator")
-  def iteratorSameFringe(p: (Tree, Tree)) {
-    val (t1, t2) = p
-    val iter1 = new TreeIterator(t1)
-    val iter2 = new TreeIterator(t2)
-    var same = true
-    while (iter1.hasNext && iter2.hasNext) {
-      val x = iter1.next()
-      val y = iter2.next()
-      if (x != y) same = false
-    }
-    if (iter1.hasNext != iter2.hasNext) same = false
-    isSame = same
-  }
-
   def treeStream(tree: Tree): Stream[Int] = {
     tree match {
       case Empty => Stream()
