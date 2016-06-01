@@ -14,6 +14,7 @@ object AsyncAwaitTest {
     var x: T @uncheckedVariance = _
   }
 
+  // Doubly defined for ToughTypeObject
   def await[R]: Future[R] ~~> ((Future[R], Cell[R]), R) =
     coroutine { (f: Future[R]) =>
       val cell = new Cell[R]
@@ -21,6 +22,7 @@ object AsyncAwaitTest {
       cell.x
     }
 
+  // Doubly defined for ToughTypeObject
   def async[Y, R](body: ~~~>[(Future[Y], Cell[Y]), R]): Future[R] = {
     val c = call(body())
     val p = Promise[R]
@@ -67,6 +69,30 @@ private object PrivateWrapper {
 
 
 class AsyncAwaitTest extends FunSuite with Matchers {
+  def await[R]: Future[R] ~~> ((Future[R], AsyncAwaitTest.Cell[R]), R) =
+    coroutine { (f: Future[R]) =>
+      val cell = new AsyncAwaitTest.Cell[R]
+      yieldval((f, cell))
+      cell.x
+    }
+
+  def async[Y, R](body: ~~~>[(Future[Y], AsyncAwaitTest.Cell[Y]), R]): Future[R] = {
+    val c = call(body())
+    val p = Promise[R]
+    def loop() {
+      if (!c.resume) p.success(c.result)
+      else {
+        val (future, cell) = c.value
+        for (x <- future) {
+          cell.x = x
+          loop()
+        }
+      }
+    }
+    Future { loop() }
+    p.future
+  }
+
   // Source: https://git.io/vrHtj
   test("propagates tough types") {
     val fut = org.coroutines.AsyncAwaitTest.ToughTypeObject.m2
@@ -78,11 +104,11 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   // Source: https://git.io/vrHmG
   /** NOTE: Currently fails compilation.
   test("pattern matching partial function") {
-    val c = AsyncAwaitTest.async(coroutine { () =>
-      AsyncAwaitTest.await(Future(1))
-      val a = AsyncAwaitTest.await(Future(1))
+    val c = async(coroutine { () =>
+      await(Future(1))
+      val a = await(Future(1))
       val f = { case x => x + a }: PartialFunction[Int, Int]
-      AsyncAwaitTest.await(Future(f(2)))
+      await(Future(f(2)))
     })
     val res = Await.result(c, 2 seconds)
     assert(res == 3)
@@ -107,11 +133,11 @@ class AsyncAwaitTest extends FunSuite with Matchers {
 
   // Source: https://git.io/vr7H9
   test("pattern matching function") {
-    val c = AsyncAwaitTest.async(coroutine { () =>
-      AsyncAwaitTest.await(Future(1))
-      val a = AsyncAwaitTest.await(Future(1))
+    val c = async(coroutine { () =>
+      await(Future(1))
+      val a = await(Future(1))
       val f = { case x => x + a }: Function[Int, Int]
-      AsyncAwaitTest.await(Future(f(2)))
+      await(Future(f(2)))
     })
     val res = Await.result(c, 2 seconds)
     assert(res == 3)
@@ -119,13 +145,13 @@ class AsyncAwaitTest extends FunSuite with Matchers {
 
   // Source: https://git.io/vr7HA
   test("existential bind 1") {
-    def m(a: Any) = AsyncAwaitTest.async(coroutine { () =>
+    def m(a: Any) = async(coroutine { () =>
       a match {
         case s: Seq[_] =>
           val x = s.size
           var ss = s
           ss = s
-          AsyncAwaitTest.await(Future(x))
+          await(Future(x))
       }
     })
     val res = Await.result(m(Nil), 2 seconds)
@@ -347,8 +373,8 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     def combine[A](a1: A, a2: A): A = a1
 
     def combineAsync[A](a1: Future[A], a2: Future[A]) =
-      AsyncAwaitTest.async(coroutine { () =>
-        combine(AsyncAwaitTest.await(Future(a1)), AsyncAwaitTest.await(Future(a2)))
+      async(coroutine { () =>
+        combine(await(Future(a1)), await(Future(a2)))
       })
 
     val fut = combineAsync(Future(1), Future(2))
@@ -422,12 +448,12 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   test("match as expression 2") {
     val c = AsyncAwaitTest.async(coroutine { () =>
       val x = "" match {
-        case "" if false => AsyncAwaitTest.await(Future(1)) + 1
-        case _           => 2 + AsyncAwaitTest.await(Future(1))
+        case "" if false => await(Future(1)) + 1
+        case _           => 2 + await(Future(1))
       }
       val y = x
       "" match {
-        case _ => AsyncAwaitTest.await(Future(y)) + 100
+        case _ => await(Future(y)) + 100
       }
     })
     val result = Await.result(c, 5 seconds)
@@ -436,10 +462,87 @@ class AsyncAwaitTest extends FunSuite with Matchers {
 
   // Source: https://git.io/vrFj3
   test("nested await as bare expression") {
-    val c = AsyncAwaitTest.async(coroutine { () =>
-      AsyncAwaitTest.await(Future(AsyncAwaitTest.await(Future("")).isEmpty))
+    val c = async(coroutine { () =>
+      await(Future(await(Future("")).isEmpty))
     })
     val result = Await.result(c, 5 seconds)
     assert(result == true)
   }
+
+  // Source: https://git.io/vrAnM
+  test("nested await in block") {
+    val c = async(coroutine { () =>
+      ()
+      await(Future(await(Future("")).isEmpty))
+    })
+    val result = Await.result(c, 5 seconds)
+    assert(result == true)
+  }
+
+  // Source: https://git.io/vrAWm
+  // NOTE: Currently fails compilation
+  /**
+  test("nested await in if") {
+    val c: Future[Any] = async(coroutine { () =>
+      if ("".isEmpty) {
+        await(Future(await(Future("")).isEmpty))
+      } else 0
+    })
+    assert(Await.result(c, 5 seconds) == true)
+  }
+  */
+
+  // Source: https://git.io/vrAlJ
+  /** NOTE: This test currently fails because the future times out. 
+   *  Interestingly, the future doesn't time out if `1` is passed as the first
+   *  argument to `foo`. 
+   */
+  test("by-name expressions aren't lifted") {
+    def foo(ignored: => Any, b: Int) = b
+    val c = async(coroutine { () =>
+      await(Future(foo(???, await(Future(1)))))
+    })
+    val result = Await.result(c, 5 seconds)
+    assert(result == 1)
+  }
+
+  // Source: https://git.io/vrA0Q
+  /** NOTE: Currently fails compilation. If I remove the parentheses after 
+   * `next`, but keep the ones after the calls to `next` on the line
+   * `foo(next(), await(Future(next())))`,
+   *  then there the compiler is able to find `next` and there is no macro
+   *  expansion error. However, there is the expected compilation error saying
+   *  that "`Int` does not take parameters."
+   *  Removing the parentheses to make the line as such:
+   *  `foo(next, await(Future(next)))`
+   *  creates another macro expansion error.
+  test("evaluation order respected") {
+    def foo(a: Int, b: Int) = (a, b)
+    val c = async(coroutine { () =>
+      var i = 0
+      def next(): Int = {
+        i += 1
+        i
+      }
+      foo(next(), await(Future(next())))
+    })
+    val result = Await.result(c, 5 seconds)
+    assert(result == 1)
+  }
+  */
+
+  // Source: https://git.io/vrAuv
+  /** NOTE: Currently fails compilation. As in the previous test, `get` cannot
+   be found.*/
+  /**
+  test("await in non-primary param section 1") {
+    def foo(a0: Int)(b0: Int) = s"a0 = $a0, b0 = $b0"
+    val c = async(coroutine {() =>
+      var i = 0
+      def get = { i += 1; i }
+      foo(get)(await(Future(get)))
+    })
+    assert(Await.result(c, 5 seconds) == "a0 = 1, b0 = 2")
+  }
+  */
 }
