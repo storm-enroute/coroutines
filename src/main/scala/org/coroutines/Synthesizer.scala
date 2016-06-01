@@ -18,7 +18,7 @@ with CfgGenerator[C]
 with ASTCanonicalization[C] {
   import c.universe._
 
-  val NUM_PREDEFINED_ENTRY_STUBS = 40
+  val NUM_PREDEFINED_ENTRY_STUBS = 30
 
   private def genEntryPoint(cfg: Cfg, subgraph: SubCfg)(
     implicit t: Table
