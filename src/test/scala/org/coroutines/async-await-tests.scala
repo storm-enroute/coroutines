@@ -2,7 +2,6 @@ package org.coroutines
 
 
 import org.scalatest._
-import scala.language.{ reflectiveCalls, postfixOps }
 import scala.annotation.unchecked.uncheckedVariance
 import scala.concurrent._
 import scala.concurrent.duration._
@@ -716,10 +715,27 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   }
 
   // Source: https://git.io/vrhT6
-  /** NOTE: Currently fails compilation because I haven't found the right
-   *  imports.
+  /** NOTE: Currently fails compilation. 
   test("await in implicit apply") {
-    val tb = mkToolbox(s"-cp ${toolboxClasspath}")
+    val scalaBinaryVersion: String = {
+      val PreReleasePattern = """.*-(M|RC).*""".r
+      val Pattern = """(\d+\.\d+)\..*""".r
+      val SnapshotPattern = """(\d+\.\d+\.\d+)-\d+-\d+-.*""".r
+      scala.util.Properties.versionNumberString match {
+        case s @ PreReleasePattern(_) => s
+        case SnapshotPattern(v) => v + "-SNAPSHOT"
+        case Pattern(v) => v
+        case _          => ""
+      }
+    }
+    val toolboxClasspath: String = {
+      val f = new java.io.File(s"target/scala-${scalaBinaryVersion}/classes")
+      if (!f.exists)
+        sys.error(s"output directory ${f.getAbsolutePath} does not exist.")
+      f.getAbsolutePath
+    }
+    val mirror = scala.reflect.runtime.currentMirror    
+    val tb = Toolbox.mkToolbox(s"-cp ${toolboxClasspath}")
     val tree = tb.typeCheck(tb.parse {
       """
         | import scala.language.implicitConversions
