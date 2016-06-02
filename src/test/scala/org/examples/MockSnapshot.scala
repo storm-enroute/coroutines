@@ -20,9 +20,9 @@ object MockSnapshot {
     }
 
     /** Returns true if either `c.isCompleted && c.hasResult` or if the rest
-      * of the coroutine is satisfied `test` regardless of the veracity of
-      * `c.value`.
-      */
+     *  of the coroutine is satisfied `test` regardless of the veracity of
+     *  `c.value`.
+     */
     def test[R](c: Cell <~> R): Boolean = {
       if (c.resume) {
         val cell = c.value

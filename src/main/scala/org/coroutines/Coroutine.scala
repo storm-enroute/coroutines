@@ -104,8 +104,8 @@ object Coroutine {
     var $result: R = null.asInstanceOf[R]
 
     /** Clones the coroutine that this instance is a part of.
-     * 
-     *  @return A new coroutine instance with exactly the same execution state. 
+     *
+     *  @return A new coroutine instance with exactly the same execution state.
      */
     final def snapshot: Instance[Y, R] = {
       val frame = new Instance[Y, R]
@@ -121,7 +121,7 @@ object Coroutine {
     }
 
     /** Advances the coroutine to the next yield point.
-     *  
+     *
      *  @return `true` if resume can be called again, `false` otherwise.
      *  @throws CoroutineStoppedException If the coroutine is not live.
      */
@@ -134,15 +134,16 @@ object Coroutine {
     }
 
     /** Calls `resume` until either the coroutine yields a value or returns.
-     * 
+     *
      *  If `pull` returns `true`, then the coroutine has suspended by yielding
      *  a value and there are more elements to traverse.
-     * 
+     *
      *  Usage:
+     *
      *  {{{
      *  while (c.pull) c.value
      *  }}}
-     * 
+     *
      *  @return `false` if the coroutine stopped, `true` otherwise.
      *  @throws CoroutineStoppedException If the coroutine is not live.
      */
@@ -156,12 +157,12 @@ object Coroutine {
     }
 
     /** Returns the value yielded by the coroutine.
-     * 
-     * This method will thrown an exception if the value cannot be accessed.
-     * 
-     * @return The value yielded by the coroutine, if there is one.
-     * @throws RuntimeException If the coroutine doesn't have a value or if it
-     *                          is not live.
+     *
+     *  This method will thrown an exception if the value cannot be accessed.
+     *
+     *  @return The value yielded by the coroutine, if there is one.
+     *  @throws RuntimeException If the coroutine doesn't have a value or if it
+     *                           is not live.
      */
     final def value: Y = {
       if (!hasValue)
@@ -179,16 +180,16 @@ object Coroutine {
       try { Success(value) } catch { case t: Throwable => Failure(t) }
 
     /** The value returned by the coroutine, if the coroutine is completed.
-     * 
-     * This method will throw an exception if the result cannot be accessed.
-     * 
-     * '''Note:''' the returned value is not the same as the value yielded
-     * by the coroutine. The coroutine may yield any number of values during its
-     * lifetime, but it returns only a single value after it terminates.
-     * 
-     * @return The return value of the coroutine, if the coroutine is completed.
-     * @throws RuntimeException If `!isCompleted`.
-     * @throws Exception        If `hasException`.
+     *
+     *  This method will throw an exception if the result cannot be accessed.
+     *
+     *  '''Note:''' the returned value is not the same as the value yielded
+     *  by the coroutine. The coroutine may yield any number of values during its
+     *  lifetime, but it returns only a single value after it terminates.
+     *
+     *  @return The return value of the coroutine, if the coroutine is completed.
+     *  @throws RuntimeException If `!isCompleted`.
+     *  @throws Exception        If `hasException`.
      */
     final def result: R = {
       if (!isCompleted)
@@ -208,30 +209,29 @@ object Coroutine {
 
     final def hasException: Boolean = isCompleted && $exception != null
 
-    /** Returns whether or not the coroutine has more instances to go through.
-     * 
-     * This is true if there are either more yield statements or if the
-     * coroutine has not yet returned its result.
-     * 
-     * @return `true` if `resume` can be called without an exception being
-     *         thrown, `false` otherwise.
+    /** Returns `false` iff the coroutine instance completed execution.
+     *
+     *  This is true if there are either more yield statements or if the
+     *  coroutine has not yet returned its result.
+     *
+     *  @return `true` if `resume` can be called without an exception being
+     *          thrown, `false` otherwise.
      */
     final def isLive: Boolean = $costackptr > 0
 
-    /** Returns whether or not the coroutine has completed.
+    /** Returns `true` iff the coroutine instance completed execution.
      *
-     * See the documentation for `isLive`.
-     * 
-     * @return `!isLive`.
+     *  See the documentation for `isLive`.
+     *
+     *  @return `!isLive`.
      */
     final def isCompleted: Boolean = !isLive
 
     /** Returns a string representation of the coroutine's state.
-     * 
-     * @return A string describing the coroutine state.
+     *
+     *  @return A string describing the coroutine state.
      */
     override def toString = s"Coroutine.Instance<depth: ${$costackptr}, live: $isLive>"
-
 
     final def debugString: String = {
       def toStackLength[T](stack: Array[T]) =
