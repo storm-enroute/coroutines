@@ -120,4 +120,20 @@ class TryCatchTest extends FunSuite with Matchers {
     assert(c.result == "done")
     assert(c.isCompleted)
   }
+
+  test("throw and then yield") {
+    val rube = coroutine { () =>
+      throw new Exception("au revoir")
+      yieldval("bonjour")
+    }
+
+    val c = call(rube())
+    assert(!c.resume)
+    assert(c.hasException)
+    assert(c.getValue == None)
+    c.tryResult match {
+      case Failure(e: Exception) => assert(e.getMessage == "au revoir")
+      case _ => assert(false)
+    }
+  }
 }
