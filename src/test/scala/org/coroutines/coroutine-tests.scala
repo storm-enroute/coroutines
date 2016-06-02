@@ -708,5 +708,5 @@ class WideValueTypesTest extends FunSuite with Matchers {
     assert(c.result == 1)
     assert(c.isCompleted)
   }
-  */
+   */
 }
