@@ -24,7 +24,11 @@ class AsyncAwaitBench extends JBench.OfflineReport {
 
   val sizes = Gen.range("size")(5000, 25000, 5000)
 
+  val delayedSizes = Gen.range("size")(5, 25, 5)
+
   private def request(i: Int): Future[Unit] = Future { () }
+
+  private def delayedRequest(i: Int): Future[Unit] = Future { Thread.sleep(1) }
 
   @gen("sizes")
   @benchmark("coroutines.async.request-reply")
@@ -34,6 +38,20 @@ class AsyncAwaitBench extends JBench.OfflineReport {
       var i = 0
       while (i < sz) {
         val reply = await(request(i))
+        i += 1
+      }
+    }
+    Await.result(done, 10.seconds)
+  }
+
+  @gen("delayedSizes")
+  @benchmark("coroutines.async.request-reply")
+  @curve("async")
+  def delayedAsyncAwait(sz: Int) = {
+    val done = async {
+      var i = 0
+      while (i < sz) {
+        val reply = await(delayedRequest(i))
         i += 1
       }
     }
@@ -68,6 +86,22 @@ class AsyncAwaitBench extends JBench.OfflineReport {
         var i = 0
         while (i < sz) {
           val reply = coroutineAwait(request(i))
+          i += 1
+        }
+      }
+    }
+    Await.result(done, 10.seconds)
+  }
+
+  @gen("delayedSizes")
+  @benchmark("coroutines.async.request-reply")
+  @curve("coroutine")
+  def delayedCoroutineAsyncAwait(sz: Int) = {
+    val done = coroutineAsync {
+      coroutine { () =>
+        var i = 0
+        while (i < sz) {
+          val reply = coroutineAwait(delayedRequest(i))
           i += 1
         }
       }
