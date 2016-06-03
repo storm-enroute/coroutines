@@ -40,27 +40,73 @@ class DataflowVariableBench extends JBench.OfflineReport {
     val tail = new FutureDataflowVar[FutureDataflowStream[T]]
   }
 
+  // @gen("sizes")
+  // @benchmark("coroutines.dataflow.producer-consumer")
+  // @curve("future")
+  // def futureProducerConsumer(sz: Int) = {
+  //   val root = new FutureDataflowVar[FutureDataflowStream[String]]()
+  //   def producer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
+  //     val s = new FutureDataflowStream("")
+  //     tail := s
+  //     if (left > 0) producer(left - 1, s.tail)
+  //   }
+  //   val done = Promise[Boolean]()
+  //   def consumer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
+  //     if (left == 0) done.success(true)
+  //     else tail(s => consumer(left - 1, s.tail))
+  //   }
+
+  //   val p = Future {
+  //     producer(sz, root)
+  //   }
+  //   val c = Future {
+  //     consumer(sz, root)
+  //   }
+  //   Await.result(done.future, 10.seconds)
+  // }
+
   @gen("sizes")
-  @benchmark("coroutines.dataflow.producer-consumer")
+  @benchmark("coroutines.dataflow.bounded-producer-consumer")
   @curve("future")
-  def futureProducerConsumer(sz: Int) = {
+  def futureBoundedProducerConsumer(sz: Int) = {
     val root = new FutureDataflowVar[FutureDataflowStream[String]]()
-    def producer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
+    val startTokens = new FutureDataflowVar[FutureDataflowStream[String]]()
+    def producer(
+      left: Int,
+      tail: FutureDataflowVar[FutureDataflowStream[String]],
+      tokenTail: FutureDataflowVar[FutureDataflowStream[String]]
+    ) {
       val s = new FutureDataflowStream("")
       tail := s
-      if (left > 0) producer(left - 1, s.tail)
+      if (left > 0) tokenTail(toks => producer(left - 1, s.tail, toks.tail))
     }
     val done = Promise[Boolean]()
-    def consumer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
+    def consumer(
+      left: Int,
+      tail: FutureDataflowVar[FutureDataflowStream[String]],
+      tokenTail: FutureDataflowVar[FutureDataflowStream[String]]
+    ) {
       if (left == 0) done.success(true)
-      else tail(s => consumer(left - 1, s.tail))
+      else {
+        val toks = new FutureDataflowStream("")
+        tokenTail := toks
+        tail(s => consumer(left - 1, s.tail, toks.tail))
+      }
     }
 
+    def fill(t: FutureDataflowVar[FutureDataflowStream[String]], left: Int):
+      FutureDataflowVar[FutureDataflowStream[String]] = {
+      val s = new FutureDataflowStream("")
+      t := s
+      if (left > 0) fill(s.tail, left - 1)
+      else s.tail
+    }
+    val tokens = fill(startTokens, 50)
     val p = Future {
-      producer(sz, root)
+      producer(sz, root, startTokens)
     }
     val c = Future {
-      consumer(sz, root)
+      consumer(sz, root, tokens)
     }
     Await.result(done.future, 10.seconds)
   }
@@ -116,35 +162,35 @@ class DataflowVariableBench extends JBench.OfflineReport {
     val tail = new DataflowVar[DataflowStream[T]]
   }
 
-  @gen("sizes")
-  @benchmark("coroutines.dataflow.producer-consumer")
-  @curve("coroutine")
-  def coroutineProducerConsumer(sz: Int) = {
-    val root = new DataflowVar[DataflowStream[String]]
-    val done = Promise[Boolean]()
-    val producer = coroutine { () =>
-      var left = sz
-      var tail = root
-      while (left > 0) {
-        tail := new DataflowStream("")
-        tail = tail.apply().tail
-        left -= 1
-      }
-    }
-    val consumer = coroutine { () =>
-      var left = sz
-      var tail = root
-      while (left > 0) {
-        tail = tail.apply().tail
-        left -= 1
-      }
-      done.success(true)
-      ()
-    }
+  // @gen("sizes")
+  // @benchmark("coroutines.dataflow.producer-consumer")
+  // @curve("coroutine")
+  // def coroutineProducerConsumer(sz: Int) = {
+  //   val root = new DataflowVar[DataflowStream[String]]
+  //   val done = Promise[Boolean]()
+  //   val producer = coroutine { () =>
+  //     var left = sz
+  //     var tail = root
+  //     while (left > 0) {
+  //       tail := new DataflowStream("")
+  //       tail = tail.apply().tail
+  //       left -= 1
+  //     }
+  //   }
+  //   val consumer = coroutine { () =>
+  //     var left = sz
+  //     var tail = root
+  //     while (left > 0) {
+  //       tail = tail.apply().tail
+  //       left -= 1
+  //     }
+  //     done.success(true)
+  //     ()
+  //   }
 
-    task(producer)
-    task(consumer)
+  //   task(producer)
+  //   task(consumer)
 
-    Await.result(done.future, 10.seconds)
-  }
+  //   Await.result(done.future, 10.seconds)
+  // }
 }
