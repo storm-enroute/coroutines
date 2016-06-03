@@ -162,35 +162,53 @@ class DataflowVariableBench extends JBench.OfflineReport {
     val tail = new DataflowVar[DataflowStream[T]]
   }
 
-  // @gen("sizes")
-  // @benchmark("coroutines.dataflow.producer-consumer")
-  // @curve("coroutine")
-  // def coroutineProducerConsumer(sz: Int) = {
-  //   val root = new DataflowVar[DataflowStream[String]]
-  //   val done = Promise[Boolean]()
-  //   val producer = coroutine { () =>
-  //     var left = sz
-  //     var tail = root
-  //     while (left > 0) {
-  //       tail := new DataflowStream("")
-  //       tail = tail.apply().tail
-  //       left -= 1
-  //     }
-  //   }
-  //   val consumer = coroutine { () =>
-  //     var left = sz
-  //     var tail = root
-  //     while (left > 0) {
-  //       tail = tail.apply().tail
-  //       left -= 1
-  //     }
-  //     done.success(true)
-  //     ()
-  //   }
+  @gen("sizes")
+  @benchmark("coroutines.dataflow.producer-consumer")
+  @curve("coroutine")
+  def coroutineProducerConsumer(sz: Int) = {
+    val root = new DataflowVar[DataflowStream[String]]
+    val tokens = new DataflowVar[DataflowStream[String]]
+    val done = Promise[Boolean]()
+    val producer = coroutine { () =>
+      var left = sz
+      var tail = root
+      var tokenTail = tokens
+      while (left > 0) {
+        tail := new DataflowStream("")
+        tail = tail.apply().tail
+        tokenTail = tokenTail.apply().tail
+        left -= 1
+      }
+    }
+    val startTokens = {
+      var t = tokens
+      var left = 50
+      while (left > 0) {
+        val s = new DataflowStream("")
+        t := s
+        t = s.tail
+        left -= 1
+      }
+      t
+    }
+    val consumer = coroutine { () =>
+      var left = sz
+      var tail = root
+      var tokenTail = startTokens
+      while (left > 0) {
+        tail = tail.apply().tail
+        val s = new DataflowStream("")
+        tokenTail := s
+        tokenTail = s.tail
+        left -= 1
+      }
+      done.success(true)
+      ()
+    }
 
-  //   task(producer)
-  //   task(consumer)
+    task(producer)
+    task(consumer)
 
-  //   Await.result(done.future, 10.seconds)
-  // }
+    Await.result(done.future, 10.seconds)
+  }
 }
