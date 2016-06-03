@@ -92,13 +92,14 @@ class CoroutineTest extends FunSuite with Matchers {
     val wrapString = coroutine { (x: String) =>
       List(x.toString)
     }
-    val f: Coroutine.Frame[Nothing, List[String]] = call(wrapString("ok"))
+    val f: Coroutine.Instance[Nothing, List[String]] = call(wrapString("ok"))
     val wrapInt = coroutine { (x: Int) =>
       yieldto(f)
       Vector(x)
     }
     val c = call(wrapInt(7))
     assert(c.resume)
+    assert(c.getResult == None)
     assert(c.getValue == None)
     assert(!c.resume)
     assert(c.result == Vector(7))
@@ -213,37 +214,44 @@ class CoroutineTest extends FunSuite with Matchers {
   }
 
   test("coroutine should contain two applications at the end of two branches") {
-    val c1 = coroutine { (x: Int) => x }
-    val c2 = coroutine { (x: Int) =>
+    val ident = coroutine { (x: Int) => x }
+    val branch = coroutine { (x: Int) =>
       if (x > 0) {
-        val y = c1(x)
+        val y = ident(x)
       } else {
-        val z = c1(-x)
+        val z = ident(-x)
       }
       x
     }
-    val c = call(c2(5))
-    assert(!c.resume)
-    assert(c.result == 5)
-    assert(c.isCompleted)
+    val c1 = call(branch(5))
+    assert(!c1.resume)
+    assert(c1.result == 5)
+    assert(c1.isCompleted)
+    val c2 = call(branch(-27))
+    assert(!c2.resume)
+    assert(c2.result == -27)
+    assert(c2.isCompleted)
   }
 
   test("coroutine should contain two assignments at the end of two branches") {
-    val c1 = coroutine { (n: Int) => 2 * n }
-    val c2 = coroutine { (x: Int) =>
+    val double = coroutine { (n: Int) => 2 * n }
+    val branch = coroutine { (x: Int) =>
       var y = 0
       if (x > 0) {
-        val z = c1(x)
+        val z = double(x)
         y = z
       } else {
-        val z = c1(-x)
+        val z = double(-x)
         y = z
       }
       y
     }
-    val c = call(c2(5))
-    assert(!c.resume)
-    assert(c.result == 10)
+    val c1 = call(branch(5))
+    assert(!c1.resume)
+    assert(c1.result == 10)
+    val c2 = call(branch(-10))
+    assert(!c2.resume)
+    assert(c2.result == 20)
   }
 
   test("coroutine should have an integer argument and a string local variable") {

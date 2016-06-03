@@ -57,4 +57,15 @@ class HashSetIteratorBench extends JBench.OfflineReport {
     longest
   }
 
+  @gen("hashsets")
+  @benchmark("coroutines.hash-set-iterator.longest")
+  @curve("foreach")
+  def foreachLongest(set: mutable.HashSet[String]) = {
+    var longest = ""
+    set.foreach { s =>
+      if (longest.length < s.length) longest = s
+    }
+    longest
+  }
+
 }

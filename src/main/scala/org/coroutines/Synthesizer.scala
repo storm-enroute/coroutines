@@ -15,10 +15,10 @@ import scala.reflect.macros.whitebox.Context
 private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C]
 with CfgGenerator[C]
-with ThreeAddressFormTransformation[C] {
+with ASTCanonicalization[C] {
   import c.universe._
 
-  val NUM_PREDEFINED_ENTRY_STUBS = 40
+  val NUM_PREDEFINED_ENTRY_STUBS = 30
 
   private def genEntryPoint(cfg: Cfg, subgraph: SubCfg)(
     implicit t: Table
@@ -28,14 +28,14 @@ with ThreeAddressFormTransformation[C] {
     val defdef = if (subgraph.uid < NUM_PREDEFINED_ENTRY_STUBS) q"""
       override def $defname(
         ${t.names.coroutineParam}:
-          _root_.org.coroutines.Coroutine.Frame[${t.yieldType}, ${t.returnType}]
+          _root_.org.coroutines.Coroutine.Instance[${t.yieldType}, ${t.returnType}]
       ): _root_.scala.Unit = {
         $body
       }
     """ else q"""
       def $defname(
         ${t.names.coroutineParam}:
-          _root_.org.coroutines.Coroutine.Frame[${t.yieldType}, ${t.returnType}]
+          _root_.org.coroutines.Coroutine.Instance[${t.yieldType}, ${t.returnType}]
       ): _root_.scala.Unit = {
         $body
       }
@@ -60,7 +60,7 @@ with ThreeAddressFormTransformation[C] {
 
       q"""
         def $$enter(
-          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+          c: _root_.org.coroutines.Coroutine.Instance[$yldtpt, $rettpt]
         ): _root_.scala.Unit = $ep0(c)
       """
     } else if (entrypoints.size == 2) {
@@ -69,7 +69,7 @@ with ThreeAddressFormTransformation[C] {
 
       q"""
         def $$enter(
-          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+          c: _root_.org.coroutines.Coroutine.Instance[$yldtpt, $rettpt]
         ): _root_.scala.Unit = {
           val pc = _root_.org.coroutines.common.Stack.top(c.$$pcstack)
           if (pc == 0) $ep0(c) else $ep1(c)
@@ -83,7 +83,7 @@ with ThreeAddressFormTransformation[C] {
 
       q"""
         def $$enter(
-          c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+          c: _root_.org.coroutines.Coroutine.Instance[$yldtpt, $rettpt]
         ): _root_.scala.Unit = {
           val pc: Short = _root_.org.coroutines.common.Stack.top(c.$$pcstack)
           (pc: @_root_.scala.annotation.switch) match {
@@ -164,7 +164,7 @@ with ThreeAddressFormTransformation[C] {
 
     q"""
       def $returnvaluemethod(
-        c: _root_.org.coroutines.Coroutine.Frame[
+        c: _root_.org.coroutines.Coroutine.Instance[
           ${table.yieldType}, ${table.returnType}],
         v: $tpe
       ): _root_.scala.Unit = {
@@ -307,7 +307,7 @@ with ThreeAddressFormTransformation[C] {
 
   def synthesize(rawlambda: Tree): Tree = {
     // transform to two operand assignment form
-    val typedtaflambda = transformToThreeAddressForm(rawlambda)
+    val typedtaflambda = canonicalizeTree(rawlambda)
     // println(typedtaflambda)
     // println(typedtaflambda.tpe)
 
@@ -351,8 +351,10 @@ with ThreeAddressFormTransformation[C] {
     val valnme = TermName(c.freshName("c"))
     val co = q"""
       new $coroutinequal[..$tparams] {
-        def $$call(..$args): _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt] = {
-          val $valnme = new _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+        def $$call(
+          ..$args
+        ): _root_.org.coroutines.Coroutine.Instance[$yldtpt, $rettpt] = {
+          val $valnme = new _root_.org.coroutines.Coroutine.Instance[$yldtpt, $rettpt]
           $$push($valnme, ..$argidents)
           $valnme
         }
@@ -361,14 +363,14 @@ with ThreeAddressFormTransformation[C] {
             _root_.org.coroutines.COROUTINE_DIRECT_APPLY_ERROR_MESSAGE)
         }
         def $$push(
-          $$c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt], ..$args
+          $$c: _root_.org.coroutines.Coroutine.Instance[$yldtpt, $rettpt], ..$args
         ): _root_.scala.Unit = {
           _root_.org.coroutines.common.Stack.push($$c.$$costack, this, -1)
           _root_.org.coroutines.common.Stack.push($$c.$$pcstack, 0.toShort, -1)
           ..$varpushes
         }
         def $$pop(
-          $$c: _root_.org.coroutines.Coroutine.Frame[$yldtpt, $rettpt]
+          $$c: _root_.org.coroutines.Coroutine.Instance[$yldtpt, $rettpt]
         ): _root_.scala.Unit = {
           _root_.org.coroutines.common.Stack.pop($$c.$$pcstack)
           _root_.org.coroutines.common.Stack.pop($$c.$$costack)
