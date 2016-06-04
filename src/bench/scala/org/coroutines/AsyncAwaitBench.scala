@@ -45,7 +45,7 @@ class AsyncAwaitBench extends JBench.OfflineReport {
   }
 
   @gen("delayedSizes")
-  @benchmark("coroutines.async.request-reply")
+  @benchmark("coroutines.async.delayed-request-reply")
   @curve("async")
   def delayedAsyncAwait(sz: Int) = {
     val done = async {
@@ -94,7 +94,7 @@ class AsyncAwaitBench extends JBench.OfflineReport {
   }
 
   @gen("delayedSizes")
-  @benchmark("coroutines.async.request-reply")
+  @benchmark("coroutines.async.delayed-request-reply")
   @curve("coroutine")
   def delayedCoroutineAsyncAwait(sz: Int) = {
     val done = coroutineAsync {
