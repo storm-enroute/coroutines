@@ -18,14 +18,16 @@ import scala.util.Failure
 
 class DataflowVariableBench extends JBench.OfflineReport {
   override def defaultConfig = Context(
-    exec.minWarmupRuns -> 80,
-    exec.maxWarmupRuns -> 120,
+    exec.minWarmupRuns -> 100,
+    exec.maxWarmupRuns -> 200,
     exec.benchRuns -> 36,
     exec.independentSamples -> 4,
     verbose -> true
   )
 
   val sizes = Gen.range("size")(50000, 250000, 50000)
+
+  val TOKENS = 100
 
   class FutureDataflowVar[T] {
     private val p = Promise[T]()
@@ -40,30 +42,30 @@ class DataflowVariableBench extends JBench.OfflineReport {
     val tail = new FutureDataflowVar[FutureDataflowStream[T]]
   }
 
-  // @gen("sizes")
-  // @benchmark("coroutines.dataflow.producer-consumer")
-  // @curve("future")
-  // def futureProducerConsumer(sz: Int) = {
-  //   val root = new FutureDataflowVar[FutureDataflowStream[String]]()
-  //   def producer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
-  //     val s = new FutureDataflowStream("")
-  //     tail := s
-  //     if (left > 0) producer(left - 1, s.tail)
-  //   }
-  //   val done = Promise[Boolean]()
-  //   def consumer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
-  //     if (left == 0) done.success(true)
-  //     else tail(s => consumer(left - 1, s.tail))
-  //   }
+  @gen("sizes")
+  @benchmark("coroutines.dataflow.producer-consumer")
+  @curve("future")
+  def futureProducerConsumer(sz: Int) = {
+    val root = new FutureDataflowVar[FutureDataflowStream[String]]()
+    def producer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
+      val s = new FutureDataflowStream("")
+      tail := s
+      if (left > 0) producer(left - 1, s.tail)
+    }
+    val done = Promise[Boolean]()
+    def consumer(left: Int, tail: FutureDataflowVar[FutureDataflowStream[String]]) {
+      if (left == 0) done.success(true)
+      else tail(s => consumer(left - 1, s.tail))
+    }
 
-  //   val p = Future {
-  //     producer(sz, root)
-  //   }
-  //   val c = Future {
-  //     consumer(sz, root)
-  //   }
-  //   Await.result(done.future, 10.seconds)
-  // }
+    val p = Future {
+      producer(sz, root)
+    }
+    val c = Future {
+      consumer(sz, root)
+    }
+    Await.result(done.future, 10.seconds)
+  }
 
   @gen("sizes")
   @benchmark("coroutines.dataflow.bounded-producer-consumer")
@@ -101,7 +103,7 @@ class DataflowVariableBench extends JBench.OfflineReport {
       if (left > 0) fill(s.tail, left - 1)
       else s.tail
     }
-    val tokens = fill(startTokens, 50)
+    val tokens = fill(startTokens, TOKENS)
     val p = Future {
       producer(sz, root, startTokens)
     }
@@ -167,6 +169,38 @@ class DataflowVariableBench extends JBench.OfflineReport {
   @curve("coroutine")
   def coroutineProducerConsumer(sz: Int) = {
     val root = new DataflowVar[DataflowStream[String]]
+    val done = Promise[Boolean]()
+    val producer = coroutine { () =>
+      var left = sz
+      var tail = root
+      while (left > 0) {
+        tail := new DataflowStream("")
+        tail = tail.apply().tail
+        left -= 1
+      }
+    }
+    val consumer = coroutine { () =>
+      var left = sz
+      var tail = root
+      while (left > 0) {
+        tail = tail.apply().tail
+        left -= 1
+      }
+      done.success(true)
+      ()
+    }
+
+    task(producer)
+    task(consumer)
+
+    Await.result(done.future, 10.seconds)
+  }
+
+  @gen("sizes")
+  @benchmark("coroutines.dataflow.bounded-producer-consumer")
+  @curve("coroutine")
+  def coroutineBoundedProducerConsumer(sz: Int) = {
+    val root = new DataflowVar[DataflowStream[String]]
     val tokens = new DataflowVar[DataflowStream[String]]
     val done = Promise[Boolean]()
     val producer = coroutine { () =>
@@ -182,7 +216,7 @@ class DataflowVariableBench extends JBench.OfflineReport {
     }
     val startTokens = {
       var t = tokens
-      var left = 50
+      var left = TOKENS
       while (left > 0) {
         val s = new DataflowStream("")
         t := s
