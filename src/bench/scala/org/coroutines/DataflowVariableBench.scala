@@ -113,6 +113,68 @@ class DataflowVariableBench extends JBench.OfflineReport {
     Await.result(done.future, 10.seconds)
   }
 
+  @gen("sizes")
+  @benchmark("coroutines.dataflow.producer-consumer")
+  @curve("ltq")
+  def ltqProducerConsumer(sz: Int) = {
+    val q = new java.util.concurrent.LinkedTransferQueue[String]()
+    val p = new Thread {
+      override def run() {
+        var i = 0
+        while (i < sz) {
+          q.add("")
+          i += 1
+        }
+      }
+    }
+    val c = new Thread {
+      override def run() {
+        var i = 0
+        while (i < sz) {
+          q.take()
+          i += 1
+        }
+      }
+    }
+    c.start()
+    p.start()
+    c.join()
+    p.join()
+  }
+
+  @gen("sizes")
+  @benchmark("coroutines.dataflow.bounded-producer-consumer")
+  @curve("ltq")
+  def ltqBoundedProducerConsumer(sz: Int) = {
+    val q = new java.util.concurrent.LinkedTransferQueue[String]()
+    val tokens = new java.util.concurrent.LinkedTransferQueue[String]()
+    for (i <- 0 until TOKENS) tokens.add("")
+    val p = new Thread {
+      override def run() {
+        var i = 0
+        while (i < sz) {
+          q.add("")
+          tokens.take()
+          i += 1
+        }
+      }
+    }
+    val c = new Thread {
+      override def run() {
+        var i = 0
+        while (i < sz) {
+          q.take()
+          tokens.add("")
+          i += 1
+        }
+      }
+    }
+    c.start()
+    p.start()
+    c.join()
+    p.join()
+  }
+
   @transient lazy val forkJoinPool = new ForkJoinPool
 
   def task[T](body: ~~~>[DataflowVar[T], Unit]) {
