@@ -507,15 +507,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   }
 
   // Source: https://git.io/vrA0Q
-  /** NOTE: Currently fails compilation. If I remove the parentheses after 
-   * `next`, but keep the ones after the calls to `next` on the line
-   * `foo(next(), await(Future(next())))`,
-   *  then there the compiler is able to find `next` and there is no macro
-   *  expansion error. However, there is the expected compilation error saying
-   *  that "`Int` does not take parameters."
-   *  Removing the parentheses to make the line as such:
-   *  `foo(next, await(Future(next)))`
-   *  creates another macro expansion error.
   test("evaluation order respected") {
     def foo(a: Int, b: Int) = (a, b)
     val c = async(coroutine { () =>
@@ -527,14 +518,10 @@ class AsyncAwaitTest extends FunSuite with Matchers {
       foo(next(), await(Future(next())))
     })
     val result = Await.result(c, 5 seconds)
-    assert(result == 1)
+    assert(result == (1, 2))
   }
-  */
 
   // Source: https://git.io/vrAuv
-  /** NOTE: Currently fails compilation. As in the previous test, `get` cannot
-   be found.*/
-  /**
   test("await in non-primary param section 1") {
     def foo(a0: Int)(b0: Int) = s"a0 = $a0, b0 = $b0"
     val c = async(coroutine {() =>
@@ -544,7 +531,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     })
     assert(Await.result(c, 5 seconds) == "a0 = 1, b0 = 2")
   }
-  */
 
   // Source: https://git.io/vrAzt
   /** NOTE: All of these tests currently fail compilation because of errors about
