@@ -19,7 +19,7 @@ import scala.reflect.macros.whitebox.Context
  *  Coroutine operations usages are checked for correctness, and nested contexts, such
  *  as function and class declarations, are checked, but not transformed.
  */
-trait ASTCanonicalization[C <: Context] {
+trait AstCanonicalization[C <: Context] {
   self: Analyzer[C] =>
 
   val c: C

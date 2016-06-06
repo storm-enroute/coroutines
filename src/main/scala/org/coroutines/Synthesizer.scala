@@ -15,7 +15,7 @@ import scala.reflect.macros.whitebox.Context
 private[coroutines] class Synthesizer[C <: Context](val c: C)
 extends Analyzer[C]
 with CfgGenerator[C]
-with ASTCanonicalization[C] {
+with AstCanonicalization[C] {
   import c.universe._
 
   val NUM_PREDEFINED_ENTRY_STUBS = 30
