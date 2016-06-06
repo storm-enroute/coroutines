@@ -610,8 +610,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
    */
 
   // Source: https://git.io/vrhUF
-  /** NOTE: Currently fails compilation because functions cannot be defined
-   *  inside coroutines.
   test("named arguments respect evaluation order") {
     def foo(a: Int, b: Int) = (a, b)
     val c = async(coroutine { () =>
@@ -624,7 +622,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     })
     assert(Await.result(c, 5 seconds) == (2, 1))
   }
-   */
 
   // Source: https://git.io/vrhTe
   test("named and default arguments respect evaluation order") {

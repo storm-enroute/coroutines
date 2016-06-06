@@ -283,4 +283,30 @@ class ASTCanonicalizationTest extends FunSuite with Matchers {
     assert(c1.result == 1)
     assert(c1.isCompleted)
   }
+
+  test("should be able to define uncalled function inside coroutine") {
+    val oy = coroutine { () =>
+      def foo(): String = "bar"
+      val bar = "bar"
+      1
+    }
+    val c = call(oy())
+    assert(!c.resume)
+    assert(c.hasResult)
+    assert(c.result == 1)
+    assert(c.isCompleted)
+  }
+
+  test("should be able to define called function inside coroutine") {
+    val oy = coroutine { () =>
+      def foo(): String = "bar"
+      val bar = foo()
+      1
+    }
+    val c = call(oy())
+    assert(!c.resume)
+    assert(c.hasResult)
+    assert(c.result == 1)
+    assert(c.isCompleted)
+  }
 }
