@@ -90,7 +90,6 @@ class ASTCanonicalizationTest extends FunSuite with Matchers {
 
     val c = call(unit())
     assert(!c.resume)
-    assert(c.result == (()))
     assert(!c.isLive)
   }
 
