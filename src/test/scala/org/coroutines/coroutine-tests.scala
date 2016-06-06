@@ -85,7 +85,6 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c.resume)
     assert(c.value == List("5"))
     assert(!c.resume)
-    assert(c.result == (()))
   }
 
   test("should lub yieldtos and returns") {
@@ -345,7 +344,6 @@ class CoroutineTest extends FunSuite with Matchers {
       assert(c.value == -i)
     }
     assert(!c.resume)
-    assert(c.result == (()))
   }
 
   test("an anonymous coroutine should be applied") {

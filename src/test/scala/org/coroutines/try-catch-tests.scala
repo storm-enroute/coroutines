@@ -19,7 +19,6 @@ class TryCatchTest extends FunSuite with Matchers {
 
     val c0 = call(rube())
     assert(!c0.resume)
-    assert(c0.result == (()))
     assert(c0.isCompleted)
   }
 
@@ -65,7 +64,6 @@ class TryCatchTest extends FunSuite with Matchers {
     assert(!error)
     assert(!completed)
     assert(!c0.resume)
-    assert(c0.result == (()))
     assert(!runtime)
     assert(error)
     assert(completed)
