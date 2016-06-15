@@ -173,4 +173,43 @@ class RegressionTest extends FunSuite with Matchers {
     assert(!r.hasException)
     assert(r.hasResult)
   }
+
+  test("issue #21") {
+    val test = coroutine { () => {} }
+    val foo = coroutine { () => {
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test()
+        test() // Lines after this did not previously compile.
+        test()
+        test()
+      }
+    }
+  }
 }
