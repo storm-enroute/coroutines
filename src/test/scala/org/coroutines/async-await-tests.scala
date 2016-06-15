@@ -1,6 +1,7 @@
 package org.coroutines
 
 
+
 import org.scalatest._
 import scala.language.{ reflectiveCalls, postfixOps }
 import scala.annotation.unchecked.uncheckedVariance
@@ -8,6 +9,7 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Success
+
 
 
 object AsyncAwaitTest {
@@ -54,18 +56,18 @@ object AsyncAwaitTest {
 
 
 class IntWrapper(val value: String) extends AnyVal {
-  def plusStr(): IntWrapper = new IntWrapper(value + "!")
+  def plusStr = Future.successful(value + "!")
 }
 
 
-class ParamWrapper[T](val value: T) extends AnyVal 
+class ParamWrapper[T](val value: T) extends AnyVal
 
 
-private class PrivateWrapper(val value: String) extends AnyVal
+class PrivateWrapper private (private val value: String) extends AnyVal
 
 
-private object PrivateWrapper {
-  def Instance() = new PrivateWrapper("Thugga")
+object PrivateWrapper {
+  def Instance = new PrivateWrapper("")
 }
 
 
