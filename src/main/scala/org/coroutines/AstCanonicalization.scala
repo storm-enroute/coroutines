@@ -19,7 +19,7 @@ import scala.reflect.macros.whitebox.Context
  *  Coroutine operations usages are checked for correctness, and nested contexts, such
  *  as function and class declarations, are checked, but not transformed.
  */
-trait ThreeAddressFormTransformation[C <: Context] {
+trait AstCanonicalization[C <: Context] {
   self: Analyzer[C] =>
 
   val c: C
@@ -70,7 +70,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
     }
   }
 
-  private def threeAddressForm(tree: Tree)(
+  private def canonicalize(tree: Tree)(
     implicit typer: ByTreeTyper[c.type]
   ): (List[Tree], Tree) = tree match {
     case q"$r.`package`" =>
@@ -78,15 +78,15 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"$r.$member" if !tree.symbol.isPackage =>
       // selection
-      val (rdecls, rident) = threeAddressForm(r)
+      val (rdecls, rident) = canonicalize(r)
       val localvarname = TermName(c.freshName("x"))
       val localvartree = q"val $localvarname = $rident.$member"
       (rdecls ++ List(localvartree), q"$localvarname")
     case q"$r.&&($arg)"
       if typer.typeOf(r) =:= typeOf[Boolean] && typer.typeOf(arg) =:= typeOf[Boolean] =>
       // short-circuit boolean and
-      val (conddecls, condident) = threeAddressForm(r)
-      val (thendecls, thenident) = threeAddressForm(arg)
+      val (conddecls, condident) = canonicalize(r)
+      val (thendecls, thenident) = canonicalize(arg)
       val localvarname = TermName(c.freshName("x"))
       val decls = List(
         q"var $localvarname = null.asInstanceOf[Boolean]",
@@ -104,8 +104,8 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case q"$r.||($arg)"
       if typer.typeOf(r) =:= typeOf[Boolean] && typer.typeOf(arg) =:= typeOf[Boolean] =>
       // short-circuit boolean or
-      val (conddecls, condident) = threeAddressForm(r)
-      val (elsedecls, elseident) = threeAddressForm(arg)
+      val (conddecls, condident) = canonicalize(r)
+      val (elsedecls, elseident) = canonicalize(arg)
       val localvarname = TermName(c.freshName("x"))
       val decls = List(
         q"var $localvarname = null.asInstanceOf[Boolean]",
@@ -124,31 +124,31 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // application
       val (rdecls, newselector) = selector match {
         case q"$r.$method" =>
-          val (rdecls, rident) = threeAddressForm(r)
+          val (rdecls, rident) = canonicalize(r)
           (rdecls, q"$rident.$method")
         case q"${method: TermName}" =>
           (Nil, q"$method")
       }
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
-      val (pdeclss, pidents) = paramss.map(_.map(threeAddressForm).unzip).unzip
+      val (pdeclss, pidents) = paramss.map(_.map(canonicalize).unzip).unzip
       val localvarname = TermName(c.freshName("x"))
       val localvartree = q"val $localvarname = $newselector[..$tpts](...$pidents)"
       (rdecls ++ pdeclss.flatten.flatten ++ List(localvartree), q"$localvarname")
     case q"$r[..$tpts]" if tpts.length > 0 =>
       // type application
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
-      val (rdecls, rident) = threeAddressForm(r)
+      val (rdecls, rident) = canonicalize(r)
       (rdecls, q"$rident[..$tpts]")
     case q"$x = $v" =>
       // assignment
-      val (xdecls, xident) = threeAddressForm(x)
-      val (vdecls, vident) = threeAddressForm(v)
+      val (xdecls, xident) = canonicalize(x)
+      val (vdecls, vident) = canonicalize(v)
       (xdecls ++ vdecls ++ List(q"$xident = $vident"), q"()")
     case q"$x(..$args) = $v" =>
       // update
-      val (xdecls, xident) = threeAddressForm(x)
-      val (argdecls, argidents) = args.map(threeAddressForm).unzip
-      val (vdecls, vident) = threeAddressForm(v)
+      val (xdecls, xident) = canonicalize(x)
+      val (argdecls, argidents) = args.map(canonicalize).unzip
+      val (vdecls, vident) = canonicalize(v)
       (xdecls ++ argdecls.flatten ++ vdecls, q"$xident(..$argidents) = $vident")
     case q"return $_" =>
       // return
@@ -156,19 +156,19 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case q"$x: $tpt" =>
       // ascription
       disallowCoroutinesIn(tpt)
-      val (xdecls, xident) = threeAddressForm(x)
+      val (xdecls, xident) = canonicalize(x)
       (xdecls, q"$xident: $tpt")
     case q"$x: @$annot" =>
       // annotation
-      val (xdecls, xident) = threeAddressForm(x)
+      val (xdecls, xident) = canonicalize(x)
       (xdecls, q"$xident: $annot")
     case q"(..$xs)" if xs.length > 1 =>
       // tuples
-      val (xsdecls, xsidents) = xs.map(threeAddressForm).unzip
+      val (xsdecls, xsidents) = xs.map(canonicalize).unzip
       (xsdecls.flatten, q"(..$xsidents)")
     case q"throw $expr" =>
       // throw
-      val (decls, ident) = threeAddressForm(expr)
+      val (decls, ident) = canonicalize(expr)
       val ndecls = decls ++ List(q"throw $ident")
       (ndecls, q"()")
     case q"try $body catch { case ..$cases } finally $expr" =>
@@ -177,15 +177,15 @@ trait ThreeAddressFormTransformation[C <: Context] {
       val localvarname = TermName(c.freshName("x"))
       val exceptionvarname = TermName(c.freshName("e"))
       val bindingname = TermName(c.freshName("t"))
-      val (bodydecls, bodyident) = threeAddressForm(body)
-      val (exprdecls, exprident) = threeAddressForm(expr)
+      val (bodydecls, bodyident) = canonicalize(body)
+      val (exprdecls, exprident) = canonicalize(expr)
       val matchcases =
         cases :+ cq"${pq"null"} =>" :+ cq"${pq"_"} => throw $exceptionvarname"
       val exceptionident = q"$exceptionvarname"
       val matchbody = q"$exceptionident match { case ..$matchcases }"
       typer.typeOf(matchbody) = typer.typeOf(tree)
       typer.typeOf(exceptionident) = typeOf[Throwable]
-      val (matchdecls, matchident) = threeAddressForm(matchbody)
+      val (matchdecls, matchident) = canonicalize(matchbody)
       val ndecls = List(
         q"var $localvarname = null.asInstanceOf[$tpe]",
         q"var $exceptionvarname: Throwable = null",
@@ -215,9 +215,9 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (ndecls, q"$localvarname")
     case q"if ($cond) $thenbranch else $elsebranch" =>
       // if
-      val (conddecls, condident) = threeAddressForm(cond)
-      val (thendecls, thenident) = threeAddressForm(thenbranch)
-      val (elsedecls, elseident) = threeAddressForm(elsebranch)
+      val (conddecls, condident) = canonicalize(cond)
+      val (thendecls, thenident) = canonicalize(thenbranch)
+      val (elsedecls, elseident) = canonicalize(elsebranch)
       val localvarname = TermName(c.freshName("x"))
       val tpe = typer.typeOf(tree)
       val decls = List(
@@ -237,12 +237,12 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case q"$expr match { case ..$cases }" =>
       // pattern match
       val localvarname = TermName(c.freshName("x"))
-      val (exdecls, exident) = threeAddressForm(expr)
+      val (exdecls, exident) = canonicalize(expr)
       val tpe = typer.typeOf(tree)
       val extpe = typer.typeOf(expr)
       val ncases = for (cq"$pat => $branch" <- cases) yield {
         disallowCoroutinesIn(pat)
-        val (branchdecls, branchident) = threeAddressForm(branch)
+        val (branchdecls, branchident) = canonicalize(branch)
         val isWildcard = pat match {
           case pq"_" => true
           case _ => false
@@ -280,13 +280,13 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"while ($cond) $body" =>
       // while
-      val (xdecls0, xident0) = threeAddressForm(cond)
+      val (xdecls0, xident0) = canonicalize(cond)
       // TODO: This is a temporary fix. It is very dangerous, since it makes the
       // transformation take O(2^n) time in the depth of the tree.
       //
       // The correct solution is to duplicate the trees so that duplicate value decls in
       // the two trees get fresh names.
-      val (xdecls1, xident1) = threeAddressForm(cond)
+      val (xdecls1, xident1) = canonicalize(cond)
       val localvarname = TermName(c.freshName("x"))
       val decls = if (xdecls0 != Nil) {
         xdecls0 ++ List(
@@ -310,8 +310,8 @@ trait ThreeAddressFormTransformation[C <: Context] {
       // TODO: This translation is a temporary fix, and can result in O(2^n) time. The
       // correct solution is to transform the subtree once, duplicate the transformed
       // trees and rename the variables.
-      val (xdecls0, xident0) = threeAddressForm(cond)
-      val (xdecls1, xident1) = threeAddressForm(cond)
+      val (xdecls0, xident0) = canonicalize(cond)
+      val (xdecls1, xident1) = canonicalize(cond)
       val localvarname = TermName(c.freshName("x"))
       val decls = if (xdecls0 != Nil) List(
         q"""
@@ -363,8 +363,8 @@ trait ThreeAddressFormTransformation[C <: Context] {
     case Block(stats, expr) =>
       // block
       val localvarname = TermName(c.freshName("x"))
-      val (statdecls, statidents) = stats.map(threeAddressForm).unzip
-      val (exprdecls, exprident) = threeAddressForm(q"$localvarname = $expr")
+      val (statdecls, statidents) = stats.map(canonicalize).unzip
+      val (exprdecls, exprident) = canonicalize(q"$localvarname = $expr")
       val tpe = typer.typeOf(expr)
       val decls =
         List(q"var $localvarname = null.asInstanceOf[${tpe.widen}]") ++
@@ -377,12 +377,12 @@ trait ThreeAddressFormTransformation[C <: Context] {
       (Nil, tree)
     case q"$mods val $v: $tpt = $rhs" =>
       // val
-      val (rhsdecls, rhsident) = threeAddressForm(rhs)
+      val (rhsdecls, rhsident) = canonicalize(rhs)
       val decls = rhsdecls ++ List(q"$mods val $v: $tpt = $rhsident")
       (decls, q"")
     case q"$mods var $v: $tpt = $rhs" =>
       // var
-      val (rhsdecls, rhsident) = threeAddressForm(rhs)
+      val (rhsdecls, rhsident) = canonicalize(rhs)
       val decls = rhsdecls ++ List(q"$mods var $v: $tpt = $rhsident")
       (decls, q"")
     case q"$mods def $tname[..$tparams](...$paramss): $tpt = $expr" =>
@@ -418,8 +418,8 @@ trait ThreeAddressFormTransformation[C <: Context] {
     implicit typer: ByTreeTyper[c.type]
   ): Tree = tree match {
     case Block(stats, expr) =>
-      val (statdecls, statidents) = stats.map(threeAddressForm).unzip
-      val (exprdecls, exprident) = threeAddressForm(expr)
+      val (statdecls, statidents) = stats.map(canonicalize).unzip
+      val (exprdecls, exprident) = canonicalize(expr)
       q"""
         ..${statdecls.flatten}
 
@@ -428,7 +428,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
         $exprident
       """
     case t =>
-      val (decls, ident) = threeAddressForm(t)
+      val (decls, ident) = canonicalize(t)
       q"""
         ..$decls
 
@@ -436,7 +436,7 @@ trait ThreeAddressFormTransformation[C <: Context] {
       """
   }
 
-  def transformToThreeAddressForm(rawlambda: Tree): Tree = {
+  def canonicalizeTree(rawlambda: Tree): Tree = {
     val typer = new ByTreeTyper[c.type](c)(rawlambda)
     val untypedrawlambda = typer.untypedTree
 

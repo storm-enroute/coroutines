@@ -7,7 +7,7 @@ import scala.util.Failure
 
 
 
-class ThreeAddressFormTransformationTest extends FunSuite with Matchers {
+class ASTCanonicalizationTest extends FunSuite with Matchers {
   test("if statements with applications") {
     val rube = coroutine { () =>
       if (0 < { math.abs(-1); math.max(1, 2) }) 2 else 1

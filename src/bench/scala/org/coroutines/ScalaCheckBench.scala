@@ -18,7 +18,7 @@ class ScalaCheckBench extends JBench.OfflineReport {
     exec.minWarmupRuns -> 100,
     exec.maxWarmupRuns -> 200,
     exec.benchRuns -> 36,
-    exec.independentSamples -> 4,
+    exec.independentSamples -> 1,
     verbose -> true
   )
 
@@ -30,7 +30,31 @@ class ScalaCheckBench extends JBench.OfflineReport {
 
   case class Fract(num: Int, den: Int)
 
-  def add(a: Fract, b: Fract) = Fract(a.num * b.den + a.den * b.num, a.den * b.den)
+  object Fract {
+    def normalize(num: Int, den: Int) = {
+      val d = gcd(num, den)
+      Fract(num / d, den / d)
+    }
+  }
+
+  def gcd(x: Int, y: Int) = {
+    var a = x
+    var b = y
+    while (b != 0) {
+      val t = b
+      b = a % b
+      a = t
+    }
+    a
+  }
+
+  def add(a: Fract, b: Fract) = Fract.normalize(
+    a.num * b.den + a.den * b.num, a.den * b.den)
+
+  def mult(a: Fract, b: Fract) = Fract.normalize(
+    a.num * b.num, a.den * b.den)
+
+  def inv(a: Fract) = Fract(a.den, a.num)
 
   trait Gen[T] {
     self =>
@@ -63,7 +87,9 @@ class ScalaCheckBench extends JBench.OfflineReport {
     for (i <- 0 until numTests) {
       val (a, b) = pairs.sample
       val c = add(a, b)
-      assert(c.num < 2 * c.den, c)
+      assert(c.num < 2 * c.den)
+      val d = add(b, a)
+      assert(d == c)
     }
   }
 
@@ -131,6 +157,8 @@ class ScalaCheckBench extends JBench.OfflineReport {
       val b = fract()
       val c = add(a, b)
       assert(c.num < 2 * c.den)
+      val d = add(b, a)
+      assert(d == c)
     }
     b.backtrack(test, numTests)
   }

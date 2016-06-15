@@ -622,7 +622,7 @@ trait CfgGenerator[C <: Context] {
           ..$savestate
           $untypedco.$$push[..$tpargs](
             $cparam.asInstanceOf[
-              _root_.org.coroutines.Coroutine.Frame[$yldtpe, $rettpe]],
+              _root_.org.coroutines.Coroutine.Instance[$yldtpe, $rettpe]],
             ..$untypedargs)
           $cparam.$$target = $cparam
           return
@@ -700,7 +700,7 @@ trait CfgGenerator[C <: Context] {
             throw new _root_.org.coroutines.CoroutineStoppedException
           $cparam.$$target =
             $untypedco.asInstanceOf[
-              _root_.org.coroutines.Coroutine.Frame[${t.yieldType}, ${t.returnType}]]
+              _root_.org.coroutines.Coroutine.Instance[${t.yieldType}, ${t.returnType}]]
           return
         """
         z.append(exittree)

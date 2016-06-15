@@ -141,5 +141,4 @@ class CoroutineBoxingBench extends JBench.Forked[Long] {
     val cs = call(fibsugar(sz))
     while (cs.pull) cs.value
   }
-
 }

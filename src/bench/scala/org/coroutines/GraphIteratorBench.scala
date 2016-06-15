@@ -20,11 +20,11 @@ class GraphIteratorBench extends JBench.OfflineReport {
 
   val SPARSE_DEG = 3
 
-  val DENSE_DEG = 20
+  val DENSE_DEG = 16
 
   val sparseSizes = Gen.range("size")(50000, 250000, 50000)
 
-  val denseSizes = Gen.range("size")(10000, 50000, 10000)
+  val denseSizes = Gen.range("size")(50000, 250000, 50000)
 
   def graphs(sizes: Gen[Int], density: Int) = for (sz <- sizes) yield {
     var totalNeighbours = 0
