@@ -135,9 +135,11 @@ trait AstCanonicalization[C <: Context] {
             }
           }
           if (paramss.length > 0 && noRepeatedParamsMap.length > 0) {
-            var repeatedParamsMap = noRepeatedParamsMap
-            while (paramss(0).length > noRepeatedParamsMap(0).length) {
-              repeatedParamsMap = repeatedParamsMap :+ noRepeatedParamsMap(0).tail
+            var repeatedParamsMap: List[List[Boolean]] = noRepeatedParamsMap
+            while (paramss(0).length > repeatedParamsMap(0).length) {
+              val newHead: List[Boolean] = repeatedParamsMap(0) :+ noRepeatedParamsMap(0).last
+              val newTail: List[List[Boolean]] = repeatedParamsMap.tail
+              repeatedParamsMap = newHead :: newTail
             }
             repeatedParamsMap
           } else {
