@@ -3,11 +3,11 @@ package org.coroutines
 
 
 import org.scalatest._
-import scala.language.{ reflectiveCalls, postfixOps }
 import scala.annotation.unchecked.uncheckedVariance
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.language.{ reflectiveCalls, postfixOps }
 import scala.util.Success
 
 
@@ -15,6 +15,16 @@ import scala.util.Success
 object AsyncAwaitTest {
   class Cell[+T] {
     var x: T @uncheckedVariance = _
+  }
+
+  object ToughTypeObject {
+    class Inner
+
+    def m2 = async(coroutine { () =>
+      val y = await { Future[List[_]] { Nil } }
+      val z = await { Future[Inner] { new Inner } }
+      (y, z)
+    })
   }
 
   // Doubly defined for ToughTypeObject
@@ -41,16 +51,6 @@ object AsyncAwaitTest {
     }
     Future { loop() }
     p.future
-  }
-
-  object ToughTypeObject {
-    class Inner
-
-    def m2 = async(coroutine { () =>
-      val y = await { Future[List[_]] { Nil } }
-      val z = await { Future[Inner] { new Inner } }
-      (y, z)
-    })
   }
 }
 
