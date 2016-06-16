@@ -179,7 +179,8 @@ class AsyncAwaitTest extends FunSuite with Matchers {
           def method(w: W, l: List[S]) = AsyncAwaitTest.async(coroutine { () =>
             val it = l.iterator
             while (it.hasNext) {
-              AsyncAwaitTest.await(Future(funDep.method(w, it.next()))(SomeExecutionContext))
+              AsyncAwaitTest.await(Future(funDep.method(w, it.next()))
+                (SomeExecutionContext))
             }
             w
           })
