@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 
 
 class AsyncAwaitTests extends FunSuite with Matchers {
-  val errorMessage = "Life ain't no Nintendo game"
+  val errorMessage = "problem"
 
   test("simple test defined in Scala Async") {
     val future = AsyncAwait.async(coroutine { () => 
@@ -53,5 +53,51 @@ class AsyncAwaitTests extends FunSuite with Matchers {
       Await.result(future, 1 seconds)
     }
     assert(exception.getMessage == errorMessage)
+  }
+
+  // Source: https://git.io/vowde
+  test("uncaught exception within async after await") {
+    val future = AsyncAwait.async(coroutine { () =>
+      AsyncAwait.await(Future(()))
+      throw new Exception(errorMessage)
+    })
+    intercept[Exception] { Await.result(future, 1 seconds) }
+  }
+
+  // Source: https://git.io/vowdk
+  test("await failing future within async") {
+    val base = Future[Int] { throw new Exception(errorMessage) }
+    val future = AsyncAwait.async(coroutine { () =>
+      val x = AsyncAwait.await(base)
+      x * 2
+    })
+    intercept[Exception] { Await.result(future, 1 seconds) }
+  }
+
+  // Source: https://git.io/vowdY
+  test("await failing future within async after await") {
+    val base = Future[Any] { "five!".length }
+    val future = AsyncAwait.async(coroutine { () =>
+      val a = AsyncAwait.await(base.mapTo[Int])
+      val b = AsyncAwait.await(Future { (a * 2).toString }.mapTo[Int])
+      val c = AsyncAwait.await(Future { (7 * 2).toString })
+      b + "-" + c
+    })
+    intercept[ClassCastException] {
+      Await.result(future, 1 seconds)
+    }
+  }
+
+  test("nested failing future within async after await") {
+    val base = Future[Any] { "five!".length }
+    val future = AsyncAwait.async(coroutine { () =>
+      val a = AsyncAwait.await(base.mapTo[Int])
+      val b = AsyncAwait.await(AsyncAwait.await(Future((Future { (a * 2).toString }).mapTo[Int])))
+      val c = AsyncAwait.await(Future { (7 * 2).toString })
+      b + "-" + c
+    })
+    intercept[ClassCastException] {
+      Await.result(future, 1 seconds)
+    }
   }
 }

@@ -32,16 +32,18 @@ object AsyncAwait {
     val p = Promise[R]
     def loop() {
       if (!c.resume) {
-        if (c.hasException) {
-          p.failure(c.$exception)
-        } else {
-          p.success(c.result)
+        c.tryResult match {
+          case Success(result) => p.success(result)
+          case Failure(exception) => p.failure(exception)
         }
       } else {
         val (future, cell) = c.value
-        for (x <- future) {
-          cell.x = x
-          loop()
+        future onComplete {
+          case Success(x) =>
+            cell.x = x
+            loop()
+          case Failure(exception) =>
+            p.failure(exception)
         }
       }
     }
