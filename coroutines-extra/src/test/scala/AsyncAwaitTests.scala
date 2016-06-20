@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 
 
 class AsyncAwaitTests extends FunSuite with Matchers {
-  val errorMessage = "problem"
+  class TestException extends Throwable
 
   test("simple test defined in Scala Async") {
     val future = AsyncAwait.async(coroutine { () => 
@@ -31,6 +31,7 @@ class AsyncAwaitTests extends FunSuite with Matchers {
   }
 
   test("error handling test 1") {
+    val errorMessage = "System error!"
     val exception = intercept[RuntimeException] {
       val c = coroutine { () =>
         sys.error(errorMessage)
@@ -43,35 +44,34 @@ class AsyncAwaitTests extends FunSuite with Matchers {
   }
 
   test("error handling test 2") {
-    val exception = intercept[RuntimeException] {
+    intercept[TestException] {
       val c = coroutine { () =>
-        sys.error(errorMessage)
+        throw new TestException
         yieldval((Future("god"), new AsyncAwait.Cell[String]))
         AsyncAwait.await(Future("dog"))
       }
       val future = AsyncAwait.async(c)
       Await.result(future, 1 seconds)
     }
-    assert(exception.getMessage == errorMessage)
   }
 
   // Source: https://git.io/vowde
   test("uncaught exception within async after await") {
     val future = AsyncAwait.async(coroutine { () =>
       AsyncAwait.await(Future(()))
-      throw new Exception(errorMessage)
+      throw new TestException
     })
-    intercept[Exception] { Await.result(future, 1 seconds) }
+    intercept[TestException] { Await.result(future, 1 seconds) }
   }
 
   // Source: https://git.io/vowdk
   test("await failing future within async") {
-    val base = Future[Int] { throw new Exception(errorMessage) }
+    val base = Future[Int] { throw new TestException }
     val future = AsyncAwait.async(coroutine { () =>
       val x = AsyncAwait.await(base)
       x * 2
     })
-    intercept[Exception] { Await.result(future, 1 seconds) }
+    intercept[TestException] { Await.result(future, 1 seconds) }
   }
 
   // Source: https://git.io/vowdY
