@@ -13,21 +13,44 @@ import scala.concurrent.duration._
 class AsyncAwaitTests extends FunSuite with Matchers {
   class TestException extends Throwable
 
-  test("simple test defined in Scala Async") {
-    val future = AsyncAwait.async(coroutine { () => 
-      val f1 = AsyncAwait.async(coroutine { () =>
-        AsyncAwait.await(Future(true))
-      })
-      val f2 = AsyncAwait.async(coroutine { () =>
-        AsyncAwait.await(Future(42))
-      })
-      if (AsyncAwait.await(f1))
-        AsyncAwait.await(f2) 
-      else
+  /** Source: https://git.io/vorXv
+   *  The use of Async/Await as opposed to pure futures allows this control flow
+   *  to be written more easily.
+   *  The execution blocks when awaiting for the result of `f1`. `f2` only blocks
+   *  after `AsyncAwait.await(f1)` evaluates to `true`.
+   */
+  test("simple test") {
+    val future = AsyncAwait.async(coroutine { () =>
+      val f1 = Future(true)
+      val f2 = Future(42)
+      if (AsyncAwait.await(f1)) {
+        AsyncAwait.await(f2)
+      } else {
         0
+      }
     })
-    val result = Await.result(future, 1 seconds)
-    assert(result == 42)
+    assert(Await.result(future, 1 seconds) == 42)
+  }
+
+  /** Asynchronous blocks of code can be defined either outside of or within any
+   *  part of an `async` block. This allows the user to avoid triggering the
+   *  computation of slow futures until it is necessary.
+   *  For instance, computation will not begin on `innerFuture` until
+   *  `await(trueFuture)` evaluates to true.
+   */
+  test("nested async blocks") {
+    val outerFuture = AsyncAwait.async(coroutine {() =>
+      val trueFuture = Future { true }
+      if (AsyncAwait.await(trueFuture)) {
+        val innerFuture = AsyncAwait.async(coroutine { () =>
+          AsyncAwait.await(Future { 100 } )
+        })
+        AsyncAwait.await(innerFuture)
+      } else {
+        200
+      }
+    })
+    assert(Await.result(outerFuture, 1 seconds) == 100)
   }
 
   test("error handling test 1") {
