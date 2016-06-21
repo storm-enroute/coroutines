@@ -20,7 +20,7 @@ class AsyncAwaitTests extends FunSuite with Matchers {
    *  after `AsyncAwait.await(f1)` evaluates to `true`.
    */
   test("simple test") {
-    val future = AsyncAwait.async(coroutine { () =>
+    val future = AsyncAwait.async {
       val f1 = Future(true)
       val f2 = Future(42)
       if (AsyncAwait.await(f1)) {
@@ -28,7 +28,7 @@ class AsyncAwaitTests extends FunSuite with Matchers {
       } else {
         0
       }
-    })
+    }
     assert(Await.result(future, 1 seconds) == 42)
   }
 
@@ -39,28 +39,30 @@ class AsyncAwaitTests extends FunSuite with Matchers {
    *  `await(trueFuture)` evaluates to true.
    */
   test("nested async blocks") {
-    val outerFuture = AsyncAwait.async(coroutine {() =>
+    val outerFuture = AsyncAwait.async {
       val trueFuture = Future { true }
       if (AsyncAwait.await(trueFuture)) {
-        val innerFuture = AsyncAwait.async(coroutine { () =>
+        val innerFuture = AsyncAwait.async {
           AsyncAwait.await(Future { 100 } )
-        })
+        }
         AsyncAwait.await(innerFuture)
       } else {
         200
       }
-    })
+    }
     assert(Await.result(outerFuture, 1 seconds) == 100)
   }
 
+  /** Uncaught exceptions thrown inside async blocks cause the associated futures
+   *  to fail.
+   */
   test("error handling test 1") {
     val errorMessage = "System error!"
     val exception = intercept[RuntimeException] {
-      val c = coroutine { () =>
+      val future = AsyncAwait.async {
         sys.error(errorMessage)
         AsyncAwait.await(Future("dog"))
       }
-      val future = AsyncAwait.async(c)
       val result = Await.result(future, 1 seconds)
     }
     assert(exception.getMessage == errorMessage)
@@ -68,44 +70,52 @@ class AsyncAwaitTests extends FunSuite with Matchers {
 
   test("error handling test 2") {
     intercept[TestException] {
-      val c = coroutine { () =>
+      val future = AsyncAwait.async {
         throw new TestException
         yieldval((Future("god"), new AsyncAwait.Cell[String]))
         AsyncAwait.await(Future("dog"))
       }
-      val future = AsyncAwait.async(c)
       Await.result(future, 1 seconds)
     }
   }
 
-  // Source: https://git.io/vowde
+  /** Source: https://git.io/vowde
+   *  Without the closing `()`, the compiler complains about expecting return
+   *  type `Future[Unit]` but finding `Future[Nothing]`.
+   */
   test("uncaught exception within async after await") {
-    val future = AsyncAwait.async(coroutine { () =>
+    val future = AsyncAwait.async {
       AsyncAwait.await(Future(()))
       throw new TestException
-    })
-    intercept[TestException] { Await.result(future, 1 seconds) }
+      ()
+    }
+    intercept[TestException] {
+      Await.result(future, 1 seconds)
+    }
   }
 
   // Source: https://git.io/vowdk
   test("await failing future within async") {
     val base = Future[Int] { throw new TestException }
-    val future = AsyncAwait.async(coroutine { () =>
+    val future = AsyncAwait.async {
       val x = AsyncAwait.await(base)
       x * 2
-    })
+    }
     intercept[TestException] { Await.result(future, 1 seconds) }
   }
 
-  // Source: https://git.io/vowdY
+  /** Source: https://git.io/vowdY
+   *  Exceptions thrown inside `await` calls are properly bubbled up. They cause
+   *  the async block's future to fail.
+   */
   test("await failing future within async after await") {
     val base = Future[Any] { "five!".length }
-    val future = AsyncAwait.async(coroutine { () =>
+    val future = AsyncAwait.async {
       val a = AsyncAwait.await(base.mapTo[Int])
       val b = AsyncAwait.await(Future { (a * 2).toString }.mapTo[Int])
       val c = AsyncAwait.await(Future { (7 * 2).toString })
       b + "-" + c
-    })
+    }
     intercept[ClassCastException] {
       Await.result(future, 1 seconds)
     }
@@ -113,12 +123,13 @@ class AsyncAwaitTests extends FunSuite with Matchers {
 
   test("nested failing future within async after await") {
     val base = Future[Any] { "five!".length }
-    val future = AsyncAwait.async(coroutine { () =>
+    val future = AsyncAwait.async {
       val a = AsyncAwait.await(base.mapTo[Int])
-      val b = AsyncAwait.await(AsyncAwait.await(Future((Future { (a * 2).toString }).mapTo[Int])))
+      val b = AsyncAwait.await(
+        AsyncAwait.await(Future((Future { (a * 2).toString }).mapTo[Int])))
       val c = AsyncAwait.await(Future { (7 * 2).toString })
       b + "-" + c
-    })
+    }
     intercept[ClassCastException] {
       Await.result(future, 1 seconds)
     }

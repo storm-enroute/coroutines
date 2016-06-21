@@ -7,6 +7,8 @@ import scala.annotation.unchecked.uncheckedVariance
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Success, Failure }
+import scala.language.experimental.macros
+import scala.reflect.macros.whitebox.Context
 
 
 
@@ -27,7 +29,7 @@ object AsyncAwait {
       cell.x
     }
 
-  def async[Y, R](body: ~~~>[(Future[Y], Cell[Y]), R]): Future[R] = {
+  def asyncCall[Y, R](body: ~~~>[(Future[Y], Cell[Y]), R]): Future[R] = {
     val c = call(body())
     val p = Promise[R]
     def loop() {
@@ -49,5 +51,18 @@ object AsyncAwait {
     }
     Future { loop() }
     p.future
+  }
+
+  def async[Y, R](body: =>R): Future[R] = macro asyncMacro[Y, R]
+
+  def asyncMacro[Y, R](c: Context)(body: c.Tree): c.Tree = {
+    import c.universe._
+
+    q"""
+       val c = coroutine { () =>
+         $body
+       }
+       _root_.org.coroutines.extra.AsyncAwait.asyncCall(c)
+     """
   }
 }
