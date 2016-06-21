@@ -91,6 +91,8 @@ class ASTCanonicalizationTest extends FunSuite with Matchers {
     val c = call(unit())
     assert(!c.resume)
     assert(!c.isLive)
+    c.result
+    assert(!c.hasException)
   }
 
   test("coroutine should be callable outside value declaration") {

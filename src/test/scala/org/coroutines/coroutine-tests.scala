@@ -85,6 +85,8 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c.resume)
     assert(c.value == List("5"))
     assert(!c.resume)
+    c.result
+    assert(!c.hasException)
   }
 
   test("should lub yieldtos and returns") {
@@ -117,6 +119,8 @@ class CoroutineTest extends FunSuite with Matchers {
     assert(c1.value == 5)
     assert(!c1.resume)
     assert(c1.isCompleted)
+    c1.result
+    assert(!c1.hasException)
     val c2 = call(xOrY(-2, 7))
     assert(c2.resume)
     assert(c2.value == 7)
@@ -344,6 +348,8 @@ class CoroutineTest extends FunSuite with Matchers {
       assert(c.value == -i)
     }
     assert(!c.resume)
+    c.result
+    assert(!c.hasException)
   }
 
   test("an anonymous coroutine should be applied") {

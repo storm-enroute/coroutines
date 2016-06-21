@@ -20,6 +20,8 @@ class TryCatchTest extends FunSuite with Matchers {
     val c0 = call(rube())
     assert(!c0.resume)
     assert(c0.isCompleted)
+    c0.result
+    assert(!c0.hasException)
   }
 
   test("try-catch-finally block") {
