@@ -21,11 +21,15 @@ class RegressionTest extends FunSuite with Matchers {
     assert(c1.value == 5)
     assert(!c1.resume)
     assert(c1.isCompleted)
+    c1.result
+    assert(!c1.hasException)
     val c2 = call(xOrY(-2, 7))
     assert(c2.resume)
     assert(c2.value == 7)
     assert(!c2.resume)
     assert(c2.isCompleted)
+    c2.result
+    assert(!c2.hasException)
   }
 
   test("coroutine should have a nested if statement") {
