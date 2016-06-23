@@ -7,7 +7,6 @@ import scala.annotation.unchecked.uncheckedVariance
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.{ reflectiveCalls, postfixOps }
 import scala.util.Success
 
 
@@ -104,6 +103,36 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(result._1 == Nil)
   }
 
+  // Source: https://git.io/vrHmG
+  /** NOTE: Currently fails compilation.
+  test("pattern matching partial function") {
+    val c = async(coroutine { () =>
+      await(Future(1))
+      val a = await(Future(1))
+      val f = { case x => x + a }: PartialFunction[Int, Int]
+      await(Future(f(2)))
+    })
+    val res = Await.result(c, 2 seconds)
+    assert(res == 3)
+  }
+  */
+
+  // Source: https://git.io/vr79k
+  /** NOTE: Currently fails compilation.
+  test("pattern matching partial function nested") {
+    val c = AsyncAwaitTest.async(coroutine { () =>
+      AsyncAwaitTest.await(Future(1))
+      val neg1 = -1
+      val a = AsyncAwaitTest.await(Future(1))
+      val f = {case x => ({case x => neg1 * x}:
+          PartialFunction[Int, Int])(x + a)}: PartialFunction[Int, Int]
+      AsyncAwaitTest.await(Future(f(2)))
+    })
+    val res = Await.result(c, 2 seconds)
+    assert(res == -3)
+  }
+  */
+
   // Source: https://git.io/vr7H9
   test("pattern matching function") {
     val c = async(coroutine { () =>
@@ -145,6 +174,37 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     })
   }
 
+  // Source: https://git.io/vr7FE
+  /** NOTE: Currently fails compilation.
+  test("singleton type") {
+    class A { class B }
+    AsyncAwaitTest.async(coroutine { () =>
+      val a = new A
+      def foo(b: a.B) = 0
+      AsyncAwaitTest.await(Future(foo(new a.B)))
+    })
+  }
+  */
+
+
+  // Source: https://git.io/vr7F6
+  /** NOTE: Currently fails compilation.
+  test("existential match") {
+    trait Container[+A]
+    case class ContainerImpl[A](value: A) extends Container[A]
+    def foo: Future[Container[_]] = AsyncAwaitTest.async(coroutine { () =>
+      val a: Any = List(1)
+      a match {
+        case buf: Seq[_] =>
+          val foo = AsyncAwaitTest.await(Future(5))
+          val e0 = buf(0)
+          ContainerImpl(e0)
+      }
+    })
+    foo
+  }
+  */
+
   // Source: https://git.io/vr7Fx
   test("existential if/else") {
     trait Container[+A]
@@ -160,6 +220,39 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     })
     foo
   }
+
+  // Source: https://git.io/vr7bJ
+  /** NOTE: Currently fails compilation
+  test("nested method with inconsistency") {
+    import language.{reflectiveCalls, postfixOps}
+
+    class Foo[A]
+
+    object Bippy {
+
+      import ExecutionContext.Implicits.global
+
+      def bar(f: => Unit): Unit = f
+
+      def quux: Future[String] = ???
+
+      def foo = AsyncAwaitTest.async(coroutine { () =>
+        def r[A](m: Foo[A])(n: A) = {
+          bar {
+            locally(m)
+            locally(n)
+            identity[A] _
+          }
+        }
+
+        AsyncAwaitTest.await(quux)
+
+        r(new Foo[String])("")
+      })
+    }
+    Bippy
+  }
+  */
 
   // Source: https://git.io/vr7ba
   test("ticket 63 in scala/async") {
@@ -213,6 +306,18 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(inner == new IntWrapper("foo"))
   }
 
+  // Source: https://git.io/vr7NJ
+  /** NOTE: This test currently fails compilation.
+  test("ticket 86 in scala/async-- using nested value class") {
+    val f = AsyncAwaitTest.async[Nothing, IntWrapper](coroutine { () =>
+      val a = Future.successful(new IntWrapper("42"))
+      AsyncAwaitTest.await(Future(AsyncAwaitTest.await(a).plusStr))
+    })
+    val res = Await.result(f, 5 seconds)
+    assert(res == "42!")
+  }
+  */
+
   // Source: https://git.io/vr7Nk
   test("ticket 86 in scala/async-- using matched value class") {
     def doAThing(param: IntWrapper) = Future(None)
@@ -231,6 +336,7 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   }
 
   // Source: https://git.io/vr7NZ
+  // NOTE: Need to look at this test's implementation. Might be done incorrectly.
   test("ticket 86 in scala/async-- using matched parameterized value class") {
     def doAThing(param: ParamWrapper[String]) = Future(None)
 
@@ -281,6 +387,53 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(inner == 1)
   }
 
+  // Source: https://git.io/vr7NB
+  /** NOTE: Currently fails compilation
+  test("ticket 106 in scala/async-- value class") {
+    AsyncAwaitTest.async(coroutine { () =>
+      "whatever value" match {
+        case _ =>
+          AsyncAwaitTest.await(Future("whatever return type"))
+          new IntWrapper("value case matters")
+      }
+      "whatever return type"
+    })
+  }
+  */
+
+  // Source: https://git.io/vrFQt
+  /** NOTE: Currently fails compilation.
+  test("Inlining block does not produce duplicate definition") {
+    AsyncAwaitTest.async(coroutine { () =>
+      val f = 12
+      val x = AsyncAwaitTest.await(Future(f))
+      {
+        type X = Int
+        val x: X = 42
+        println(x)
+      }
+      type X = Int
+      x: X
+    })
+  }
+  */
+
+  // Source: https://git.io/vrF5X
+  /** NOTE: Currently fails compilation.
+  test("Inlining block in tail position does not produce duplication definition") {
+    val c = AsyncAwaitTest.async(coroutine { () =>
+      val f = 12
+      val x = AsyncAwaitTest.await(Future(f))
+      {
+        val x = 42
+        x
+      }
+    })
+    val res = Await.result(c, 5 seconds)
+    assert(res == 42)
+  }
+  */
+
   // Source: https://git.io/vrFp5
   test("match as expression 1") {
     val c = AsyncAwaitTest.async(coroutine { () =>
@@ -328,6 +481,136 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(result == true)
   }
 
+  // Source: https://git.io/vrAWm
+  // NOTE: Currently fails compilation
+  /**
+  test("nested await in if") {
+    val c: Future[Any] = async(coroutine { () =>
+      if ("".isEmpty) {
+        await(Future(await(Future("")).isEmpty))
+      } else 0
+    })
+    assert(Await.result(c, 5 seconds) == true)
+  }
+  */
+
+  // Source: https://git.io/vrAlJ
+  /** NOTE: This test currently fails because the future times out.
+   *  Interestingly, the future doesn't time out if `1` is passed as the first
+   *  argument to `foo`.
+   */
+  test("by-name expressions aren't lifted") {
+    def foo(ignored: => Any, b: Int) = b
+    val c = async(coroutine { () =>
+      await(Future(foo(???, await(Future(1)))))
+    })
+    val result = Await.result(c, 5 seconds)
+    assert(result == 1)
+  }
+
+  // Source: https://git.io/vrA0Q
+  test("evaluation order respected") {
+    def foo(a: Int, b: Int) = (a, b)
+    val c = async(coroutine { () =>
+      var i = 0
+      def next(): Int = {
+        i += 1
+        i
+      }
+      foo(next(), await(Future(next())))
+    })
+    val result = Await.result(c, 5 seconds)
+    assert(result == (1, 2))
+  }
+
+  // Source: https://git.io/vrAuv
+  test("await in non-primary param section 1") {
+    def foo(a0: Int)(b0: Int) = s"a0 = $a0, b0 = $b0"
+    val c = async(coroutine {() =>
+      var i = 0
+      def get = { i += 1; i }
+      foo(get)(await(Future(get)))
+    })
+    assert(Await.result(c, 5 seconds) == "a0 = 1, b0 = 2")
+  }
+
+  // Source: https://git.io/vrAzt
+  /** NOTE: All of these tests currently fail compilation because of errors about
+   *  the yield types of the coroutines. The compiler expects the yield type of
+   *  the coroutines `nilAsync` and `c` to be `(Future[?], Cell[?])`, but they
+   *  are both `Nothing`. This does not work because the yield type is invariant.
+   *  I'm not sure why compilation fails here but it succeeds above.
+  test("await in non-primary param section 2") {
+    def foo[T](a0: Int)(b0: Int*) = s"a0 = $a0, b0 = ${b0.head}"
+
+    val c = async(coroutine { () =>
+      var i = 0
+      def get = async(coroutine { () =>
+        i += 1
+        i
+      })
+      val nilAsync = async(coroutine { () =>
+        Nil
+      })
+      foo[Int](await(get))(await(get) ::
+        await(nilAsync) : _*)
+    })
+    assert(Await.result(c, 5 seconds) == "a0 = 1, b0 = 2")
+  }
+
+  // Source: https://git.io/vrpP8
+  test("await in non-primary param section with lazy 1") {
+    def foo[T](a: => Int)(b: Int) = b
+    val c = async(coroutine { () =>
+      def get = async(coroutine { () => 0 } )
+      foo[Int](???)(await(get))
+    })
+    assert(Await.result(c, 5 seconds) == 0)
+  }
+
+  // Source: https://git.io/vrpPN
+  test("await in non-primary param section with lazy 2") {
+    def foo[T](a: Int)(b: => Int) = a
+    val c = async(coroutine { () =>
+      def get = async(coroutine { () => 0 } )
+      foo[Int](await(get))(???)
+    })
+    assert(Await.result(c, 5 seconds) == 0)
+  }
+
+  // Source: https://git.io/vrpXL
+  test("await with lazy") {
+    def foo[T](a: Int, b: => Int) = a
+    val c = async(coroutine { () =>
+      def get = async(coroutine { () => 0 } )
+      foo[Int](await(get), ???)
+    })
+    assert(Await.result(c, 5 seconds) == 0)
+  }
+
+  // Source: https://git.io/vrpXz
+  test("await ok in receiver") {
+    class Foo { def bar(a: Int)(b: Int) = a + b }
+    async(coroutine { () =>
+      await(async(coroutine { () => new Foo })).bar(1)(2)
+    })
+  }
+   */
+
+  // Source: https://git.io/vrhUF
+  test("named arguments respect evaluation order") {
+    def foo(a: Int, b: Int) = (a, b)
+    val c = async(coroutine { () =>
+      var i = 0
+      def next() = {
+        i += 1;
+        i
+      }
+      foo(b = next(), a = await(Future(next())))
+    })
+    assert(Await.result(c, 5 seconds) == (2, 1))
+  }
+
   // Source: https://git.io/vrhTe
   test("named and default arguments respect evaluation order") {
     var i = 0
@@ -369,6 +652,22 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(Await.result(c, 5 seconds) == List(1, 2, 3))
   }
 
+  // Source: https://git.io/vrhTc
+  /** NOTE: This test currently fails compilation because of typing issues.
+   *  Also note that `thrower` is declared outside of the line that throws the
+   *  exception because "coroutine blueprints can only be invoked directly
+   *  inside the coroutine."
+  test("await in throw") {
+    val thrower = await(Future(0))
+    val e = intercept[Exception] {
+      async(coroutine { () =>
+        throw new Exception("msg: " + thrower)
+      })
+    }
+    assert(e.getMessage == "msg: 0")
+  }
+   */
+
   // Source: https://git.io/vrhT0
   test("await in typed") {
     val c = async(coroutine { () =>
@@ -399,4 +698,87 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     })
     assert(Await.result(sign, 5 seconds) == 1.0)
   }
+
+  // Source: https://git.io/vrhT6
+  /** NOTE: Currently fails compilation.
+  test("await in implicit apply") {
+    val scalaBinaryVersion: String = {
+      val PreReleasePattern = """.*-(M|RC).*""".r
+      val Pattern = """(\d+\.\d+)\..*""".r
+      val SnapshotPattern = """(\d+\.\d+\.\d+)-\d+-\d+-.*""".r
+      scala.util.Properties.versionNumberString match {
+        case s @ PreReleasePattern(_) => s
+        case SnapshotPattern(v) => v + "-SNAPSHOT"
+        case Pattern(v) => v
+        case _          => ""
+      }
+    }
+    val toolboxClasspath: String = {
+      val f = new java.io.File(s"target/scala-${scalaBinaryVersion}/classes")
+      if (!f.exists)
+        sys.error(s"output directory ${f.getAbsolutePath} does not exist.")
+      f.getAbsolutePath
+    }
+    val mirror = scala.reflect.runtime.currentMirror
+    val tb = Toolbox.mkToolbox(s"-cp ${toolboxClasspath}")
+    val tree = tb.typeCheck(tb.parse {
+      """
+        | import scala.language.implicitConversions
+        | implicit def view(a: Int): String = ""
+        | async(coroutine { () =>
+        |   await(Future(0)).length
+        | })
+      """.stripMargin
+    })
+    val applyImplicitView = tree.collect {
+      case x if x.getClass.getName.endsWith("ApplyImplicitView") => x
+    }
+    applyImplicitView.map(_.toString) mustStartWith List("view(a$macro$")
+  }
+   */
+
+  // Source: https://git.io/vrhTD
+  /** NOTE: Compilation currently fails. The block is typed as Unit, I believe.
+  test("nothing typed if") {
+    val result = scala.util.Try(async(coroutine { () =>
+      if (true) {
+        val n = await(Future(1))
+        if (n < 2) {
+          throw new RuntimeException("case a")
+        }
+        else {
+          throw new RuntimeException("case b")
+        }
+      }
+      else {
+        "case c"
+      }
+    }))
+    assert(result.asInstanceOf[scala.util.Failure[_]].exception.getMessage ==
+      "case a")
+  }
+  */
+
+  // Source: https://git.io/vrhTS
+  /** NOTE: Currently fails compilation because of type errors.
+  test("nothing typed match") {
+    val result = scala.util.Try(async(coroutine { () =>
+      0 match {
+        case _ if "".isEmpty =>
+          val n = await(Future(1))
+          n match {
+            case _ if n < 2 =>
+              throw new RuntimeException("case a")
+            case _ =>
+              throw new RuntimeException("case b")
+          }
+        case _ =>
+          "case c"
+      }
+    }))
+
+    assert(result.asInstanceOf[scala.util.Failure[_]].exception.getMessage ==
+      "case a")
+  }
+   */
 }
