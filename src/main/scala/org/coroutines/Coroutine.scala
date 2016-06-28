@@ -172,15 +172,16 @@ object Coroutine {
       $yield
     }
 
-    /** Returns whether or not the coroutine yielded a value. This value can be
-     *  accessed via `getValue`.
+    /** Returns whether or not the coroutine yielded a value.
+     *
+     *  This value can be accessed via `getValue`.
      *
      *  @return `true` if the coroutine yielded a value, `false` otherwise.
      */
     final def hasValue: Boolean = $hasYield
 
-    /** Returns an `Option` instance wrapping the current value of the coroutine,
-     *  if any.
+    /** Returns an `Option` instance wrapping the current value of the coroutine, if
+     *  any.
      *
      *  @return `Some(value)` if `hasValue`, `None` otherwise.
      */
@@ -221,8 +222,8 @@ object Coroutine {
      */
     final def hasResult: Boolean = isCompleted && $exception == null
 
-    /** Returns an `Option` instance wrapping this coroutine's non-exception
-     *  result, if any.
+    /** Returns an `Option` instance wrapping this coroutine's non-exception result, if
+     *  any.
      *
      *  @return `Some(result)` if `hasResult`, `None` otherwise.
      */
@@ -264,15 +265,18 @@ object Coroutine {
      */
     final def isCompleted: Boolean = !isLive
 
-    /** Returns a string representation of the coroutine's state. Contains less
-     *  information than `debugString`.
+    /** Returns a string representation of the coroutine's state.
+     *
+     *  Contains less information than `debugString`.
      *
      *  @return A string describing the coroutine state.
      */
     override def toString = s"Coroutine.Instance<depth: ${$costackptr}, live: $isLive>"
 
     /** Returns a string containing information about the internal state of the
-     *  coroutine. Contains more information than `toString`.
+     *  coroutine.
+     *
+     *  Contains more information than `toString`.
      *
      *  @return A string containing information about the internal state of the
      *          coroutine.
