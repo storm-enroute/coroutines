@@ -4,41 +4,35 @@ package org.coroutines.extra
 
 import org.coroutines._
 import scala.annotation.unchecked.uncheckedVariance
-import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{ Success, Failure }
+import scala.concurrent._
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
+import scala.util.{ Success, Failure }
 
 
 
 object AsyncAwait {
-  /** A wrapper class for a variable of type `T`.
-   *
-   *  Used inside `await` to wrap the results of asynchronous computations.
-   */
-  class Cell[+T] {
-    var x: T @uncheckedVariance = _
-  }
-
   /** Await the result of a future.
    *
    *  When called inside an `async` body, this function will block until its
    *  associated future completes.
-   *
-   *  Note that the usage of `Cell` gives users the option to not directly
-   *  return the result of the future.
    *
    *  @return A coroutine that yields a tuple. `async` will assign this tuple's
    *          second element to hold the completed result of the `Future` passed
    *          into the coroutine. The coroutine will directly return the
    *          result of the future.
    */
-  def await[R]: Future[R] ~~> ((Future[R], Cell[R]), R) =
-    coroutine { (f: Future[R]) =>
-      val cell = new Cell[R]
-      yieldval((f, cell))
-      cell.x
+  def await[R]: Future[R] ~~> (Future[R], R) =
+    coroutine { (awaitedFuture: Future[R]) =>
+      yieldval(awaitedFuture)
+      var result: R = null.asInstanceOf[R]
+      awaitedFuture.value match {
+        case Some(Success(x)) => result = x
+        case Some(Failure(error)) => throw error
+        case None => sys.error("Future was not completed")
+      }
+      result
     }
 
   /** Calls `body`, blocking on any calls to `await`.
@@ -48,7 +42,7 @@ object AsyncAwait {
    *          if `body.hasException` or if one of `body`'s yielded tuples
    *          has a failing future.
    */
-  def asyncCall[Y, R](body: ~~~>[(Future[Y], Cell[Y]), R]): Future[R] = {
+  def asyncCall[Y, R](body: ~~~>[Future[Y], R]): Future[R] = {
     val c = call(body())
     val p = Promise[R]
     def loop() {
@@ -58,10 +52,9 @@ object AsyncAwait {
           case Failure(exception) => p.failure(exception)
         }
       } else {
-        val (future, cell) = c.value
-        future onComplete {
-          case Success(x) =>
-            cell.x = x
+        val awaitedFuture = c.value
+        awaitedFuture onComplete {
+          case Success(result) =>
             loop()
           case Failure(exception) =>
             p.failure(exception)
@@ -72,8 +65,7 @@ object AsyncAwait {
     p.future
   }
 
-  /** Wraps `body` inside a coroutine and asynchronously invokes it using
-   * `asyncMacro`.
+  /** Wraps `body` inside a coroutine and asynchronously invokes it using `asyncMacro`.
    *
    *  @param  body The block of code to wrap inside an asynchronous coroutine.
    *  @return A `Future` wrapping the result of `body`.
