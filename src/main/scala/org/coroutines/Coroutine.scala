@@ -300,6 +300,23 @@ object Coroutine {
       s"  valstack:    ${toStackString($valstack)}\n" +
       s">"
     }
+
+    def foreach(f: (Y) => Unit) {
+      while (resume) {
+        tryValue match {
+          case Success(value) => f(value)
+          case Failure(exception) => throw exception
+        }
+      }
+    }
+
+    def map(f: (Y) => Y) = {
+      var resultList = immutable.Seq.empty[Y]
+      foreach { element =>
+        resultList = resultList :+ f(element)
+      }
+      resultList.toList
+    }
   }
 
   trait DefMarker[YR]
