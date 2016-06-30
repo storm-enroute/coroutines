@@ -21,4 +21,12 @@ object Enumerators {
   def toIterator_0[@specialized Y, R](c: Coroutine._0[Y, R]): Iterator[Y] = {
     toList_0(c).toIterator
   }
+
+  def toCoroutine[@specialized Y](i: Iterator[Y]): Coroutine._0[Y, Unit] = {
+    coroutine { () =>
+      while (i.hasNext) {
+        yieldval(i.next)
+      }
+    }
+  }
 }
