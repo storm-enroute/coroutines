@@ -434,15 +434,11 @@ trait AstCanonicalization[C <: Context] {
       (decls, q"")
     case q"$mods def $tname[..$tparams](...$paramss): $tpt = $rhs" =>
       // method
-      val (rhsdecls, rhsident) = canonicalize(rhs)
       val decls = List(
         q"""
-          $mods def $tname[..$tparams](...$paramss): $tpt = {
-            ..$rhsdecls
-            $rhsident
-          }
+          $mods def $tname[..$tparams](...$paramss): $tpt = $rhs
         """)
-      new NestedContextValidator().traverse(tree)
+      new NestedContextValidator().traverse(rhs)
       (decls, q"")
     case q"$mods type $tpname[..$tparams] = $tpt" =>
       // type
