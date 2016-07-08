@@ -53,11 +53,15 @@ object AsyncAwait {
         }
       } else {
         val awaitedFuture = c.value
-        awaitedFuture onComplete {
-          case Success(result) =>
-            loop()
-          case Failure(exception) =>
-            p.failure(exception)
+        if (awaitedFuture.isCompleted) {
+          loop()
+        } else {
+          awaitedFuture onComplete {
+            case Success(result) =>
+              loop()
+            case Failure(exception) =>
+              p.failure(exception)
+          }
         }
       }
     }
