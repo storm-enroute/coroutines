@@ -94,46 +94,6 @@ object AsyncAwait {
   def asyncMacro[Y, R](c: Context)(body: c.Tree): c.Tree = {
     import c.universe._
 
-    /** This class ensrues that no values are yielded inside the async block.
-     *
-     *  It is similar to and shares functionality with
-     *  [[org.coroutines.AstCanonicalization.NestedContextValidator]].
-     *
-     *  @param typer  Holds the typings for the body of the coroutine. Can be generated
-     *                using `org.coroutines.common.ByTreeTyper`.
-     */
-    class NoYieldsValidator(implicit typer: common.ByTreeTyper[c.type])
-    extends Traverser {
-      // return type is the lub of the function return type and yield argument types
-      def isCoroutinesPkg(q: Tree) = q match {
-        case q"org.coroutines.`package`" => true
-        case q"coroutines.this.`package`" => true
-        case t => false
-      }
-
-      override def traverse(tree: Tree): Unit = tree match {
-        case q"$qual.yieldval[$_]($_)" if isCoroutinesPkg(qual) =>
-          c.abort(
-            tree.pos,
-            "The yieldval statement only be invoked directly inside the coroutine. " +
-            "Nested classes, functions or for-comprehensions, should either use the " +
-            "call statement or declare another coroutine.")
-        case q"$qual.yieldto[$_]($_)" if isCoroutinesPkg(qual) =>
-          c.abort(
-            tree.pos,
-            "The yieldto statement only be invoked directly inside the coroutine. " +
-            "Nested classes, functions or for-comprehensions, should either use the " +
-            "call statement or declare another coroutine.")
-        case q"$qual.call($co.apply(..$args))" if isCoroutinesPkg(qual) =>
-          // no need to check further, the call macro will validate the coroutine type
-        case _ =>
-          super.traverse(tree)
-      }
-    }
-
-    implicit val typer = new common.ByTreeTyper[c.type](c)(body)
-    new NoYieldsValidator().traverse(body)
-
     q"""
        val c = coroutine { () =>
          $body
