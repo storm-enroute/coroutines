@@ -119,6 +119,16 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(exception.getMessage == errorMessage)
   }
 
+  test("error handling test 3") {
+    intercept[AsyncAwait.YieldInsideAsyncException[_]] {
+      val future = AsyncAwait.async {
+        yieldval("hubba")
+        AsyncAwait.await(Future("dog"))
+      }
+      Await.result(future, 1 seconds)
+    }
+  }
+
   /** Source: https://git.io/vowde
    *  Without the closing `()`, the compiler complains about expecting return
    *  type `Future[Unit]` but finding `Future[Nothing]`.
