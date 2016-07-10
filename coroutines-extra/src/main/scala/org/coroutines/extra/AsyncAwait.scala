@@ -94,8 +94,14 @@ object AsyncAwait {
   def asyncMacro[Y, R](c: Context)(body: c.Tree): c.Tree = {
     import c.universe._
 
-    // This class shares functionality with `NestedContextValidator`. It ensures that
-    // no values are yielded inside the async block.
+    /** This class ensrues that no values are yielded inside the async block.
+     *
+     *  It is similar to and shares functionality with
+     *  [[org.coroutines.AstCanonicalization.NestedContextValidator]].
+     *
+     *  @param typer  Holds the typings for the body of the coroutine. Can be generated
+     *                using `org.coroutines.common.ByTreeTyper`.
+     */
     class NoYieldsValidator(implicit typer: common.ByTreeTyper[c.type])
     extends Traverser {
       // return type is the lub of the function return type and yield argument types
