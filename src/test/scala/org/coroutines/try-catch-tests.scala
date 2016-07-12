@@ -138,4 +138,18 @@ class TryCatchTest extends FunSuite with Matchers {
       case _ => assert(false)
     }
   }
+
+  test("try/catch with same return type") {
+    val c = coroutine { () =>
+      try {
+        "ho_1"
+      } catch {
+        case _: Throwable => "ho_2"
+      }
+      "ho_3"
+    }
+    val instance = call(c())
+    assert(!instance.resume)
+    assert(instance.result == "ho_3")
+  }
 }
