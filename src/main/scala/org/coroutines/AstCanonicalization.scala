@@ -230,7 +230,6 @@ trait AstCanonicalization[C <: Context] {
         cases :+ cq"${pq"null"} =>" :+ cq"${pq"_"} => throw $exceptionvarname"
       val exceptionident = q"$exceptionvarname"
       val matchbody = q"$exceptionident match { case ..$matchcases }"
-
       typer.typeOf(matchbody) = typer.typeOf(tree)
       typer.typeOf(exceptionident) = typeOf[Throwable]
       val (matchdecls, matchident) = canonicalize(matchbody)
