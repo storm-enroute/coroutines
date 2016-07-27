@@ -13,7 +13,7 @@ import scala.util.Success
 
 
 
-class TestException extends Throwable
+class TestException(msg: String = "") extends Throwable(msg)
 
 
 class AsyncAwaitTest extends FunSuite with Matchers {
@@ -142,5 +142,42 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     intercept[ClassCastException] {
       Await.result(future, 1 seconds)
     }
+  }
+
+  test("await should bubble up exceptions") {
+    def thrower() = {
+      throw new TestException
+      Future(1)
+    }
+
+    var exceptionFound = false
+    val future = async {
+      try {
+        await(thrower())
+        ()
+      } catch {
+        case _: TestException => exceptionFound = true
+      }
+    }
+    val r = Await.result(future, 1 seconds)
+    assert(exceptionFound)
+  }
+
+  test("await should bubble up exceptions from failed futures") {
+    def failer(): Future[Int] = {
+      Future.failed(new TestException("kaboom"))
+    }
+
+    var exceptionFound = false
+    val future = async {
+      try {
+        await(failer())
+        ()
+      } catch {
+        case _: TestException => exceptionFound = true
+      }
+    }
+    val r = Await.result(future, 1 seconds)
+    assert(exceptionFound)
   }
 }
