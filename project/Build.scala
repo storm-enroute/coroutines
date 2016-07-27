@@ -159,6 +159,63 @@ object CoroutinesBuild extends MechaRepoBuild {
       mechaDocsPathKey := "coroutines-common"
     )
 
+  val coroutinesExtraSettings =
+    Defaults.defaultSettings ++ MechaRepoPlugin.defaultSettings ++ Seq(
+      name := "coroutines-extra",
+      organization := "com.storm-enroute",
+      version <<= frameworkVersion,
+      scalaVersion <<= coroutinesScalaVersion,
+      crossScalaVersions <<= coroutinesCrossScalaVersions,
+      libraryDependencies <++= (scalaVersion)(sv => extraDependencies(sv)),
+      scalacOptions ++= Seq(
+        "-deprecation",
+        "-unchecked",
+        "-optimise",
+        "-Yinline-warnings"
+      ),
+      resolvers ++= Seq(
+        "Sonatype OSS Snapshots" at
+          "https://oss.sonatype.org/content/repositories/snapshots",
+        "Sonatype OSS Releases" at
+          "https://oss.sonatype.org/content/repositories/releases"
+      ),
+      ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet,
+      publishMavenStyle := true,
+      publishTo <<= version { (v: String) =>
+        val nexus = "https://oss.sonatype.org/"
+        if (v.trim.endsWith("SNAPSHOT"))
+          Some("snapshots" at nexus + "content/repositories/snapshots")
+        else
+          Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+      },
+      publishArtifact in Test := false,
+      pomIncludeRepository := { _ => false },
+      pomExtra :=
+        <url>http://storm-enroute.com/</url>
+        <licenses>
+          <license>
+            <name>BSD-style</name>
+            <url>http://opensource.org/licenses/BSD-3-Clause</url>
+            <distribution>repo</distribution>
+          </license>
+        </licenses>
+        <scm>
+          <url>git@github.com:storm-enroute/coroutines.git</url>
+          <connection>scm:git:git@github.com:storm-enroute/coroutines.git</connection>
+        </scm>
+        <developers>
+          <developer>
+            <id>axel22</id>
+            <name>Aleksandar Prokopec</name>
+            <url>http://axel22.github.com/</url>
+          </developer>
+        </developers>,
+      mechaPublishKey <<= mechaPublishKey.dependsOn(publish),
+      mechaDocsRepoKey := "git@github.com:storm-enroute/apidocs.git",
+      mechaDocsBranchKey := "gh-pages",
+      mechaDocsPathKey := "coroutines-extra"
+    )
+
   def commonDependencies(scalaVersion: String) =
     CrossVersion.partialVersion(scalaVersion) match {
     case Some((2, major)) if major >= 11 => Seq(
@@ -168,6 +225,14 @@ object CoroutinesBuild extends MechaRepoBuild {
     )
     case _ => Nil
   }
+
+  def extraDependencies(scalaVersion: String) =
+    CrossVersion.partialVersion(scalaVersion) match {
+      case Some((2, major)) if major >= 11 => Seq(
+        "org.scalatest" % "scalatest_2.11" % "2.2.6" % "test"
+      )
+      case _ => Nil
+    }
 
   lazy val Benchmarks = config("bench") extend (Test)
 
@@ -191,4 +256,12 @@ object CoroutinesBuild extends MechaRepoBuild {
     settings = coroutinesCommonSettings
   ) dependsOnSuperRepo
 
+
+  lazy val coroutinesExtra: Project = Project(
+    "coroutines-extra",
+    file("coroutines-extra"),
+    settings = coroutinesExtraSettings
+  ) dependsOn(
+    coroutines % "compile->compile;test->test"
+  ) dependsOnSuperRepo
 }
