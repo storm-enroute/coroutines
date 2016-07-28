@@ -408,4 +408,19 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     })
     assert(Await.result(sign, 5 seconds) == 1.0)
   }
+
+  test("compilation error in partial function") {
+    val c = coroutine { () =>
+      try {
+        sys.error("error")
+        await(Future("ho"))
+      } catch {
+        case e: RuntimeException => await(Future("oh"))
+        case _ => await(Future("ho"))
+      }
+      await(Future("oh"))
+    }
+    val future = async(c)
+    assert(Await.result(future, 1 seconds) == "oh")
+  }
 }

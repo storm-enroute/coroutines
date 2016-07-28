@@ -3,6 +3,9 @@ package org.coroutines
 
 
 import org.scalatest._
+import scala.concurrent._
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Failure
 
 
@@ -137,6 +140,20 @@ class TryCatchTest extends FunSuite with Matchers {
       case Failure(e: Exception) => assert(e.getMessage == "au revoir")
       case _ => assert(false)
     }
+  }
+
+  test("try/catch with different return types") {
+    val c = coroutine { () =>
+      try {
+        ()
+      } catch {
+        case _: Throwable => Future("ho")
+      }
+      Future("oh")
+    }
+    val instance = call(c())
+    assert(!instance.resume)
+    assert(Await.result(instance.result, 1 seconds) == "oh")
   }
 
   test("try/catch with same return type") {
