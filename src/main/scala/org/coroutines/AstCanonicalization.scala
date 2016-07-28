@@ -8,6 +8,7 @@ import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
 
 
+
 /** Transforms the coroutine body into three address form with restricted control flow
  *  that contains only try-catch statements, while loops, if-statements, value and
  *  variable declarations, pattern matches, nested blocks and function calls.
@@ -121,34 +122,6 @@ trait AstCanonicalization[C <: Context] {
       (decls, q"$localvarname")
     case q"$selector[..$tpts](...$paramss)" if tpts.length > 0 || paramss.length > 0 =>
       // application
-      val byNameParams: immutable.Seq[immutable.Seq[Boolean]] = {
-        if (selector.symbol != null && selector.symbol != NoSymbol) {
-          val methodSymbol = selector.symbol.asMethod
-          val noRepeatedParamsMap = methodSymbol.paramLists.map { paramList =>
-            paramList.map { param =>
-              param match {
-                case ts: TermSymbol =>
-                  ts.isByNameParam
-                case _ =>
-                  false
-              }
-            }
-          }
-          if (paramss.length > 0 && noRepeatedParamsMap.length > 0) {
-            var repeatedParamsMap: List[List[Boolean]] = noRepeatedParamsMap
-            while (paramss(0).length > repeatedParamsMap(0).length) {
-              val newHead: List[Boolean] = repeatedParamsMap(0) :+ noRepeatedParamsMap(0).last
-              val newTail: List[List[Boolean]] = repeatedParamsMap.tail
-              repeatedParamsMap = newHead :: newTail
-            }
-            repeatedParamsMap
-          } else {
-            noRepeatedParamsMap
-          }
-        } else {
-          immutable.Seq.fill(1, paramss(0).length)(false)
-        }
-      }
       val (rdecls, newselector) = selector match {
         case q"$r.$method" =>
           val (rdecls, rident) = canonicalize(r)
@@ -157,30 +130,10 @@ trait AstCanonicalization[C <: Context] {
           (Nil, q"$method")
       }
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
-      type TupleType = (List[c.universe.Tree], c.universe.Tree)
-      val paramsByNameUnmodified: List[List[TupleType]] = {
-        val modifiedParamLists = mutable.Seq.fill[List[TupleType]](paramss.length)(null)
-        for (i <- 0 until paramss.length) {
-          val modifiedParams = mutable.Seq.fill[TupleType](paramss(i).length)(null)
-          for (j <- 0 until modifiedParams.length) {
-            if (byNameParams(i)(j)) {
-              modifiedParams(j) = (List(q""), paramss(i)(j))
-            } else {
-              modifiedParams(j) = canonicalize(paramss(i)(j))
-            }
-          }
-          modifiedParamLists(i) = modifiedParams.toList
-        }
-        modifiedParamLists.toList
-      }
-      val pdeclss =
-        paramsByNameUnmodified.map((_.map(tuple => tuple._1))).flatten.flatten.filter{ decl =>
-          decl != q""
-        }
-      val pidents = paramsByNameUnmodified.map((_.map(tuple => tuple._2)))
+      val (pdeclss, pidents) = paramss.map(_.map(canonicalize).unzip).unzip
       val localvarname = TermName(c.freshName("x"))
       val localvartree = q"val $localvarname = $newselector[..$tpts](...$pidents)"
-      (rdecls ++ pdeclss ++ List(localvartree), q"$localvarname")
+      (rdecls ++ pdeclss.flatten.flatten ++ List(localvartree), q"$localvarname")
     case q"$r[..$tpts]" if tpts.length > 0 =>
       // type application
       for (tpt <- tpts) disallowCoroutinesIn(tpt)
