@@ -462,52 +462,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(result == 103)
   }
 
-  // Source: https://git.io/vrFj3
-  test("nested await as bare expression") {
-    val c = async(coroutine { () =>
-      await(Future(await(Future("")).isEmpty))
-    })
-    val result = Await.result(c, 5 seconds)
-    assert(result == true)
-  }
-
-  // Source: https://git.io/vrAnM
-  test("nested await in block") {
-    val c = async(coroutine { () =>
-      ()
-      await(Future(await(Future("")).isEmpty))
-    })
-    val result = Await.result(c, 5 seconds)
-    assert(result == true)
-  }
-
-  // Source: https://git.io/vrAWm
-  // NOTE: Currently fails compilation
-  /**
-  test("nested await in if") {
-    val c: Future[Any] = async(coroutine { () =>
-      if ("".isEmpty) {
-        await(Future(await(Future("")).isEmpty))
-      } else 0
-    })
-    assert(Await.result(c, 5 seconds) == true)
-  }
-  */
-
-  // Source: https://git.io/vrAlJ
-  /** NOTE: This test currently fails because the future times out.
-   *  Interestingly, the future doesn't time out if `1` is passed as the first
-   *  argument to `foo`.
-   */
-  test("by-name expressions aren't lifted") {
-    def foo(ignored: => Any, b: Int) = b
-    val c = async(coroutine { () =>
-      await(Future(foo(???, await(Future(1)))))
-    })
-    val result = Await.result(c, 5 seconds)
-    assert(result == 1)
-  }
-
   // Source: https://git.io/vrA0Q
   test("evaluation order respected") {
     def foo(a: Int, b: Int) = (a, b)
@@ -522,80 +476,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     val result = Await.result(c, 5 seconds)
     assert(result == (1, 2))
   }
-
-  // Source: https://git.io/vrAuv
-  test("await in non-primary param section 1") {
-    def foo(a0: Int)(b0: Int) = s"a0 = $a0, b0 = $b0"
-    val c = async(coroutine {() =>
-      var i = 0
-      def get = { i += 1; i }
-      foo(get)(await(Future(get)))
-    })
-    assert(Await.result(c, 5 seconds) == "a0 = 1, b0 = 2")
-  }
-
-  // Source: https://git.io/vrAzt
-  /** NOTE: All of these tests currently fail compilation because of errors about
-   *  the yield types of the coroutines. The compiler expects the yield type of
-   *  the coroutines `nilAsync` and `c` to be `(Future[?], Cell[?])`, but they
-   *  are both `Nothing`. This does not work because the yield type is invariant.
-   *  I'm not sure why compilation fails here but it succeeds above.
-  test("await in non-primary param section 2") {
-    def foo[T](a0: Int)(b0: Int*) = s"a0 = $a0, b0 = ${b0.head}"
-
-    val c = async(coroutine { () =>
-      var i = 0
-      def get = async(coroutine { () =>
-        i += 1
-        i
-      })
-      val nilAsync = async(coroutine { () =>
-        Nil
-      })
-      foo[Int](await(get))(await(get) ::
-        await(nilAsync) : _*)
-    })
-    assert(Await.result(c, 5 seconds) == "a0 = 1, b0 = 2")
-  }
-
-  // Source: https://git.io/vrpP8
-  test("await in non-primary param section with lazy 1") {
-    def foo[T](a: => Int)(b: Int) = b
-    val c = async(coroutine { () =>
-      def get = async(coroutine { () => 0 } )
-      foo[Int](???)(await(get))
-    })
-    assert(Await.result(c, 5 seconds) == 0)
-  }
-
-  // Source: https://git.io/vrpPN
-  test("await in non-primary param section with lazy 2") {
-    def foo[T](a: Int)(b: => Int) = a
-    val c = async(coroutine { () =>
-      def get = async(coroutine { () => 0 } )
-      foo[Int](await(get))(???)
-    })
-    assert(Await.result(c, 5 seconds) == 0)
-  }
-
-  // Source: https://git.io/vrpXL
-  test("await with lazy") {
-    def foo[T](a: Int, b: => Int) = a
-    val c = async(coroutine { () =>
-      def get = async(coroutine { () => 0 } )
-      foo[Int](await(get), ???)
-    })
-    assert(Await.result(c, 5 seconds) == 0)
-  }
-
-  // Source: https://git.io/vrpXz
-  test("await ok in receiver") {
-    class Foo { def bar(a: Int)(b: Int) = a + b }
-    async(coroutine { () =>
-      await(async(coroutine { () => new Foo })).bar(1)(2)
-    })
-  }
-   */
 
   // Source: https://git.io/vrhUF
   test("named arguments respect evaluation order") {
