@@ -308,35 +308,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(result == 103)
   }
 
-  // Source: https://git.io/vrA0Q
-  test("evaluation order respected") {
-    def foo(a: Int, b: Int) = (a, b)
-    val c = async(coroutine { () =>
-      var i = 0
-      def next(): Int = {
-        i += 1
-        i
-      }
-      foo(next(), await(Future(next())))
-    })
-    val result = Await.result(c, 5 seconds)
-    assert(result == (1, 2))
-  }
-
-  // Source: https://git.io/vrhUF
-  test("named arguments respect evaluation order") {
-    def foo(a: Int, b: Int) = (a, b)
-    val c = async(coroutine { () =>
-      var i = 0
-      def next() = {
-        i += 1;
-        i
-      }
-      foo(b = next(), a = await(Future(next())))
-    })
-    assert(Await.result(c, 5 seconds) == (2, 1))
-  }
-
   // Source: https://git.io/vrhTe
   test("named and default arguments respect evaluation order") {
     var i = 0
