@@ -230,7 +230,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   }
 
   // Source: https://git.io/vr7NZ
-  // NOTE: Need to look at this test's implementation. Might be done incorrectly.
   test("ticket 86 in scala/async-- using matched parameterized value class") {
     def doAThing(param: ParamWrapper[String]) = Future(None)
 
