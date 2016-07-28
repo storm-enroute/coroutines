@@ -227,7 +227,7 @@ trait AstCanonicalization[C <: Context] {
       val (bodydecls, bodyident) = canonicalize(body)
       val (exprdecls, exprident) = canonicalize(expr)
       val matchcases =
-        cases :+ cq"${pq"null"} =>" :+ cq"${pq"_"} => throw $exceptionvarname"
+        cases :+ cq"${pq"null"} => null" :+ cq"${pq"_"} => throw $exceptionvarname"
       val exceptionident = q"$exceptionvarname"
       val matchbody = q"$exceptionident match { case ..$matchcases }"
       typer.typeOf(matchbody) = typer.typeOf(tree)
