@@ -706,16 +706,4 @@ class WideValueTypesTest extends FunSuite with Matchers {
     assert(c.result == 1)
     assert(c.isCompleted)
   }
-
-  test("map should be able to have a return type that is different than the yield type") {
-    val rube = coroutine { () =>
-      yieldval("life")
-      yieldval("is")
-    }
-    val c = call(rube())
-    val lengths = c.map { string => string.length }
-    assert(lengths.size == 2)
-    assert(lengths(0) == 4)
-    assert(lengths(1) == 2)
-  }
 }

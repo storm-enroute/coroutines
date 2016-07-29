@@ -5,7 +5,6 @@ package org.coroutines
 import org.coroutines.common._
 import scala.annotation.tailrec
 import scala.annotation.unchecked.uncheckedVariance
-import scala.collection._
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
 import scala.util.Failure
@@ -299,40 +298,6 @@ object Coroutine {
       s"  valstackptr: ${$valstackptr}\n" +
       s"  valstack:    ${toStackString($valstack)}\n" +
       s">"
-    }
-
-    /** Apply `f` to each value yielded by the coroutine.
-     *
-     *  Exceptions seen when in calls to `tryValue` are only thrown if `hasException`.
-     *  This is so nothing fails if the coroutine pauses but does not yield a value. For
-     *  instance, this avoids exceptions from `yieldto` points.
-     *
-     *  @param f The function to apply to each value yielded by the coroutine
-     */
-    def foreach(f: (Y) => Unit) {
-      while (resume) {
-        tryValue match {
-          case Success(value) => f(value)
-          case Failure(exception) =>
-            if (hasException) throw exception
-        }
-      }
-    }
-
-    /** Apply `f` to each value yielded by the coroutine, and collect the results into
-     *  a `immutable.List[Z]`.
-     *
-     *  Internally, this calls `foreach`.
-     *
-     *  @param  `f` The function to apply to each value yielded by the coroutine
-     *  @return A `List` holding the results of the applications of `f`.
-     */
-    def map[@specialized Z](f: (Y) => Z): immutable.List[Z] = {
-      var resultList = immutable.Seq.empty[Z]
-      foreach { element =>
-        resultList = resultList :+ f(element)
-      }
-      resultList.toList
     }
   }
 

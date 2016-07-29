@@ -7,26 +7,25 @@ import scala.collection._
 
 
 
-object Enumerators {
-  // Map not used directly so that we can avoid a function call
-  def toList_0[@specialized Y, R](c: Coroutine._0[Y, R]): immutable.List[Y] = {
-    val instance = call(c())
-    var result = immutable.Seq.empty[Y]
-    instance foreach { element =>
-      result = result :+ element
-    }
-    result.toList
-  }
+// `Y` is the member type of the enumerator.
+trait Enumerator[@specialized Y] {
+  /** Apply `f` to each value yielded by the coroutine.
+   *
+   *  Exceptions seen when in calls to `tryValue` are only thrown if `hasException`.
+   *  This is so nothing fails if the coroutine pauses but does not yield a value. For
+   *  instance, this avoids exceptions from `yieldto` points.
+   *
+   *  @param f The function to apply to each value yielded by the coroutine
+   */
+  def foreach(f: (Y) => Unit)
 
-  def toIterator_0[@specialized Y, R](c: Coroutine._0[Y, R]): Iterator[Y] = {
-    toList_0(c).toIterator
-  }
-
-  def toCoroutine[@specialized Y](i: Iterator[Y]): Coroutine._0[Y, Unit] = {
-    coroutine { () =>
-      while (i.hasNext) {
-        yieldval(i.next)
-      }
-    }
-  }
+  /** Apply `f` to each value yielded by the coroutine, and collect the results into
+   *  a `immutable.List[Z]`.
+   *
+   *  Internally, this calls `foreach`.
+   *
+   *  @param  `f` The function to apply to each value yielded by the coroutine
+   *  @return A `List` holding the results of the applications of `f`.
+   */
+  def map[@specialized Z](f: (Y) => Z): immutable.List[Z]
 }
