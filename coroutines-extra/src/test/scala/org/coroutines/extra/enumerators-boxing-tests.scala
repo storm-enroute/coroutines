@@ -37,10 +37,10 @@ class EnumeratorsBoxingBench extends JBench.Forked[Long] {
   )
 
   @gen("sizes")
-  @benchmark("coroutines.extra.boxing.foreach")
+  @benchmark("coroutines.extra.boxing.applyInstance")
   @curve("coroutine")
   @ctx("noBoxingContext")
-  def foreachTest(size: Int) {
+  def applyInstanceTest(size: Int) {
     val id = coroutine { (n: Int) =>
       var i = 0
       while (i < n) {
@@ -50,27 +50,19 @@ class EnumeratorsBoxingBench extends JBench.Forked[Long] {
     }
     var i = 0
     val instance = call(id(size))
-    instance foreach { element =>
-      i += 1
-    }
+    val enumerator = Enumerator(instance)
   }
 
   @gen("sizes")
-  @benchmark("coroutines.extra.boxing.map")
+  @benchmark("coroutines.extra.boxing.applyCoroutine_0")
   @curve("coroutine")
   @ctx("noBoxingContext")
-  def mapTest(size: Int) {
-    val id = coroutine { (n: Int) =>
-      var i = 0
-      while (i < n) {
-        yieldval(i)
-        i += 1
-      }
+  def applyCoroutine_0Test(size: Int) {
+    val rube = coroutine { () =>
+      yieldval(1)
+      yieldval(2)
+      yieldval(3)
     }
-    var i = 0
-    val instance = call(id(size))
-    instance map { element: Int =>
-      i += 1
-    }
+    val enumerator = Enumerator(rube)
   }
 }
