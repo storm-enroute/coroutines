@@ -172,10 +172,29 @@ object Coroutine {
       $yield
     }
 
+    /** Returns whether or not the coroutine yielded a value.
+     *
+     *  This value can be accessed via `getValue`.
+     *
+     *  @return `true` if the coroutine yielded a value, `false` otherwise.
+     */
     final def hasValue: Boolean = $hasYield
 
+    /** Returns an `Option` instance wrapping the current value of the coroutine, if
+     *  any.
+     *
+     *  @return `Some(value)` if `hasValue`, `None` otherwise.
+     */
     final def getValue: Option[Y] = if (hasValue) Some(value) else None
 
+    /** Returns a `Try` instance wrapping this coroutine's value, if any.
+     *
+     *  The `Try` wraps either the current value of this coroutine or any exceptions
+     *  thrown when trying to get the value.
+     *
+     *  @return `Success(value)` if `value` does not throw an exception, or
+     *          a `Failure` instance if it does.
+     */
     final def tryValue: Try[Y] =
       try { Success(value) } catch { case t: Throwable => Failure(t) }
 
@@ -198,15 +217,35 @@ object Coroutine {
       $result
     }
 
+    /** Returns whether or not the coroutine completed without an exception.
+     *
+     *  @return `true` if the coroutine completed without an exception, `false`
+     *          otherwise.
+     */
     final def hasResult: Boolean = isCompleted && $exception == null
 
+    /** Returns an `Option` wrapping this coroutine's non-exception result, if any.
+     *
+     *  @return `Some(result)` if `hasResult`, `None` otherwise.
+     */
     final def getResult: Option[R] = if (hasResult) Some(result) else None
 
+    /** Returns a `Try` object wrapping either the successful result of this
+     *  coroutine or the exception that the coroutine threw.
+     *
+     *  @return A `Failure` instance if the coroutine has an exception,
+     *          `Try(result)` otherwise.
+     */
     final def tryResult: Try[R] = {
       if ($exception != null) Failure($exception)
       else Try(result)
     }
 
+    /** Returns whether or not the coroutine completed with an exception.
+     *
+     *  @return `true` iff `isCompleted` and the coroutine has a non-null
+     *          exception, `false` otherwise.
+     */
     final def hasException: Boolean = isCompleted && $exception != null
 
     /** Returns `false` iff the coroutine instance completed execution.
@@ -229,10 +268,19 @@ object Coroutine {
 
     /** Returns a string representation of the coroutine's state.
      *
+     *  Contains less information than `debugString`.
+     *
      *  @return A string describing the coroutine state.
      */
     override def toString = s"Coroutine.Instance<depth: ${$costackptr}, live: $isLive>"
 
+    /** Returns a string that describes the internal state of the coroutine.
+     *
+     *  Contains more information than `toString`.
+     *
+     *  @return A string containing information about the internal state of the
+     *          coroutine.
+     */
     final def debugString: String = {
       def toStackLength[T](stack: Array[T]) =
         if (stack != null) "${stack.length}" else "<uninitialized>"
