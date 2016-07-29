@@ -921,14 +921,20 @@ trait CfgGenerator[C <: Context] {
 
     def emit(cfg: Cfg)(implicit table: Table): Tree = {
       val cparam = table.names.coroutineParam
-      def patch(n: Node, chain: Chain): Node = {
+
+      /** Patches the CFG with declaration nodes and code block nodes to lift the scope.
+       *  Returns the patched node, and whether or not the exception check was added.
+       */
+      def patch(n: Node, chain: Chain, checkthrow: Option[Tree]): (Node, Boolean) = {
         val head = chain.info.tryuids match {
           case Some((tryuid, enduid)) =>
             cfg.allnodes(tryuid).copyWithoutSuccessors(chain)
           case None =>
             Node.CodeBlock(q"()", chain, table.newNodeUid())
         }
-        val decls = for {
+
+        // Compute declarations
+        var decls: Seq[Node] = for {
           ((sym, info), idx) <- chain.decls.zipWithIndex
           if mustLoadVar(sym, chain)
         } yield {
@@ -947,22 +953,33 @@ trait CfgGenerator[C <: Context] {
                 table.newNodeUid())
           }
         }
+
+        // Check if the exception check needs to be inserted at this point.
+        var checked = false
+        if (checkthrow.nonEmpty) chain.info.tryuids match {
+          case Some((tryuid, enduid)) =>
+            checked = true
+            val ch = Node.DefaultStatement(checkthrow.get, chain, table.newNodeUid())
+            decls = ch +: decls
+          case None =>
+        }
+
         (decls.foldLeft(head: Node) {
           (previous, current) =>
           previous.successor = Some(current)
           current
         }).successor = Some(n)
-        if (chain.parent == null) head else patch(head, chain.parent)
+
+        if (chain.parent == null) (head, checked)
+        else {
+          val ncheckthrow = if (checked) None else checkthrow
+          val (n, parentchecked) = patch(head, chain.parent, ncheckthrow)
+          (n, checked || parentchecked)
+        }
       }
 
-      // emit body
-      val startZipper = Zipper(null, Nil, trees => q"..$trees")
-      val patchedStart = patch(start, start.chain)
-      val bodyzipper = patchedStart.emitCode(startZipper, this)
-      val body = bodyzipper.result
-
-      // add exception check
-      val checkexception = {
+      // Prepare exception check.
+      val checkthrow = {
         val needcheck = cfg.subgraphs.exists {
           case (_, sub) if sub.exitSubgraphs.exists(_._2 eq this) =>
             sub.exitSubgraphs.find(_._2 eq this).get._1 match {
@@ -986,10 +1003,16 @@ trait CfgGenerator[C <: Context] {
         }
       }
 
-      // wrap inside an exception
+      // Emit body. Note that the exception check must be pushed to innermost try-block.
+      val startZipper = Zipper(null, Nil, trees => q"..$trees")
+      val (patchedStart, checked) = patch(start, start.chain, Some(checkthrow))
+      val bodyzipper = patchedStart.emitCode(startZipper, this)
+      val body = bodyzipper.result
+
+      // Wrap inside an exception.
       q"""
         try {
-          $checkexception
+          ${if (checked) q"()" else checkthrow}
           $body
         } catch {
           case t: _root_.java.lang.Throwable =>

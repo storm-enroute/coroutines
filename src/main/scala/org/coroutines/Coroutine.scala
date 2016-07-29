@@ -187,8 +187,10 @@ object Coroutine {
      */
     final def getValue: Option[Y] = if (hasValue) Some(value) else None
 
-    /** Returns a `Try` instance wrapping either the current value of this coroutine
-     *  or any exceptions thrown when trying to get the value.
+    /** Returns a `Try` instance wrapping this coroutine's value, if any.
+     *
+     *  The `Try` wraps either the current value of this coroutine or any exceptions
+     *  thrown when trying to get the value.
      *
      *  @return `Success(value)` if `value` does not throw an exception, or
      *          a `Failure` instance if it does.
@@ -222,8 +224,7 @@ object Coroutine {
      */
     final def hasResult: Boolean = isCompleted && $exception == null
 
-    /** Returns an `Option` instance wrapping this coroutine's non-exception result, if
-     *  any.
+    /** Returns an `Option` wrapping this coroutine's non-exception result, if any.
      *
      *  @return `Some(result)` if `hasResult`, `None` otherwise.
      */
@@ -273,8 +274,7 @@ object Coroutine {
      */
     override def toString = s"Coroutine.Instance<depth: ${$costackptr}, live: $isLive>"
 
-    /** Returns a string containing information about the internal state of the
-     *  coroutine.
+    /** Returns a string that describes the internal state of the coroutine.
      *
      *  Contains more information than `toString`.
      *

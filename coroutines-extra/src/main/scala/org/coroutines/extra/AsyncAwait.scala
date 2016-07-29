@@ -37,10 +37,10 @@ object AsyncAwait {
 
   /** Calls `body`, blocking on any calls to `await`.
    *
-   *  @param  body A coroutine to be invoked.
-   *  @return A `Future` wrapping the result of the coroutine. The future fails
-   *          if `body.hasException` or if one of `body`'s yielded tuples
-   *          has a failing future.
+   *  @param body  A coroutine to be invoked.
+   *  @return      A `Future` wrapping the result of the coroutine. The future fails
+   *               if `body` throws an exception or one of the `await`s takes a failed
+   *               future.
    */
   def asyncCall[Y, R](body: ~~~>[Future[Y], R]): Future[R] = {
     val c = call(body())
@@ -53,11 +53,12 @@ object AsyncAwait {
         }
       } else {
         val awaitedFuture = c.value
-        awaitedFuture onComplete {
-          case Success(result) =>
-            loop()
-          case Failure(exception) =>
-            p.failure(exception)
+        if (awaitedFuture.isCompleted) {
+          loop()
+        } else {
+          awaitedFuture onComplete {
+            case _ => loop()
+          }
         }
       }
     }
@@ -67,8 +68,8 @@ object AsyncAwait {
 
   /** Wraps `body` inside a coroutine and asynchronously invokes it using `asyncMacro`.
    *
-   *  @param  body The block of code to wrap inside an asynchronous coroutine.
-   *  @return A `Future` wrapping the result of `body`.
+   *  @param body  The block of code to wrap inside an asynchronous coroutine.
+   *  @return      A `Future` wrapping the result of `body`.
    */
   def async[Y, R](body: =>R): Future[R] = macro asyncMacro[Y, R]
 
@@ -76,9 +77,9 @@ object AsyncAwait {
    *
    *  Wraps `body` inside a coroutine and calls `asyncCall`.
    *
-   *  @param  body The function to be wrapped in a coroutine.
-   *  @return A tree that contains an invocation of `asyncCall` on a coroutine
-   *          with `body` as its body.
+   *  @param body  The function to be wrapped in a coroutine.
+   *  @return      A tree that contains an invocation of `asyncCall` on a coroutine
+   *               with `body` as its body.
    */
   def asyncMacro[Y, R](c: Context)(body: c.Tree): c.Tree = {
     import c.universe._
