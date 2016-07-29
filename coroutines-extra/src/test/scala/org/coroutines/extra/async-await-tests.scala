@@ -88,14 +88,23 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(exception.getMessage == errorMessage)
   }
 
-  test("error handling test 3") {
-    intercept[AsyncAwait.YieldInsideAsyncException[_]] {
-      val future = AsyncAwait.async {
-        yieldval("hubba")
-        AsyncAwait.await(Future("dog"))
-      }
-      Await.result(future, 1 seconds)
+  test("no yields allowed inside async statements 1") {
+    """val future = AsyncAwait.async {
+      yieldval("hubba")
+      Future(1)
+    }""" shouldNot compile
+  }
+
+  test("no yields allowed inside async statements 2") {
+    val c = coroutine { () =>
+      yieldval(0)
     }
+    val instance = call(c())
+
+    """val future = AsyncAwait.async {
+      yieldto(instance)
+      Future(1)
+    }""" shouldNot compile
   }
 
   /** Source: https://git.io/vowde
