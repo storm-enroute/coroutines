@@ -54,20 +54,10 @@ object AsyncAwait {
       } else {
         val awaitedFuture = c.value
         if (awaitedFuture.isCompleted) {
-          awaitedFuture.value match {
-            case Some(Success(result)) =>
-              loop()
-            case Some(Failure(exception)) =>
-              p.failure(exception)
-            case None =>
-              sys.error("Awaited future completed but had no value")
-          }
+          loop()
         } else {
           awaitedFuture onComplete {
-            case Success(result) =>
-              loop()
-            case Failure(exception) =>
-              p.failure(exception)
+            case _ => loop()
           }
         }
       }

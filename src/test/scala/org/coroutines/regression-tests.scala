@@ -214,4 +214,25 @@ class RegressionTest extends FunSuite with Matchers {
       }
     }
   }
+
+  test("must catch exception passed from a direct call") {
+    val buggy = coroutine { () =>
+      throw new Exception
+    }
+    val catchy = coroutine { () =>
+      var result = "initial value"
+      try {
+        buggy()
+        "not ok..."
+      } catch {
+        case e: Exception =>
+          result = "caught!"
+      }
+      result
+    }
+
+    val c = call(catchy())
+    assert(!c.resume)
+    assert(c.result == "caught!")
+  }
 }

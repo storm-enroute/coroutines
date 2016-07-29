@@ -224,8 +224,7 @@ object Coroutine {
      */
     final def hasResult: Boolean = isCompleted && $exception == null
 
-    /** Returns an `Option` instance wrapping this coroutine's non-exception result, if
-     *  any.
+    /** Returns an `Option` wrapping this coroutine's non-exception result, if any.
      *
      *  @return `Some(result)` if `hasResult`, `None` otherwise.
      */
