@@ -18,9 +18,19 @@ class EnumeratorsTest extends FunSuite with Matchers {
   test("enumerator creation from coroutine instance") {
     val instance = call(rube())
     val enumerator = Enumerator(instance)
+    assert(enumerator.hasNext())
+    assert(enumerator.next == 1)
+    assert(enumerator.next == 2)
+    assert(enumerator.next == 3)
+    assert(!enumerator.hasNext)
   }
 
   test("enumerator creation from coroutine_0") {
     val enumerator = Enumerator(rube)
+    assert(enumerator.hasNext())
+    assert(enumerator.next == 1)
+    assert(enumerator.next == 2)
+    assert(enumerator.next == 3)
+    assert(!enumerator.hasNext)
   }
 }
