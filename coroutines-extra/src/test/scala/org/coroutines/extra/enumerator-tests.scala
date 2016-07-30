@@ -33,4 +33,19 @@ class EnumeratorsTest extends FunSuite with Matchers {
     assert(enumerator.next == 3)
     assert(!enumerator.hasNext)
   }
+
+  test("enumerator should ignore return value of coroutine") {
+    val rubeWithReturn = coroutine { () =>
+      yieldval(1)
+      yieldval(2)
+      yieldval(3)
+      "foo"
+    }
+    val enumerator = Enumerator(rubeWithReturn)
+    assert(enumerator.hasNext())
+    assert(enumerator.next == 1)
+    assert(enumerator.next == 2)
+    assert(enumerator.next == 3)
+    assert(!enumerator.hasNext)
+  }
 }

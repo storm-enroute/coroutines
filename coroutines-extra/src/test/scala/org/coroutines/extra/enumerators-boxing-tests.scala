@@ -37,10 +37,10 @@ class EnumeratorsBoxingBench extends JBench.Forked[Long] {
   )
 
   @gen("sizes")
-  @benchmark("coroutines.extra.boxing.applyInstance")
+  @benchmark("coroutines.extra.boxing.apply.instance.noReturn")
   @curve("coroutine")
   @ctx("noBoxingContext")
-  def applyInstanceTest(size: Int) {
+  def applyInstanceTestNoReturn(size: Int) {
     val id = coroutine { (n: Int) =>
       var i = 0
       while (i < n) {
@@ -54,15 +54,64 @@ class EnumeratorsBoxingBench extends JBench.Forked[Long] {
   }
 
   @gen("sizes")
-  @benchmark("coroutines.extra.boxing.applyCoroutine_0")
+  @benchmark("coroutines.extra.boxing.apply.coroutine_0.noReturn")
   @curve("coroutine")
   @ctx("noBoxingContext")
-  def applyCoroutine_0Test(size: Int) {
+  def applyCoroutine_0TestNoReturn(size: Int) {
     val rube = coroutine { () =>
       yieldval(1)
       yieldval(2)
       yieldval(3)
     }
     val enumerator = Enumerator(rube)
+  }
+
+  @gen("sizes")
+  @benchmark("coroutines.extra.boxing.apply.instance.return")
+  @curve("coroutine")
+  @ctx("noBoxingContext")
+  def applyInstanceTestReturn(size: Int) {
+    val idDifferentReturnType = coroutine { (n: Int) =>
+      var i = 0
+      while (i < n) {
+        yieldval(i)
+        i += 1
+      }
+      "foo"
+    }
+
+    val idSameReturnType = coroutine { (n: Int) =>
+      var i = 0
+      while (i < n) {
+        yieldval(i)
+        i += 1
+      }
+      5
+    }
+
+    var i = 0
+    val foo = Enumerator(call(idDifferentReturnType(size)))
+    val bar = Enumerator(call(idSameReturnType(size)))
+  }
+
+  @gen("sizes")
+  @benchmark("coroutines.extra.boxing.apply.coroutine_0.return")
+  @curve("coroutine")
+  @ctx("noBoxingContext")
+  def applyCoroutine_0TestReturn(size: Int) {
+    val rubeDifferentReturnType = coroutine { () =>
+      yieldval(1)
+      yieldval(2)
+      yieldval(3)
+      "bar"
+    }
+    val rubeSameReturnType = coroutine { () =>
+      yieldval(1)
+      yieldval(2)
+      yieldval(3)
+      1
+    }
+    val foo = Enumerator(rubeDifferentReturnType)
+    val bar = Enumerator(rubeSameReturnType)
   }
 }
