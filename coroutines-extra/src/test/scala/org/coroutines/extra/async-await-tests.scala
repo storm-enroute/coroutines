@@ -88,6 +88,25 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(exception.getMessage == errorMessage)
   }
 
+  test("no yields allowed inside async statements 1") {
+    """val future = AsyncAwait.async {
+      yieldval("hubba")
+      Future(1)
+    }""" shouldNot compile
+  }
+
+  test("no yields allowed inside async statements 2") {
+    val c = coroutine { () =>
+      yieldval(0)
+    }
+    val instance = call(c())
+
+    """val future = AsyncAwait.async {
+      yieldto(instance)
+      Future(1)
+    }""" shouldNot compile
+  }
+
   /** Source: https://git.io/vowde
    *  Without the closing `()`, the compiler complains about expecting return
    *  type `Future[Unit]` but finding `Future[Nothing]`.
