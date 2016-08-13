@@ -7,7 +7,6 @@ import scala.annotation.unchecked.uncheckedVariance
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.{ reflectiveCalls, postfixOps }
 import scala.util.Success
 
 
@@ -309,25 +308,6 @@ class AsyncAwaitTest extends FunSuite with Matchers {
     assert(result == 103)
   }
 
-  // Source: https://git.io/vrFj3
-  test("nested await as bare expression") {
-    val c = async(coroutine { () =>
-      await(Future(await(Future("")).isEmpty))
-    })
-    val result = Await.result(c, 5 seconds)
-    assert(result == true)
-  }
-
-  // Source: https://git.io/vrAnM
-  test("nested await in block") {
-    val c = async(coroutine { () =>
-      ()
-      await(Future(await(Future("")).isEmpty))
-    })
-    val result = Await.result(c, 5 seconds)
-    assert(result == true)
-  }
-
   // Source: https://git.io/vrhTe
   test("named and default arguments respect evaluation order") {
     var i = 0
@@ -398,5 +378,20 @@ class AsyncAwaitTest extends FunSuite with Matchers {
       }
     })
     assert(Await.result(sign, 5 seconds) == 1.0)
+  }
+
+  test("compilation error in partial function") {
+    val c = coroutine { () =>
+      try {
+        sys.error("error")
+        await(Future("ho"))
+      } catch {
+        case e: RuntimeException => await(Future("oh"))
+        case _ => await(Future("ho"))
+      }
+      await(Future("oh"))
+    }
+    val future = async(c)
+    assert(Await.result(future, 1 seconds) == "oh")
   }
 }

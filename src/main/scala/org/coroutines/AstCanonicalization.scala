@@ -90,7 +90,7 @@ trait AstCanonicalization[C <: Context] {
       val localvarname = TermName(c.freshName("x"))
       val decls = List(
         q"var $localvarname = null.asInstanceOf[Boolean]",
-        q""" 
+        q"""
           ..$conddecls
           if ($condident) {
             ..$thendecls
@@ -170,7 +170,7 @@ trait AstCanonicalization[C <: Context] {
       // throw
       val (decls, ident) = canonicalize(expr)
       val ndecls = decls ++ List(q"throw $ident")
-      (ndecls, q"()")
+      (ndecls, q"throw $ident")
     case q"try $body catch { case ..$cases } finally $expr" =>
       // try
       val tpe = typer.typeOf(tree)
@@ -180,7 +180,7 @@ trait AstCanonicalization[C <: Context] {
       val (bodydecls, bodyident) = canonicalize(body)
       val (exprdecls, exprident) = canonicalize(expr)
       val matchcases =
-        cases :+ cq"${pq"null"} =>" :+ cq"${pq"_"} => throw $exceptionvarname"
+        cases :+ cq"${pq"null"} => null" :+ cq"${pq"_"} => throw $exceptionvarname"
       val exceptionident = q"$exceptionvarname"
       val matchbody = q"$exceptionident match { case ..$matchcases }"
       typer.typeOf(matchbody) = typer.typeOf(tree)
@@ -385,10 +385,14 @@ trait AstCanonicalization[C <: Context] {
       val (rhsdecls, rhsident) = canonicalize(rhs)
       val decls = rhsdecls ++ List(q"$mods var $v: $tpt = $rhsident")
       (decls, q"")
-    case q"$mods def $tname[..$tparams](...$paramss): $tpt = $expr" =>
+    case q"$mods def $tname[..$tparams](...$paramss): $tpt = $rhs" =>
       // method
-      new NestedContextValidator().traverse(tree)
-      (Nil, tree)
+      val decls = List(
+        q"""
+          $mods def $tname[..$tparams](...$paramss): $tpt = $rhs
+        """)
+      new NestedContextValidator().traverse(rhs)
+      (decls, q"")
     case q"$mods type $tpname[..$tparams] = $tpt" =>
       // type
       new NestedContextValidator().traverse(tree)
