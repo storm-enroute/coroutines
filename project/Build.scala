@@ -167,6 +167,7 @@ object CoroutinesBuild extends MechaRepoBuild {
       scalaVersion <<= coroutinesScalaVersion,
       crossScalaVersions <<= coroutinesCrossScalaVersions,
       libraryDependencies <++= (scalaVersion)(sv => extraDependencies(sv)),
+      testFrameworks += new TestFramework("org.scalameter.ScalaMeterFramework"),
       scalacOptions ++= Seq(
         "-deprecation",
         "-unchecked",
