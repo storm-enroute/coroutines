@@ -16,7 +16,8 @@ import scala.reflect.macros.whitebox.Context
  *  Takes a `Coroutine.Instance` over a `Coroutine` so that both the constructor is
  *  more general and so that an enumerator can be built from an in-progress coroutine.
  */
-class Enumerator[@specialized Y](instance: Coroutine.Instance[Y, _]) {
+class Enumerator[@specialized(Int, Long, Double) Y]
+  (instance: Coroutine.Instance[Y, _]) {
   private var _hasNext = instance.pull
 
   /** Return whether or not the enumerator has a next value.
