@@ -66,7 +66,22 @@ object AsyncAwait {
     p.future
   }
 
-  def validate[C <: Context](c: C)(body: c.Tree) {
+  /** Wraps `body` inside a coroutine and asynchronously invokes it using `asyncMacro`.
+   *
+   *  @param body  The block of code to wrap inside an asynchronous coroutine.
+   *  @return      A `Future` wrapping the result of `body`.
+   */
+  def async[Y, R](body: =>R): Future[R] = macro asyncMacro[Y, R]
+
+  /** Implements `async`.
+   *
+   *  Wraps `body` inside a coroutine and calls `asyncCall`.
+   *
+   *  @param body  The function to be wrapped in a coroutine.
+   *  @return      A tree that contains an invocation of `asyncCall` on a coroutine
+   *               with `body` as its body.
+   */
+  def asyncMacro[Y, R](c: Context)(body: c.Tree): c.Tree = {
     import c.universe._
 
     /** Ensures that no values are yielded inside the async block.
@@ -74,8 +89,6 @@ object AsyncAwait {
      *  It is similar to and shares functionality with
      *  [[org.coroutines.AstCanonicalization.NestedContextValidator]].
      *
-     *  @param typer  Holds the typings for the body of the coroutine. Can be generated
-     *                using `org.coroutines.common.ByTreeTyper`.
      */
     class NoYieldsValidator extends Traverser {
       // return type is the lub of the function return type and yield argument types
@@ -104,27 +117,6 @@ object AsyncAwait {
     }
 
     new NoYieldsValidator().traverse(body)
-  }
-
-  /** Wraps `body` inside a coroutine and asynchronously invokes it using `asyncMacro`.
-   *
-   *  @param body  The block of code to wrap inside an asynchronous coroutine.
-   *  @return      A `Future` wrapping the result of `body`.
-   */
-  def async[Y, R](body: =>R): Future[R] = macro asyncMacro[Y, R]
-
-  /** Implements `async`.
-   *
-   *  Wraps `body` inside a coroutine and calls `asyncCall`.
-   *
-   *  @param body  The function to be wrapped in a coroutine.
-   *  @return      A tree that contains an invocation of `asyncCall` on a coroutine
-   *               with `body` as its body.
-   */
-  def asyncMacro[Y, R](c: Context)(body: c.Tree): c.Tree = {
-    import c.universe._
-
-    validate(c)(body)
 
     q"""
        val c = coroutine { () =>
