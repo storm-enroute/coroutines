@@ -41,6 +41,7 @@ class Enumerator[@specialized(Int, Long, Double) Y]
   }
 }
 
+
 object Enumerator {
   def apply[Y](c: Coroutine.Instance[Y, _]) = new Enumerator(c.snapshot)
 
