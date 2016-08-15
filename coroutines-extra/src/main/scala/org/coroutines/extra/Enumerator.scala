@@ -4,6 +4,8 @@ package org.coroutines.extra
 
 import org.coroutines._
 import scala.collection._
+import scala.language.experimental.macros
+import scala.reflect.macros.whitebox.Context
 
 
 
@@ -42,4 +44,16 @@ object Enumerator {
   def apply[Y](c: Coroutine.Instance[Y, _]) = new Enumerator(c.snapshot)
 
   def apply[Y](c: Coroutine._0[Y, _]) = new Enumerator(call(c()))
+
+  def apply[Y, R](body: =>R): Enumerator[Y] = macro applyMacro[Y, R]
+
+  def applyMacro[Y, R](c: Context)(body: c.Tree): c.Tree = {
+    import c.universe._
+
+    q"""
+       Enumerator(coroutine { () =>
+         $body
+       })
+     """
+  }
 }

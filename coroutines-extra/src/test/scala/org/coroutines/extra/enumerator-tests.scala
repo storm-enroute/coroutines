@@ -53,6 +53,21 @@ class EnumeratorsTest extends FunSuite with Matchers {
     assert(!enumerator2.hasNext)
   }
 
+  test("enumerator creation from lambda function") {
+    val enumerator = Enumerator {
+      var i = 0
+      while (i < 5) {
+        yieldval(i)
+        i += 1
+      }
+    }
+    assert(enumerator.hasNext())
+    for (i <- 0 until 5) {
+      assert(enumerator.next == i)
+    }
+    assert(!enumerator.hasNext)
+  }
+
   test("enumerator should ignore return value of coroutine") {
     val rubeWithReturn = coroutine { () =>
       yieldval(1)
