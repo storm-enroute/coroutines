@@ -53,7 +53,7 @@ class EnumeratorsTest extends FunSuite with Matchers {
     assert(!enumerator2.hasNext)
   }
 
-  test("enumerator creation from lambda function") {
+  test("enumerator creation from code block") {
     val enumerator = Enumerator {
       var i = 0
       while (i < 5) {
