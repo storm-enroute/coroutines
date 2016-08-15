@@ -706,4 +706,32 @@ class WideValueTypesTest extends FunSuite with Matchers {
     assert(c.result == 1)
     assert(c.isCompleted)
   }
+
+  test("should be able to access thrown exceptions via `getException`") {
+    val failure = coroutine { () =>
+      sys.error("rats!")
+    }
+    val instance = call(failure())
+    assert(!instance.resume)
+    assert(instance.hasException)
+    instance.getException match {
+      case Some(exception) => assert(exception.getMessage() == "rats!")
+      case None => assert(false)
+    }
+  }
+
+  test("`getException` should return `None` when there is no exception") {
+    val simple = coroutine { () =>
+      yieldval(1)
+      2
+    }
+    val instance = call(simple())
+    assert(instance.getException == None)
+    assert(instance.resume)
+    assert(instance.value == 1)
+    assert(instance.getException == None)
+    assert(!instance.resume)
+    assert(instance.result == 2)
+    assert(instance.getException == None)
+  }
 }

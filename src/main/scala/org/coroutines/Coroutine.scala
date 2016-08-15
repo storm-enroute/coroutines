@@ -247,6 +247,16 @@ object Coroutine {
      */
     final def hasException: Boolean = isCompleted && $exception != null
 
+    /** Returns an `Option` object wrapping the exception thrown by this coroutine.
+     *
+     *  @return If `hasException`, a `Some` instance wrapping the exception thrown by
+     *          this coroutine. Otherwise, `None`.
+     */
+    final def getException: Option[Throwable] = {
+      if (hasException) Some($exception)
+      else None
+    }
+
     /** Returns `false` iff the coroutine instance completed execution.
      *
      *  This is true if there are either more yield statements or if the
