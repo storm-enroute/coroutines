@@ -66,14 +66,6 @@ object AsyncAwait {
     p.future
   }
 
-  /** Thrown by `NoYieldsValidator` if a value is yielded inside an `async` block.
-   *
-   *  @param position  Where a yield occurred inside an async block.
-   *  @param message   A description of the error.
-   */
-  class YieldInsideAsyncException[P](val position: P, val message: String)
-    extends RuntimeException
-
   def validate[C <: Context](c: C)(body: c.Tree) {
     import c.universe._
 
@@ -95,12 +87,12 @@ object AsyncAwait {
 
       override def traverse(tree: Tree): Unit = tree match {
         case q"$qual.yieldval[$_]($_)" if isCoroutinesPkg(qual) =>
-          throw new YieldInsideAsyncException[c.universe.Position](tree.pos,
+          c.abort(tree.pos,
             "The yieldval statement only be invoked directly inside the coroutine. " +
             "Nested classes, functions or for-comprehensions, should either use the " +
             "call statement or declare another coroutine.")
         case q"$qual.yieldto[$_]($_)" if isCoroutinesPkg(qual) =>
-          throw new YieldInsideAsyncException[c.universe.Position](tree.pos,
+          c.abort(tree.pos,
             "The yieldto statement only be invoked directly inside the coroutine. " +
             "Nested classes, functions or for-comprehensions, should either use the " +
             "call statement or declare another coroutine.")
@@ -132,13 +124,7 @@ object AsyncAwait {
   def asyncMacro[Y, R](c: Context)(body: c.Tree): c.Tree = {
     import c.universe._
 
-    try {
-      validate[Context](c)(body)
-    } catch {
-      case te: YieldInsideAsyncException[c.Position] =>
-        c.abort(te.position, te.message)
-      case re: RuntimeException => throw re
-    }
+    validate(c)(body)
 
     q"""
        val c = coroutine { () =>
