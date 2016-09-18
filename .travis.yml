@@ -2,7 +2,7 @@ language: scala
 scala:
   - "2.11.7"
 jdk:
-  - oraclejdk7
+  - oraclejdk8
 script:
   - sbt ++${TRAVIS_SCALA_VERSION} test
   - git clone https://github.com/storm-enroute/dev-tools.git ~/.dev-tools
