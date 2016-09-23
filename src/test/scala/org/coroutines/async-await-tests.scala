@@ -213,56 +213,56 @@ class AsyncAwaitTest extends FunSuite with Matchers {
   }
 
   // Source: https://git.io/vr7Nk
-  test("ticket 86 in scala/async-- using matched value class") {
-    def doAThing(param: IntWrapper) = Future(None)
+  // test("ticket 86 in scala/async-- using matched value class") {
+  //   def doAThing(param: IntWrapper) = Future(None)
 
-    val fut = AsyncAwaitTest.async(coroutine { () =>
-      Option(new IntWrapper("value!")) match {
-        case Some(valueHolder) =>
-          AsyncAwaitTest.await(Future(doAThing(valueHolder)))
-        case None =>
-          None
-      }
-    })
+  //   val fut = AsyncAwaitTest.async(coroutine { () =>
+  //     Option(new IntWrapper("value!")) match {
+  //       case Some(valueHolder) =>
+  //         AsyncAwaitTest.await(Future(doAThing(valueHolder)))
+  //       case None =>
+  //         None
+  //     }
+  //   })
 
-    val result = Await.result(fut, 5 seconds)
-    assert(result.asInstanceOf[Future[IntWrapper]].value == Some(Success(None)))
-  }
+  //   val result = Await.result(fut, 5 seconds)
+  //   assert(result.asInstanceOf[Future[IntWrapper]].value == Some(Success(None)))
+  // }
 
-  // Source: https://git.io/vr7NZ
-  test("ticket 86 in scala/async-- using matched parameterized value class") {
-    def doAThing(param: ParamWrapper[String]) = Future(None)
+  // // Source: https://git.io/vr7NZ
+  // test("ticket 86 in scala/async-- using matched parameterized value class") {
+  //   def doAThing(param: ParamWrapper[String]) = Future(None)
 
-    val fut = AsyncAwaitTest.async(coroutine { () =>
-      Option(new ParamWrapper("value!")) match {
-        case Some(valueHolder) =>
-          AsyncAwaitTest.await(Future(doAThing(valueHolder)))
-        case None =>
-          None
-      }
-    })
+  //   val fut = AsyncAwaitTest.async(coroutine { () =>
+  //     Option(new ParamWrapper("value!")) match {
+  //       case Some(valueHolder) =>
+  //         AsyncAwaitTest.await(Future(doAThing(valueHolder)))
+  //       case None =>
+  //         None
+  //     }
+  //   })
 
-    val result = Await.result(fut, 5 seconds)
-    assert(result.asInstanceOf[Future[ParamWrapper[String]]].value ==
-      Some(Success(None)))
-  }
+  //   val result = Await.result(fut, 5 seconds)
+  //   assert(result.asInstanceOf[Future[ParamWrapper[String]]].value ==
+  //     Some(Success(None)))
+  // }
 
-  // Source: https://git.io/vr7NW
-  test("ticket 86 in scala/async-- using private value class") {
-    def doAThing(param: PrivateWrapper) = Future(None)
+  // // Source: https://git.io/vr7NW
+  // test("ticket 86 in scala/async-- using private value class") {
+  //   def doAThing(param: PrivateWrapper) = Future(None)
 
-    val fut = AsyncAwaitTest.async(coroutine { () => 
-      Option(PrivateWrapper.Instance) match {
-        case Some(valueHolder) =>
-          AsyncAwaitTest.await(doAThing(valueHolder))
-        case None =>
-          None
-      }
-    })
+  //   val fut = AsyncAwaitTest.async(coroutine { () => 
+  //     Option(PrivateWrapper.Instance) match {
+  //       case Some(valueHolder) =>
+  //         AsyncAwaitTest.await(doAThing(valueHolder))
+  //       case None =>
+  //         None
+  //     }
+  //   })
 
-    val result = Await.result(fut, 5 seconds)
-    assert(result == None)
-  }
+  //   val result = Await.result(fut, 5 seconds)
+  //   assert(result == None)
+  // }
 
   // Source: https://git.io/vr7N8
   test("await of abstract type") {
