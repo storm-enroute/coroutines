@@ -3,6 +3,8 @@ scala:
   - "2.11.7"
 jdk:
   - oraclejdk8
+before_script:
+  - sudo chmod +x /usr/local/bin/sbt
 script:
   - sbt ++${TRAVIS_SCALA_VERSION} test
   - git clone https://github.com/storm-enroute/dev-tools.git ~/.dev-tools
